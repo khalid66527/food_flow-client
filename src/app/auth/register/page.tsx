@@ -2,6 +2,7 @@
 
 import React, { useState, useCallback, useEffect } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import {
   User,
   Mail,
@@ -16,6 +17,8 @@ import {
   CheckCircle2,
   AlertCircle,
   Check,
+  ArrowRight,
+  Sparkles,
 } from "lucide-react";
 import type {
   RegisterFormData,
@@ -25,8 +28,13 @@ import type {
   TouchedFields,
   PasswordStrength,
   FormFieldName,
+  RoleRedirectMap,
 } from "@/types/auth";
 
+// ---------------------------------------------------------------------------
+// Role configuration displayed in the public registration UI.
+// Admin is intentionally excluded — it must never appear here.
+// ---------------------------------------------------------------------------
 const ROLES: {
   value: PublicRole;
   label: string;
@@ -53,6 +61,19 @@ const ROLES: {
   },
 ];
 
+// Maps each public role to its post-registration dashboard route.
+const ROLE_REDIRECT_MAP: RoleRedirectMap = {
+  Customer: "/dashboard/customer",
+  "Restaurant Partner": "/dashboard/restaurant",
+  "Delivery Partner": "/dashboard/delivery",
+};
+
+// Seconds to wait before auto-redirecting after successful registration.
+const REDIRECT_COUNTDOWN_SECONDS = 5;
+
+// ---------------------------------------------------------------------------
+// Initial state
+// ---------------------------------------------------------------------------
 const INITIAL_FORM: RegisterFormData = {
   fullName: "",
   email: "",
@@ -71,6 +92,9 @@ const INITIAL_TOUCHED: TouchedFields = {
   confirmPassword: false,
 };
 
+// ---------------------------------------------------------------------------
+// Password strength helper
+// ---------------------------------------------------------------------------
 function getPasswordStrength(password: string): PasswordStrength {
   let score = 0;
   if (password.length >= 6) score++;
@@ -96,6 +120,9 @@ const STRENGTH_COLORS: Record<PasswordStrength, string> = {
   4: "bg-green-500",
 };
 
+// ---------------------------------------------------------------------------
+// Validation
+// ---------------------------------------------------------------------------
 function validateField(
   name: FormFieldName,
   form: RegisterFormData
@@ -149,6 +176,20 @@ function hasErrors(errors: RegisterFormErrors): boolean {
   return Object.values(errors).some(Boolean);
 }
 
+// ---------------------------------------------------------------------------
+// Mock registration handler — replace with Better Auth signUp() later.
+//
+// TODO (Better Auth integration):
+//   import { signUp } from "@/lib/auth-client";
+//   const response = await signUp.email({
+//     name: data.fullName,
+//     email: data.email,
+//     password: data.password,
+//     // phone & role stored via a separate API call or callback
+//   });
+//   if (response.error) throw new Error(response.error.message);
+//   return { success: true, userId: response.data.user.id };
+// ---------------------------------------------------------------------------
 function mockRegister(
   data: RegisterFormData
 ): Promise<MockRegisterResponse> {
@@ -170,6 +211,9 @@ function mockRegister(
   });
 }
 
+// ---------------------------------------------------------------------------
+// InputField — reusable, animated form field
+// ---------------------------------------------------------------------------
 function InputField({
   id,
   name,
@@ -180,6 +224,7 @@ function InputField({
   value,
   error,
   touched,
+  disabled,
   onChange,
   onBlur,
   trailing,
@@ -194,6 +239,7 @@ function InputField({
   value: string;
   error?: string;
   touched: boolean;
+  disabled: boolean;
   onChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
   onBlur: () => void;
   trailing?: React.ReactNode;
@@ -205,7 +251,9 @@ function InputField({
       <label
         htmlFor={id}
         className={`block text-sm font-semibold transition-colors duration-200 ${
-          showError ? "text-red-500" : "text-gray-700 group-focus-within:text-orange-600"
+          showError
+            ? "text-red-500"
+            : "text-gray-700 group-focus-within:text-orange-600"
         }`}
       >
         {label}
@@ -226,9 +274,10 @@ function InputField({
           value={value}
           onChange={onChange}
           onBlur={onBlur}
+          disabled={disabled}
           className={`w-full pl-10 ${
             trailing ? "pr-11" : "pr-4"
-          } py-3 rounded-xl border text-sm text-gray-900 placeholder:text-gray-400 outline-none transition-all duration-200 ease-out ${
+          } py-3 rounded-xl border text-sm text-gray-900 placeholder:text-gray-400 outline-none transition-all duration-200 ease-out disabled:opacity-50 disabled:cursor-not-allowed disabled:bg-gray-50 ${
             showError
               ? "border-red-300 focus:ring-2 focus:ring-red-500/20 focus:border-red-500 animate-shake"
               : "border-gray-200 hover:border-gray-300 focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 focus:shadow-[0_0_0_3px_rgba(249,115,22,0.08)]"
@@ -246,7 +295,12 @@ function InputField({
   );
 }
 
+// ===========================================================================
+// RegisterPage
+// ===========================================================================
 export default function RegisterPage() {
+  const router = useRouter();
+
   const [form, setForm] = useState<RegisterFormData>(INITIAL_FORM);
   const [errors, setErrors] = useState<RegisterFormErrors>({});
   const [touched, setTouched] = useState<TouchedFields>(INITIAL_TOUCHED);
@@ -256,13 +310,34 @@ export default function RegisterPage() {
   const [serverError, setServerError] = useState<string | null>(null);
   const [isSuccess, setIsSuccess] = useState(false);
   const [shakeSubmit, setShakeSubmit] = useState(false);
+  const [redirectCountdown, setRedirectCountdown] = useState(
+    REDIRECT_COUNTDOWN_SECONDS
+  );
 
+  // Shake animation reset
   useEffect(() => {
     if (shakeSubmit) {
       const timer = setTimeout(() => setShakeSubmit(false), 400);
       return () => clearTimeout(timer);
     }
   }, [shakeSubmit]);
+
+  // Auto-redirect countdown after successful registration
+  useEffect(() => {
+    if (!isSuccess || !form.role) return;
+
+    if (redirectCountdown <= 0) {
+      const destination = ROLE_REDIRECT_MAP[form.role as PublicRole];
+      router.push(destination);
+      return;
+    }
+
+    const timer = setTimeout(
+      () => setRedirectCountdown((prev) => prev - 1),
+      1000
+    );
+    return () => clearTimeout(timer);
+  }, [isSuccess, redirectCountdown, form.role, router]);
 
   const handleChange = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -294,7 +369,6 @@ export default function RegisterPage() {
   const handleBlur = useCallback(
     (name: FormFieldName) => {
       setTouched((prev) => ({ ...prev, [name]: true }));
-
       const fieldError = validateField(name, form);
       setErrors((prev) => ({ ...prev, [name]: fieldError }));
     },
@@ -334,10 +408,17 @@ export default function RegisterPage() {
       }
 
       setIsLoading(true);
+
       try {
+        // TODO (Better Auth integration):
+        // Replace mockRegister() with the real signUp call:
+        //   const { data, error } = await signUp.email({ ... });
+        //   if (error) throw new Error(error.message);
         const response = await mockRegister(form);
+
         if (response.success) {
           setIsSuccess(true);
+          setRedirectCountdown(REDIRECT_COUNTDOWN_SECONDS);
         } else {
           setServerError(response.message);
         }
@@ -352,36 +433,113 @@ export default function RegisterPage() {
 
   const passwordStrength = getPasswordStrength(form.password);
 
-  if (isSuccess) {
+  // -----------------------------------------------------------------------
+  // SUCCESS STATE — shown after registration
+  // -----------------------------------------------------------------------
+  if (isSuccess && form.role) {
+    const role = form.role as PublicRole;
+    const dashboardRoute = ROLE_REDIRECT_MAP[role];
+    const RoleIcon =
+      ROLES.find((r) => r.value === role)?.icon ?? ShoppingBag;
+
     return (
       <div className="min-h-[80vh] flex items-center justify-center px-4 py-12 bg-white">
-        <div className="max-w-md w-full text-center space-y-6 animate-scale-in">
-          <div className="w-20 h-20 mx-auto bg-orange-50 rounded-full flex items-center justify-center border-2 border-orange-100">
-            <CheckCircle2 className="w-10 h-10 text-orange-500" />
+        <div className="max-w-md w-full text-center space-y-7 animate-scale-in">
+          {/* Animated checkmark */}
+          <div className="relative w-20 h-20 mx-auto">
+            <div className="absolute inset-0 bg-orange-100 rounded-full animate-ping opacity-20" />
+            <div className="relative w-20 h-20 bg-orange-50 rounded-full flex items-center justify-center border-2 border-orange-100">
+              <CheckCircle2 className="w-10 h-10 text-orange-500" />
+            </div>
           </div>
+
+          {/* Headline */}
           <div className="space-y-2">
             <h1 className="text-2xl font-extrabold text-gray-900 tracking-tight">
-              Registration Complete!
+              Welcome to Food Flow!
             </h1>
             <p className="text-sm text-gray-500 leading-relaxed">
-              Your account has been created as a{" "}
-              <span className="font-semibold text-orange-600">
-                {form.role}
-              </span>
-              . Welcome to Food Flow, {form.fullName}!
+              Your account has been created successfully.
             </p>
           </div>
-          <Link
-            href="/auth/login"
-            className="inline-flex items-center justify-center gap-2 px-6 py-3 rounded-full bg-orange-500 text-white font-semibold text-sm shadow-lg shadow-orange-500/25 hover:bg-orange-600 hover:shadow-xl hover:shadow-orange-500/30 active:scale-95 transition-all duration-200"
-          >
-            Go to Login
-          </Link>
+
+          {/* User details card */}
+          <div className="bg-gray-50 rounded-2xl border border-gray-100 p-5 space-y-4 text-left">
+            <div className="flex items-center gap-3">
+              <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-orange-500 text-white shadow-md shadow-orange-500/25">
+                <RoleIcon className="h-5 w-5" />
+              </div>
+              <div>
+                <p className="text-sm font-semibold text-gray-900">
+                  {form.fullName}
+                </p>
+                <p className="text-xs text-gray-500">{form.email}</p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2 text-xs">
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-orange-100 text-orange-700 font-semibold">
+                <Sparkles className="h-3 w-3" />
+                {role}
+              </span>
+              <span className="text-gray-400">•</span>
+              <span className="text-gray-500">{form.phone}</span>
+            </div>
+          </div>
+
+          {/* Redirect countdown */}
+          <div className="space-y-3">
+            <p className="text-xs text-gray-400">
+              Redirecting to your{" "}
+              <span className="font-semibold text-gray-600">
+                {role.toLowerCase()} dashboard
+              </span>{" "}
+              in{" "}
+              <span className="font-bold text-orange-500 tabular-nums">
+                {redirectCountdown}
+              </span>{" "}
+              seconds…
+            </p>
+
+            {/* Progress bar */}
+            <div className="w-full h-1 bg-gray-100 rounded-full overflow-hidden">
+              <div
+                className="h-full bg-orange-500 rounded-full transition-all duration-1000 ease-linear"
+                style={{
+                  width: `${
+                    ((REDIRECT_COUNTDOWN_SECONDS - redirectCountdown) /
+                      REDIRECT_COUNTDOWN_SECONDS) *
+                    100
+                  }%`,
+                }}
+              />
+            </div>
+          </div>
+
+          {/* Actions */}
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-3 pt-2">
+            <Link
+              href={dashboardRoute}
+              className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-6 py-3 rounded-full bg-orange-500 text-white font-semibold text-sm shadow-lg shadow-orange-500/25 hover:bg-orange-600 hover:shadow-xl hover:shadow-orange-500/30 active:scale-95 transition-all duration-200"
+            >
+              Go to Dashboard
+              <ArrowRight className="h-4 w-4" />
+            </Link>
+            <Link
+              href="/auth/login"
+              className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-6 py-3 rounded-full border border-gray-200 text-gray-700 font-semibold text-sm hover:bg-gray-50 active:scale-95 transition-all duration-200"
+            >
+              Sign in Instead
+            </Link>
+          </div>
         </div>
       </div>
     );
   }
 
+  // -----------------------------------------------------------------------
+  // REGISTRATION FORM
+  // -----------------------------------------------------------------------
   return (
     <div className="min-h-[80vh] flex items-center justify-center px-4 py-12 bg-white">
       <div className="w-full max-w-lg space-y-8">
@@ -408,8 +566,9 @@ export default function RegisterPage() {
                   key={value}
                   type="button"
                   onClick={() => handleRoleSelect(value)}
+                  disabled={isLoading}
                   style={{ animationDelay: `${0.15 + index * 0.07}s` }}
-                  className={`relative flex flex-col items-center gap-3 p-5 rounded-2xl border-2 text-center animate-fade-in-up transition-all duration-200 ease-out ${
+                  className={`relative flex flex-col items-center gap-3 p-5 rounded-2xl border-2 text-center animate-fade-in-up transition-all duration-200 ease-out disabled:opacity-50 disabled:cursor-not-allowed ${
                     isActive
                       ? "border-orange-500 bg-orange-50 shadow-sm shadow-orange-500/10 scale-[1.02]"
                       : "border-gray-200 bg-white hover:border-orange-300 hover:bg-orange-50/40 hover:shadow-md hover:shadow-orange-500/5 hover:-translate-y-0.5 active:scale-[0.98]"
@@ -478,6 +637,7 @@ export default function RegisterPage() {
             value={form.fullName}
             error={errors.fullName}
             touched={touched.fullName}
+            disabled={isLoading}
             onChange={handleChange}
             onBlur={() => handleBlur("fullName")}
             style={{ animationDelay: "0.25s" }}
@@ -494,6 +654,7 @@ export default function RegisterPage() {
             value={form.email}
             error={errors.email}
             touched={touched.email}
+            disabled={isLoading}
             onChange={handleChange}
             onBlur={() => handleBlur("email")}
             style={{ animationDelay: "0.3s" }}
@@ -510,6 +671,7 @@ export default function RegisterPage() {
             value={form.phone}
             error={errors.phone}
             touched={touched.phone}
+            disabled={isLoading}
             onChange={handleChange}
             onBlur={() => handleBlur("phone")}
             style={{ animationDelay: "0.35s" }}
@@ -527,6 +689,7 @@ export default function RegisterPage() {
               value={form.password}
               error={errors.password}
               touched={touched.password}
+              disabled={isLoading}
               onChange={handleChange}
               onBlur={() => handleBlur("password")}
               style={{ animationDelay: "0.4s" }}
@@ -534,7 +697,8 @@ export default function RegisterPage() {
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-orange-500 active:scale-90 transition-all duration-150"
+                  disabled={isLoading}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-orange-500 active:scale-90 transition-all duration-150 disabled:opacity-40"
                   tabIndex={-1}
                 >
                   {showPassword ? (
@@ -589,6 +753,7 @@ export default function RegisterPage() {
             value={form.confirmPassword}
             error={errors.confirmPassword}
             touched={touched.confirmPassword}
+            disabled={isLoading}
             onChange={handleChange}
             onBlur={() => handleBlur("confirmPassword")}
             style={{ animationDelay: "0.45s" }}
@@ -596,7 +761,8 @@ export default function RegisterPage() {
               <button
                 type="button"
                 onClick={() => setShowConfirm(!showConfirm)}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-orange-500 active:scale-90 transition-all duration-150"
+                disabled={isLoading}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-orange-500 active:scale-90 transition-all duration-150 disabled:opacity-40"
                 tabIndex={-1}
               >
                 {showConfirm ? (
@@ -616,7 +782,8 @@ export default function RegisterPage() {
                 name="agreeToTerms"
                 checked={form.agreeToTerms}
                 onChange={handleChange}
-                className="mt-0.5 h-4 w-4 rounded border-gray-300 text-orange-500 focus:ring-orange-500/20 accent-orange-500 transition-transform duration-150 group-active:scale-90"
+                disabled={isLoading}
+                className="mt-0.5 h-4 w-4 rounded border-gray-300 text-orange-500 focus:ring-orange-500/20 accent-orange-500 transition-transform duration-150 group-active:scale-90 disabled:opacity-40"
               />
               <span className="text-sm text-gray-600 leading-snug">
                 I agree to the{" "}
@@ -663,7 +830,10 @@ export default function RegisterPage() {
         </form>
 
         {/* Footer */}
-        <p className="text-center text-sm text-gray-500 animate-fade-in-up" style={{ animationDelay: "0.5s" }}>
+        <p
+          className="text-center text-sm text-gray-500 animate-fade-in-up"
+          style={{ animationDelay: "0.5s" }}
+        >
           Already have an account?{" "}
           <Link
             href="/auth/login"

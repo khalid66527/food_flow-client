@@ -38,3 +38,5 @@ export interface RoleOption {
   description: string;
   icon: string;
 }
+
+export type RoleRedirectMap = Record<PublicRole, string>;
