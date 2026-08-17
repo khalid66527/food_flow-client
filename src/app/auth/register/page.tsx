@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useCallback } from "react";
 import Link from "next/link";
 import {
   User,
@@ -21,6 +21,9 @@ import type {
   RegisterFormErrors,
   MockRegisterResponse,
   PublicRole,
+  TouchedFields,
+  PasswordStrength,
+  FormFieldName,
 } from "@/types/auth";
 
 const ROLES: { value: PublicRole; label: string; icon: typeof Store }[] = [
@@ -39,48 +42,90 @@ const INITIAL_FORM: RegisterFormData = {
   agreeToTerms: false,
 };
 
-function validate(form: RegisterFormData): RegisterFormErrors {
-  const errors: RegisterFormErrors = {};
+const INITIAL_TOUCHED: TouchedFields = {
+  fullName: false,
+  email: false,
+  phone: false,
+  password: false,
+  confirmPassword: false,
+};
 
-  if (!form.fullName.trim()) {
-    errors.fullName = "Full name is required";
-  } else if (form.fullName.trim().length < 2) {
-    errors.fullName = "Name must be at least 2 characters";
+function getPasswordStrength(password: string): PasswordStrength {
+  let score = 0;
+  if (password.length >= 6) score++;
+  if (password.length >= 10) score++;
+  if (/[A-Z]/.test(password) && /[a-z]/.test(password)) score++;
+  if (/\d/.test(password)) score++;
+  return Math.min(score, 4) as PasswordStrength;
+}
+
+const STRENGTH_LABELS: Record<PasswordStrength, string> = {
+  0: "Too short",
+  1: "Weak",
+  2: "Fair",
+  3: "Good",
+  4: "Strong",
+};
+
+const STRENGTH_COLORS: Record<PasswordStrength, string> = {
+  0: "bg-gray-200",
+  1: "bg-red-400",
+  2: "bg-orange-400",
+  3: "bg-yellow-400",
+  4: "bg-green-500",
+};
+
+function validateField(
+  name: FormFieldName,
+  form: RegisterFormData
+): string | undefined {
+  switch (name) {
+    case "fullName":
+      if (!form.fullName.trim()) return "Full name is required";
+      if (form.fullName.trim().length < 2)
+        return "Name must be at least 2 characters";
+      return undefined;
+    case "email":
+      if (!form.email.trim()) return "Email is required";
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email))
+        return "Enter a valid email address";
+      return undefined;
+    case "phone":
+      if (!form.phone.trim()) return "Phone number is required";
+      if (!/^01[3-9]\d{8}$/.test(form.phone.replace(/\s/g, "")))
+        return "Enter a valid BD phone number (01XXXXXXXXX)";
+      return undefined;
+    case "password":
+      if (!form.password) return "Password is required";
+      if (form.password.length < 6)
+        return "Password must be at least 6 characters";
+      return undefined;
+    case "confirmPassword":
+      if (!form.confirmPassword) return "Please confirm your password";
+      if (form.password !== form.confirmPassword)
+        return "Passwords do not match";
+      return undefined;
+    default:
+      return undefined;
   }
+}
 
-  if (!form.email.trim()) {
-    errors.email = "Email is required";
-  } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) {
-    errors.email = "Enter a valid email address";
-  }
+function validateAll(form: RegisterFormData): RegisterFormErrors {
+  return {
+    fullName: validateField("fullName", form),
+    email: validateField("email", form),
+    phone: validateField("phone", form),
+    password: validateField("password", form),
+    confirmPassword: validateField("confirmPassword", form),
+    role: !form.role ? "Please select a role" : undefined,
+    agreeToTerms: !form.agreeToTerms
+      ? "You must agree to the terms"
+      : undefined,
+  };
+}
 
-  if (!form.phone.trim()) {
-    errors.phone = "Phone number is required";
-  } else if (!/^01[3-9]\d{8}$/.test(form.phone.replace(/\s/g, ""))) {
-    errors.phone = "Enter a valid BD phone number (01XXXXXXXXX)";
-  }
-
-  if (!form.password) {
-    errors.password = "Password is required";
-  } else if (form.password.length < 6) {
-    errors.password = "Password must be at least 6 characters";
-  }
-
-  if (!form.confirmPassword) {
-    errors.confirmPassword = "Please confirm your password";
-  } else if (form.password !== form.confirmPassword) {
-    errors.confirmPassword = "Passwords do not match";
-  }
-
-  if (!form.role) {
-    errors.role = "Please select a role";
-  }
-
-  if (!form.agreeToTerms) {
-    errors.agreeToTerms = "You must agree to the terms";
-  }
-
-  return errors;
+function hasErrors(errors: RegisterFormErrors): boolean {
+  return Object.values(errors).some(Boolean);
 }
 
 function mockRegister(
@@ -95,7 +140,6 @@ function mockRegister(
         password: data.password,
         role: data.role,
       });
-
       resolve({
         success: true,
         message: `Registration successful! Welcome ${data.fullName}.`,
@@ -105,61 +149,170 @@ function mockRegister(
   });
 }
 
+function InputField({
+  id,
+  name,
+  label,
+  type,
+  placeholder,
+  icon: Icon,
+  value,
+  error,
+  touched,
+  onChange,
+  onBlur,
+  trailing,
+}: {
+  id: string;
+  name: FormFieldName;
+  label: string;
+  type: string;
+  placeholder: string;
+  icon: typeof User;
+  value: string;
+  error?: string;
+  touched: boolean;
+  onChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
+  onBlur: () => void;
+  trailing?: React.ReactNode;
+}) {
+  const showError = touched && error;
+  return (
+    <div className="space-y-1.5">
+      <label
+        htmlFor={id}
+        className="block text-sm font-semibold text-gray-700"
+      >
+        {label}
+      </label>
+      <div className="relative">
+        <Icon
+          className={`absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 ${
+            showError ? "text-red-400" : "text-gray-400"
+          }`}
+        />
+        <input
+          id={id}
+          name={name}
+          type={type}
+          placeholder={placeholder}
+          value={value}
+          onChange={onChange}
+          onBlur={onBlur}
+          className={`w-full pl-10 ${
+            trailing ? "pr-11" : "pr-4"
+          } py-3 rounded-xl border text-sm text-gray-900 placeholder:text-gray-400 outline-none transition-all ${
+            showError
+              ? "border-red-300 focus:ring-2 focus:ring-red-500/20 focus:border-red-500"
+              : "border-gray-200 focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500"
+          }`}
+        />
+        {trailing}
+      </div>
+      {showError && (
+        <p className="flex items-center gap-1 text-xs text-red-500 mt-0.5">
+          <AlertCircle className="h-3 w-3 shrink-0" />
+          {error}
+        </p>
+      )}
+    </div>
+  );
+}
+
 export default function RegisterPage() {
   const [form, setForm] = useState<RegisterFormData>(INITIAL_FORM);
   const [errors, setErrors] = useState<RegisterFormErrors>({});
+  const [touched, setTouched] = useState<TouchedFields>(INITIAL_TOUCHED);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [serverError, setServerError] = useState<string | null>(null);
   const [isSuccess, setIsSuccess] = useState(false);
 
-  const handleChange = (
-    e: React.ChangeEvent<HTMLInputElement>
-  ) => {
-    const { name, value, type, checked } = e.target;
-    setForm((prev) => ({
-      ...prev,
-      [name]: type === "checkbox" ? checked : value,
-    }));
+  const handleChange = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      const { name, value, type, checked } = e.target;
 
-    if (errors[name as keyof RegisterFormErrors]) {
-      setErrors((prev) => ({ ...prev, [name]: undefined }));
-    }
-    setServerError(null);
-  };
-
-  const handleRoleSelect = (role: PublicRole) => {
-    setForm((prev) => ({ ...prev, role }));
-    if (errors.role) {
-      setErrors((prev) => ({ ...prev, role: undefined }));
-    }
-  };
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setServerError(null);
-
-    const validationErrors = validate(form);
-    if (Object.keys(validationErrors).length > 0) {
-      setErrors(validationErrors);
-      return;
-    }
-
-    setIsLoading(true);
-    try {
-      const response = await mockRegister(form);
-      if (response.success) {
-        setIsSuccess(true);
-      } else {
-        setServerError(response.message);
+      if (name === "agreeToTerms") {
+        setForm((prev) => ({ ...prev, agreeToTerms: checked }));
+        if (errors.agreeToTerms) {
+          setErrors((prev) => ({ ...prev, agreeToTerms: undefined }));
+        }
+        return;
       }
-    } catch {
-      setServerError("Something went wrong. Please try again.");
-    } finally {
-      setIsLoading(false);
-    }
-  };
+
+      setForm((prev) => ({ ...prev, [name]: value }));
+
+      if (touched[name as keyof TouchedFields]) {
+        const fieldError = validateField(
+          name as FormFieldName,
+          { ...form, [name]: value }
+        );
+        setErrors((prev) => ({ ...prev, [name]: fieldError }));
+      }
+
+      setServerError(null);
+    },
+    [form, errors, touched]
+  );
+
+  const handleBlur = useCallback(
+    (name: FormFieldName) => {
+      setTouched((prev) => ({ ...prev, [name]: true }));
+
+      const fieldError = validateField(name, form);
+      setErrors((prev) => ({ ...prev, [name]: fieldError }));
+    },
+    [form]
+  );
+
+  const handleRoleSelect = useCallback(
+    (role: PublicRole) => {
+      setForm((prev) => ({ ...prev, role }));
+      if (errors.role) {
+        setErrors((prev) => ({ ...prev, role: undefined }));
+      }
+    },
+    [errors.role]
+  );
+
+  const handleSubmit = useCallback(
+    async (e: React.FormEvent) => {
+      e.preventDefault();
+      setServerError(null);
+
+      const allTouched: TouchedFields = {
+        fullName: true,
+        email: true,
+        phone: true,
+        password: true,
+        confirmPassword: true,
+      };
+      setTouched(allTouched);
+
+      const validationErrors = validateAll(form);
+      setErrors(validationErrors);
+
+      if (hasErrors(validationErrors)) return;
+
+      setIsLoading(true);
+      try {
+        const response = await mockRegister(form);
+        if (response.success) {
+          setIsSuccess(true);
+        } else {
+          setServerError(response.message);
+        }
+      } catch {
+        setServerError("Something went wrong. Please try again.");
+      } finally {
+        setIsLoading(false);
+      }
+    },
+    [form]
+  );
+
+  const passwordStrength = getPasswordStrength(form.password);
 
   if (isSuccess) {
     return (
@@ -174,8 +327,10 @@ export default function RegisterPage() {
             </h1>
             <p className="text-sm text-gray-500 leading-relaxed">
               Your account has been created as a{" "}
-              <span className="font-semibold text-orange-600">{form.role}</span>.
-              {` `}Welcome to Food Flow, {form.fullName}!
+              <span className="font-semibold text-orange-600">
+                {form.role}
+              </span>
+              . Welcome to Food Flow, {form.fullName}!
             </p>
           </div>
           <Link
@@ -221,9 +376,7 @@ export default function RegisterPage() {
               >
                 <Icon
                   className={`h-6 w-6 ${
-                    form.role === value
-                      ? "text-orange-500"
-                      : "text-gray-400"
+                    form.role === value ? "text-orange-500" : "text-gray-400"
                   }`}
                 />
                 <span className="text-xs font-semibold text-center leading-tight">
@@ -234,7 +387,7 @@ export default function RegisterPage() {
           </div>
           {errors.role && (
             <p className="flex items-center gap-1 text-xs text-red-500">
-              <AlertCircle className="h-3 w-3" />
+              <AlertCircle className="h-3 w-3 shrink-0" />
               {errors.role}
             </p>
           )}
@@ -250,168 +403,126 @@ export default function RegisterPage() {
           )}
 
           {/* Full Name */}
-          <div className="space-y-1.5">
-            <label
-              htmlFor="fullName"
-              className="block text-sm font-semibold text-gray-700"
-            >
-              Full Name
-            </label>
-            <div className="relative">
-              <User className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
-              <input
-                id="fullName"
-                name="fullName"
-                type="text"
-                placeholder="John Doe"
-                value={form.fullName}
-                onChange={handleChange}
-                className={`w-full pl-10 pr-4 py-3 rounded-xl border text-sm text-gray-900 placeholder:text-gray-400 outline-none transition-all ${
-                  errors.fullName
-                    ? "border-red-300 focus:ring-2 focus:ring-red-500/20 focus:border-red-500"
-                    : "border-gray-200 focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500"
-                }`}
-              />
-            </div>
-            {errors.fullName && (
-              <p className="flex items-center gap-1 text-xs text-red-500">
-                <AlertCircle className="h-3 w-3" />
-                {errors.fullName}
-              </p>
-            )}
-          </div>
+          <InputField
+            id="fullName"
+            name="fullName"
+            label="Full Name"
+            type="text"
+            placeholder="John Doe"
+            icon={User}
+            value={form.fullName}
+            error={errors.fullName}
+            touched={touched.fullName}
+            onChange={handleChange}
+            onBlur={() => handleBlur("fullName")}
+          />
 
           {/* Email */}
-          <div className="space-y-1.5">
-            <label
-              htmlFor="email"
-              className="block text-sm font-semibold text-gray-700"
-            >
-              Email Address
-            </label>
-            <div className="relative">
-              <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
-              <input
-                id="email"
-                name="email"
-                type="email"
-                placeholder="you@example.com"
-                value={form.email}
-                onChange={handleChange}
-                className={`w-full pl-10 pr-4 py-3 rounded-xl border text-sm text-gray-900 placeholder:text-gray-400 outline-none transition-all ${
-                  errors.email
-                    ? "border-red-300 focus:ring-2 focus:ring-red-500/20 focus:border-red-500"
-                    : "border-gray-200 focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500"
-                }`}
-              />
-            </div>
-            {errors.email && (
-              <p className="flex items-center gap-1 text-xs text-red-500">
-                <AlertCircle className="h-3 w-3" />
-                {errors.email}
-              </p>
-            )}
-          </div>
+          <InputField
+            id="email"
+            name="email"
+            label="Email Address"
+            type="email"
+            placeholder="you@example.com"
+            icon={Mail}
+            value={form.email}
+            error={errors.email}
+            touched={touched.email}
+            onChange={handleChange}
+            onBlur={() => handleBlur("email")}
+          />
 
           {/* Phone */}
-          <div className="space-y-1.5">
-            <label
-              htmlFor="phone"
-              className="block text-sm font-semibold text-gray-700"
-            >
-              Phone Number
-            </label>
-            <div className="relative">
-              <Phone className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
-              <input
-                id="phone"
-                name="phone"
-                type="tel"
-                placeholder="01XXXXXXXXX"
-                value={form.phone}
-                onChange={handleChange}
-                className={`w-full pl-10 pr-4 py-3 rounded-xl border text-sm text-gray-900 placeholder:text-gray-400 outline-none transition-all ${
-                  errors.phone
-                    ? "border-red-300 focus:ring-2 focus:ring-red-500/20 focus:border-red-500"
-                    : "border-gray-200 focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500"
-                }`}
-              />
-            </div>
-            {errors.phone && (
-              <p className="flex items-center gap-1 text-xs text-red-500">
-                <AlertCircle className="h-3 w-3" />
-                {errors.phone}
-              </p>
-            )}
-          </div>
+          <InputField
+            id="phone"
+            name="phone"
+            label="Phone Number"
+            type="tel"
+            placeholder="01XXXXXXXXX"
+            icon={Phone}
+            value={form.phone}
+            error={errors.phone}
+            touched={touched.phone}
+            onChange={handleChange}
+            onBlur={() => handleBlur("phone")}
+          />
 
           {/* Password */}
           <div className="space-y-1.5">
-            <label
-              htmlFor="password"
-              className="block text-sm font-semibold text-gray-700"
-            >
-              Password
-            </label>
-            <div className="relative">
-              <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
-              <input
-                id="password"
-                name="password"
-                type={showPassword ? "text" : "password"}
-                placeholder="Min. 6 characters"
-                value={form.password}
-                onChange={handleChange}
-                className={`w-full pl-10 pr-11 py-3 rounded-xl border text-sm text-gray-900 placeholder:text-gray-400 outline-none transition-all ${
-                  errors.password
-                    ? "border-red-300 focus:ring-2 focus:ring-red-500/20 focus:border-red-500"
-                    : "border-gray-200 focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500"
-                }`}
-              />
-              <button
-                type="button"
-                onClick={() => setShowPassword(!showPassword)}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
-                tabIndex={-1}
-              >
-                {showPassword ? (
-                  <EyeOff className="h-4 w-4" />
-                ) : (
-                  <Eye className="h-4 w-4" />
-                )}
-              </button>
-            </div>
-            {errors.password && (
-              <p className="flex items-center gap-1 text-xs text-red-500">
-                <AlertCircle className="h-3 w-3" />
-                {errors.password}
-              </p>
+            <InputField
+              id="password"
+              name="password"
+              label="Password"
+              type={showPassword ? "text" : "password"}
+              placeholder="Min. 6 characters"
+              icon={Lock}
+              value={form.password}
+              error={errors.password}
+              touched={touched.password}
+              onChange={handleChange}
+              onBlur={() => handleBlur("password")}
+              trailing={
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
+                  tabIndex={-1}
+                >
+                  {showPassword ? (
+                    <EyeOff className="h-4 w-4" />
+                  ) : (
+                    <Eye className="h-4 w-4" />
+                  )}
+                </button>
+              }
+            />
+
+            {/* Password Strength Indicator */}
+            {form.password.length > 0 && (
+              <div className="space-y-1.5 pt-1">
+                <div className="flex gap-1">
+                  {([0, 1, 2, 3] as const).map((i) => (
+                    <div
+                      key={i}
+                      className={`h-1 flex-1 rounded-full transition-colors duration-300 ${
+                        i < passwordStrength
+                          ? STRENGTH_COLORS[passwordStrength]
+                          : "bg-gray-200"
+                      }`}
+                    />
+                  ))}
+                </div>
+                <p
+                  className={`text-xs font-medium ${
+                    passwordStrength <= 1
+                      ? "text-red-500"
+                      : passwordStrength === 2
+                      ? "text-orange-500"
+                      : passwordStrength === 3
+                      ? "text-yellow-600"
+                      : "text-green-600"
+                  }`}
+                >
+                  {STRENGTH_LABELS[passwordStrength]}
+                </p>
+              </div>
             )}
           </div>
 
           {/* Confirm Password */}
-          <div className="space-y-1.5">
-            <label
-              htmlFor="confirmPassword"
-              className="block text-sm font-semibold text-gray-700"
-            >
-              Confirm Password
-            </label>
-            <div className="relative">
-              <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
-              <input
-                id="confirmPassword"
-                name="confirmPassword"
-                type={showConfirm ? "text" : "password"}
-                placeholder="Re-enter your password"
-                value={form.confirmPassword}
-                onChange={handleChange}
-                className={`w-full pl-10 pr-11 py-3 rounded-xl border text-sm text-gray-900 placeholder:text-gray-400 outline-none transition-all ${
-                  errors.confirmPassword
-                    ? "border-red-300 focus:ring-2 focus:ring-red-500/20 focus:border-red-500"
-                    : "border-gray-200 focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500"
-                }`}
-              />
+          <InputField
+            id="confirmPassword"
+            name="confirmPassword"
+            label="Confirm Password"
+            type={showConfirm ? "text" : "password"}
+            placeholder="Re-enter your password"
+            icon={Lock}
+            value={form.confirmPassword}
+            error={errors.confirmPassword}
+            touched={touched.confirmPassword}
+            onChange={handleChange}
+            onBlur={() => handleBlur("confirmPassword")}
+            trailing={
               <button
                 type="button"
                 onClick={() => setShowConfirm(!showConfirm)}
@@ -424,14 +535,8 @@ export default function RegisterPage() {
                   <Eye className="h-4 w-4" />
                 )}
               </button>
-            </div>
-            {errors.confirmPassword && (
-              <p className="flex items-center gap-1 text-xs text-red-500">
-                <AlertCircle className="h-3 w-3" />
-                {errors.confirmPassword}
-              </p>
-            )}
-          </div>
+            }
+          />
 
           {/* Terms Checkbox */}
           <div className="space-y-1">
@@ -462,7 +567,7 @@ export default function RegisterPage() {
             </label>
             {errors.agreeToTerms && (
               <p className="flex items-center gap-1 text-xs text-red-500">
-                <AlertCircle className="h-3 w-3" />
+                <AlertCircle className="h-3 w-3 shrink-0" />
                 {errors.agreeToTerms}
               </p>
             )}
