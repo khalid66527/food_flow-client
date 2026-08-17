@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useCallback } from "react";
+import React, { useState, useCallback, useEffect } from "react";
 import Link from "next/link";
 import {
   User,
@@ -183,6 +183,7 @@ function InputField({
   onChange,
   onBlur,
   trailing,
+  style,
 }: {
   id: string;
   name: FormFieldName;
@@ -196,20 +197,25 @@ function InputField({
   onChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
   onBlur: () => void;
   trailing?: React.ReactNode;
+  style?: React.CSSProperties;
 }) {
   const showError = touched && error;
   return (
-    <div className="space-y-1.5">
+    <div className="space-y-1.5 group" style={style}>
       <label
         htmlFor={id}
-        className="block text-sm font-semibold text-gray-700"
+        className={`block text-sm font-semibold transition-colors duration-200 ${
+          showError ? "text-red-500" : "text-gray-700 group-focus-within:text-orange-600"
+        }`}
       >
         {label}
       </label>
       <div className="relative">
         <Icon
-          className={`absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 ${
-            showError ? "text-red-400" : "text-gray-400"
+          className={`absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 transition-colors duration-200 ${
+            showError
+              ? "text-red-400"
+              : "text-gray-400 group-focus-within:text-orange-500"
           }`}
         />
         <input
@@ -222,16 +228,16 @@ function InputField({
           onBlur={onBlur}
           className={`w-full pl-10 ${
             trailing ? "pr-11" : "pr-4"
-          } py-3 rounded-xl border text-sm text-gray-900 placeholder:text-gray-400 outline-none transition-all ${
+          } py-3 rounded-xl border text-sm text-gray-900 placeholder:text-gray-400 outline-none transition-all duration-200 ease-out ${
             showError
-              ? "border-red-300 focus:ring-2 focus:ring-red-500/20 focus:border-red-500"
-              : "border-gray-200 focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500"
+              ? "border-red-300 focus:ring-2 focus:ring-red-500/20 focus:border-red-500 animate-shake"
+              : "border-gray-200 hover:border-gray-300 focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 focus:shadow-[0_0_0_3px_rgba(249,115,22,0.08)]"
           }`}
         />
         {trailing}
       </div>
       {showError && (
-        <p className="flex items-center gap-1 text-xs text-red-500 mt-0.5">
+        <p className="flex items-center gap-1 text-xs text-red-500 mt-0.5 animate-slide-down">
           <AlertCircle className="h-3 w-3 shrink-0" />
           {error}
         </p>
@@ -249,6 +255,14 @@ export default function RegisterPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [serverError, setServerError] = useState<string | null>(null);
   const [isSuccess, setIsSuccess] = useState(false);
+  const [shakeSubmit, setShakeSubmit] = useState(false);
+
+  useEffect(() => {
+    if (shakeSubmit) {
+      const timer = setTimeout(() => setShakeSubmit(false), 400);
+      return () => clearTimeout(timer);
+    }
+  }, [shakeSubmit]);
 
   const handleChange = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -314,7 +328,10 @@ export default function RegisterPage() {
       const validationErrors = validateAll(form);
       setErrors(validationErrors);
 
-      if (hasErrors(validationErrors)) return;
+      if (hasErrors(validationErrors)) {
+        setShakeSubmit(true);
+        return;
+      }
 
       setIsLoading(true);
       try {
@@ -338,7 +355,7 @@ export default function RegisterPage() {
   if (isSuccess) {
     return (
       <div className="min-h-[80vh] flex items-center justify-center px-4 py-12 bg-white">
-        <div className="max-w-md w-full text-center space-y-6">
+        <div className="max-w-md w-full text-center space-y-6 animate-scale-in">
           <div className="w-20 h-20 mx-auto bg-orange-50 rounded-full flex items-center justify-center border-2 border-orange-100">
             <CheckCircle2 className="w-10 h-10 text-orange-500" />
           </div>
@@ -356,7 +373,7 @@ export default function RegisterPage() {
           </div>
           <Link
             href="/auth/login"
-            className="inline-flex items-center justify-center gap-2 px-6 py-3 rounded-full bg-orange-500 text-white font-semibold text-sm shadow-lg shadow-orange-500/25 hover:bg-orange-600 transition-all duration-200"
+            className="inline-flex items-center justify-center gap-2 px-6 py-3 rounded-full bg-orange-500 text-white font-semibold text-sm shadow-lg shadow-orange-500/25 hover:bg-orange-600 hover:shadow-xl hover:shadow-orange-500/30 active:scale-95 transition-all duration-200"
           >
             Go to Login
           </Link>
@@ -369,7 +386,7 @@ export default function RegisterPage() {
     <div className="min-h-[80vh] flex items-center justify-center px-4 py-12 bg-white">
       <div className="w-full max-w-lg space-y-8">
         {/* Header */}
-        <div className="text-center space-y-2">
+        <div className="text-center space-y-2 animate-fade-in-up">
           <h1 className="text-3xl font-extrabold text-gray-900 tracking-tight">
             Create Account
           </h1>
@@ -379,35 +396,36 @@ export default function RegisterPage() {
         </div>
 
         {/* Role Selection */}
-        <div className="space-y-3">
+        <div className="space-y-3 animate-fade-in-up-delay">
           <label className="block text-sm font-semibold text-gray-700">
             I want to join as
           </label>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-            {ROLES.map(({ value, label, description, icon: Icon }) => {
+            {ROLES.map(({ value, label, description, icon: Icon }, index) => {
               const isActive = form.role === value;
               return (
                 <button
                   key={value}
                   type="button"
                   onClick={() => handleRoleSelect(value)}
-                  className={`relative flex flex-col items-center gap-3 p-5 rounded-2xl border-2 text-center transition-all duration-200 ${
+                  style={{ animationDelay: `${0.15 + index * 0.07}s` }}
+                  className={`relative flex flex-col items-center gap-3 p-5 rounded-2xl border-2 text-center animate-fade-in-up transition-all duration-200 ease-out ${
                     isActive
-                      ? "border-orange-500 bg-orange-50 shadow-sm shadow-orange-500/10"
-                      : "border-gray-200 bg-white hover:border-orange-300 hover:bg-orange-50/40"
+                      ? "border-orange-500 bg-orange-50 shadow-sm shadow-orange-500/10 scale-[1.02]"
+                      : "border-gray-200 bg-white hover:border-orange-300 hover:bg-orange-50/40 hover:shadow-md hover:shadow-orange-500/5 hover:-translate-y-0.5 active:scale-[0.98]"
                   }`}
                 >
                   {isActive && (
-                    <span className="absolute top-2.5 right-2.5 flex h-5 w-5 items-center justify-center rounded-full bg-orange-500">
+                    <span className="absolute top-2.5 right-2.5 flex h-5 w-5 items-center justify-center rounded-full bg-orange-500 animate-pop">
                       <Check className="h-3 w-3 text-white" strokeWidth={3} />
                     </span>
                   )}
 
                   <div
-                    className={`flex h-12 w-12 items-center justify-center rounded-xl transition-colors duration-200 ${
+                    className={`flex h-12 w-12 items-center justify-center rounded-xl transition-all duration-300 ease-out ${
                       isActive
-                        ? "bg-orange-500 text-white"
-                        : "bg-gray-100 text-gray-400"
+                        ? "bg-orange-500 text-white shadow-md shadow-orange-500/25"
+                        : "bg-gray-100 text-gray-400 group-hover:bg-orange-100"
                     }`}
                   >
                     <Icon className="h-6 w-6" />
@@ -415,7 +433,7 @@ export default function RegisterPage() {
 
                   <div className="space-y-1">
                     <span
-                      className={`block text-sm font-semibold leading-tight ${
+                      className={`block text-sm font-semibold leading-tight transition-colors duration-200 ${
                         isActive ? "text-orange-600" : "text-gray-700"
                       }`}
                     >
@@ -430,7 +448,7 @@ export default function RegisterPage() {
             })}
           </div>
           {errors.role && (
-            <p className="flex items-center gap-1 text-xs text-red-500">
+            <p className="flex items-center gap-1 text-xs text-red-500 animate-slide-down">
               <AlertCircle className="h-3 w-3 shrink-0" />
               {errors.role}
             </p>
@@ -443,7 +461,7 @@ export default function RegisterPage() {
         {/* Form */}
         <form onSubmit={handleSubmit} className="space-y-5">
           {serverError && (
-            <div className="flex items-center gap-2 p-3 rounded-xl bg-red-50 border border-red-200 text-sm text-red-600">
+            <div className="flex items-center gap-2 p-3 rounded-xl bg-red-50 border border-red-200 text-sm text-red-600 animate-slide-down">
               <AlertCircle className="h-4 w-4 shrink-0" />
               {serverError}
             </div>
@@ -462,6 +480,7 @@ export default function RegisterPage() {
             touched={touched.fullName}
             onChange={handleChange}
             onBlur={() => handleBlur("fullName")}
+            style={{ animationDelay: "0.25s" }}
           />
 
           {/* Email */}
@@ -477,6 +496,7 @@ export default function RegisterPage() {
             touched={touched.email}
             onChange={handleChange}
             onBlur={() => handleBlur("email")}
+            style={{ animationDelay: "0.3s" }}
           />
 
           {/* Phone */}
@@ -492,6 +512,7 @@ export default function RegisterPage() {
             touched={touched.phone}
             onChange={handleChange}
             onBlur={() => handleBlur("phone")}
+            style={{ animationDelay: "0.35s" }}
           />
 
           {/* Password */}
@@ -508,11 +529,12 @@ export default function RegisterPage() {
               touched={touched.password}
               onChange={handleChange}
               onBlur={() => handleBlur("password")}
+              style={{ animationDelay: "0.4s" }}
               trailing={
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-orange-500 active:scale-90 transition-all duration-150"
                   tabIndex={-1}
                 >
                   {showPassword ? (
@@ -526,21 +548,21 @@ export default function RegisterPage() {
 
             {/* Password Strength Indicator */}
             {form.password.length > 0 && (
-              <div className="space-y-1.5 pt-1">
+              <div className="space-y-1.5 pt-1 animate-fade-in-up">
                 <div className="flex gap-1">
                   {([0, 1, 2, 3] as const).map((i) => (
                     <div
                       key={i}
-                      className={`h-1 flex-1 rounded-full transition-colors duration-300 ${
+                      className={`h-1 flex-1 rounded-full transition-all duration-500 ease-out ${
                         i < passwordStrength
-                          ? STRENGTH_COLORS[passwordStrength]
+                          ? `${STRENGTH_COLORS[passwordStrength]} scale-y-150`
                           : "bg-gray-200"
                       }`}
                     />
                   ))}
                 </div>
                 <p
-                  className={`text-xs font-medium ${
+                  className={`text-xs font-medium transition-colors duration-300 ${
                     passwordStrength <= 1
                       ? "text-red-500"
                       : passwordStrength === 2
@@ -569,11 +591,12 @@ export default function RegisterPage() {
             touched={touched.confirmPassword}
             onChange={handleChange}
             onBlur={() => handleBlur("confirmPassword")}
+            style={{ animationDelay: "0.45s" }}
             trailing={
               <button
                 type="button"
                 onClick={() => setShowConfirm(!showConfirm)}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-orange-500 active:scale-90 transition-all duration-150"
                 tabIndex={-1}
               >
                 {showConfirm ? (
@@ -587,33 +610,33 @@ export default function RegisterPage() {
 
           {/* Terms Checkbox */}
           <div className="space-y-1">
-            <label className="flex items-start gap-2.5 cursor-pointer">
+            <label className="flex items-start gap-2.5 cursor-pointer group">
               <input
                 type="checkbox"
                 name="agreeToTerms"
                 checked={form.agreeToTerms}
                 onChange={handleChange}
-                className="mt-0.5 h-4 w-4 rounded border-gray-300 text-orange-500 focus:ring-orange-500/20 accent-orange-500"
+                className="mt-0.5 h-4 w-4 rounded border-gray-300 text-orange-500 focus:ring-orange-500/20 accent-orange-500 transition-transform duration-150 group-active:scale-90"
               />
               <span className="text-sm text-gray-600 leading-snug">
                 I agree to the{" "}
                 <Link
                   href="/terms"
-                  className="font-semibold text-orange-600 hover:text-orange-700 underline underline-offset-2"
+                  className="font-semibold text-orange-600 hover:text-orange-700 underline underline-offset-2 transition-colors duration-150"
                 >
                   Terms of Service
                 </Link>{" "}
                 and{" "}
                 <Link
                   href="/privacy"
-                  className="font-semibold text-orange-600 hover:text-orange-700 underline underline-offset-2"
+                  className="font-semibold text-orange-600 hover:text-orange-700 underline underline-offset-2 transition-colors duration-150"
                 >
                   Privacy Policy
                 </Link>
               </span>
             </label>
             {errors.agreeToTerms && (
-              <p className="flex items-center gap-1 text-xs text-red-500">
+              <p className="flex items-center gap-1 text-xs text-red-500 animate-slide-down">
                 <AlertCircle className="h-3 w-3 shrink-0" />
                 {errors.agreeToTerms}
               </p>
@@ -624,7 +647,9 @@ export default function RegisterPage() {
           <button
             type="submit"
             disabled={isLoading}
-            className="w-full flex items-center justify-center gap-2 px-6 py-3.5 rounded-full bg-orange-500 text-white font-semibold text-sm shadow-lg shadow-orange-500/25 hover:bg-orange-600 disabled:opacity-60 disabled:cursor-not-allowed transition-all duration-200"
+            className={`w-full flex items-center justify-center gap-2 px-6 py-3.5 rounded-full bg-orange-500 text-white font-semibold text-sm shadow-lg shadow-orange-500/25 hover:bg-orange-600 hover:shadow-xl hover:shadow-orange-500/30 hover:-translate-y-0.5 active:scale-[0.98] active:shadow-md disabled:opacity-60 disabled:cursor-not-allowed disabled:hover:translate-y-0 disabled:active:scale-100 transition-all duration-200 ease-out ${
+              shakeSubmit ? "animate-shake" : ""
+            }`}
           >
             {isLoading ? (
               <>
@@ -638,11 +663,11 @@ export default function RegisterPage() {
         </form>
 
         {/* Footer */}
-        <p className="text-center text-sm text-gray-500">
+        <p className="text-center text-sm text-gray-500 animate-fade-in-up" style={{ animationDelay: "0.5s" }}>
           Already have an account?{" "}
           <Link
             href="/auth/login"
-            className="font-semibold text-orange-600 hover:text-orange-700 transition-colors"
+            className="font-semibold text-orange-600 hover:text-orange-700 transition-colors duration-150"
           >
             Sign in
           </Link>
