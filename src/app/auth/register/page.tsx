@@ -15,6 +15,7 @@ import {
   Loader2,
   CheckCircle2,
   AlertCircle,
+  Check,
 } from "lucide-react";
 import type {
   RegisterFormData,
@@ -26,10 +27,30 @@ import type {
   FormFieldName,
 } from "@/types/auth";
 
-const ROLES: { value: PublicRole; label: string; icon: typeof Store }[] = [
-  { value: "Customer", label: "Customer", icon: ShoppingBag },
-  { value: "Restaurant Partner", label: "Restaurant Partner", icon: Store },
-  { value: "Delivery Partner", label: "Delivery Partner", icon: Bike },
+const ROLES: {
+  value: PublicRole;
+  label: string;
+  description: string;
+  icon: typeof Store;
+}[] = [
+  {
+    value: "Customer",
+    label: "Customer",
+    description: "Order food from your favorite restaurants",
+    icon: ShoppingBag,
+  },
+  {
+    value: "Restaurant Partner",
+    label: "Restaurant Partner",
+    description: "List your restaurant and reach more customers",
+    icon: Store,
+  },
+  {
+    value: "Delivery Partner",
+    label: "Delivery Partner",
+    description: "Deliver orders and earn on your own schedule",
+    icon: Bike,
+  },
 ];
 
 const INITIAL_FORM: RegisterFormData = {
@@ -362,28 +383,51 @@ export default function RegisterPage() {
           <label className="block text-sm font-semibold text-gray-700">
             I want to join as
           </label>
-          <div className="grid grid-cols-3 gap-3">
-            {ROLES.map(({ value, label, icon: Icon }) => (
-              <button
-                key={value}
-                type="button"
-                onClick={() => handleRoleSelect(value)}
-                className={`flex flex-col items-center gap-2 p-4 rounded-xl border-2 transition-all duration-200 ${
-                  form.role === value
-                    ? "border-orange-500 bg-orange-50 text-orange-600 shadow-sm"
-                    : "border-gray-200 bg-white text-gray-600 hover:border-orange-300 hover:bg-orange-50/50"
-                }`}
-              >
-                <Icon
-                  className={`h-6 w-6 ${
-                    form.role === value ? "text-orange-500" : "text-gray-400"
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            {ROLES.map(({ value, label, description, icon: Icon }) => {
+              const isActive = form.role === value;
+              return (
+                <button
+                  key={value}
+                  type="button"
+                  onClick={() => handleRoleSelect(value)}
+                  className={`relative flex flex-col items-center gap-3 p-5 rounded-2xl border-2 text-center transition-all duration-200 ${
+                    isActive
+                      ? "border-orange-500 bg-orange-50 shadow-sm shadow-orange-500/10"
+                      : "border-gray-200 bg-white hover:border-orange-300 hover:bg-orange-50/40"
                   }`}
-                />
-                <span className="text-xs font-semibold text-center leading-tight">
-                  {label}
-                </span>
-              </button>
-            ))}
+                >
+                  {isActive && (
+                    <span className="absolute top-2.5 right-2.5 flex h-5 w-5 items-center justify-center rounded-full bg-orange-500">
+                      <Check className="h-3 w-3 text-white" strokeWidth={3} />
+                    </span>
+                  )}
+
+                  <div
+                    className={`flex h-12 w-12 items-center justify-center rounded-xl transition-colors duration-200 ${
+                      isActive
+                        ? "bg-orange-500 text-white"
+                        : "bg-gray-100 text-gray-400"
+                    }`}
+                  >
+                    <Icon className="h-6 w-6" />
+                  </div>
+
+                  <div className="space-y-1">
+                    <span
+                      className={`block text-sm font-semibold leading-tight ${
+                        isActive ? "text-orange-600" : "text-gray-700"
+                      }`}
+                    >
+                      {label}
+                    </span>
+                    <span className="block text-xs text-gray-500 leading-snug">
+                      {description}
+                    </span>
+                  </div>
+                </button>
+              );
+            })}
           </div>
           {errors.role && (
             <p className="flex items-center gap-1 text-xs text-red-500">
@@ -391,6 +435,9 @@ export default function RegisterPage() {
               {errors.role}
             </p>
           )}
+          <p className="text-xs text-gray-400 text-center pt-1">
+            Admin registration is not available through public signup.
+          </p>
         </div>
 
         {/* Form */}

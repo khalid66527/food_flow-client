@@ -31,3 +31,10 @@ export interface MockRegisterResponse {
 }
 
 export type PasswordStrength = 0 | 1 | 2 | 3 | 4;
+
+export interface RoleOption {
+  value: PublicRole;
+  label: string;
+  description: string;
+  icon: string;
+}
