@@ -434,7 +434,7 @@ export default function LoginPage() {
     if (!isSuccess || !loggedInUser) return;
 
     if (redirectCountdown <= 0) {
-      router.push(ROLE_REDIRECT_MAP[loggedInUser.role]);
+      router.push(ROLE_REDIRECT_MAP[loggedInUser.role] ?? "/dashboard/customer");
       return;
     }
 
@@ -552,7 +552,7 @@ export default function LoginPage() {
   // Success state
   // -------------------------------------------------------------------------
   if (isSuccess && loggedInUser) {
-    const dashboardRoute = ROLE_REDIRECT_MAP[loggedInUser.role];
+    const dashboardRoute = ROLE_REDIRECT_MAP[loggedInUser.role] ?? "/dashboard/customer";
 
     return (
       <div className="min-h-[80vh] flex items-center justify-center px-4 py-12 bg-white dark:bg-gray-950">
