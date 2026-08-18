@@ -67,3 +67,42 @@ export interface MockLoginResponse {
   };
 }
 
+export type ForgotPasswordStep = "email" | "otp" | "reset" | "done";
+
+export interface ForgotPasswordFormData {
+  email: string;
+}
+
+export interface ForgotPasswordFormErrors {
+  email?: string;
+}
+
+export type OtpFieldName = "otp";
+
+export interface OtpFormData {
+  otp: string;
+}
+
+export interface OtpFormErrors {
+  otp?: string;
+}
+
+export type ResetPasswordFieldName = "password" | "confirmPassword";
+
+export interface ResetPasswordFormData {
+  password: string;
+  confirmPassword: string;
+}
+
+export interface ResetPasswordFormErrors {
+  password?: string;
+  confirmPassword?: string;
+}
+
+export type ResetPasswordTouchedFields = Record<ResetPasswordFieldName, boolean>;
+
+export interface MockForgotPasswordResponse {
+  success: boolean;
+  message: string;
+}
+
