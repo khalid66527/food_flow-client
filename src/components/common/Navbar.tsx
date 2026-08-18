@@ -32,6 +32,7 @@ interface NavbarProps {
   session?: {
     user: UserSession;
   } | null;
+  user?: UserSession | null;
   onLogout?: () => Promise<void> | void;
   cartItemCount?: number;
   userLocation?: string; // Real location tracking er jonno prop
@@ -39,6 +40,7 @@ interface NavbarProps {
 
 export default function Navbar({ 
   session, 
+  user: userProp,
   onLogout, 
   cartItemCount = 0,
   userLocation = "Chattogram" 
@@ -47,7 +49,7 @@ export default function Navbar({
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState<boolean>(false);
   
   const pathname = usePathname();
-  const user = session?.user || null;
+  const user = userProp || session?.user || null;
 
   // Better Auth role onujayi dashboard ebong management routes gulo define kora
   const getRoleBasedLinks = (role: UserRole) => {
