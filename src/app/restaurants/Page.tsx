@@ -2,6 +2,7 @@
 
 import React, { useMemo, useState } from "react";
 import Link from "next/link";
+import { motion } from "framer-motion";
 import {
     Search,
     MapPin,
@@ -579,7 +580,12 @@ const RestaurantsPage = () => {
             </div>
 
             {/* ============== Header / Search ============== */}
-            <div className="border-b border-gray-100 bg-white">
+            <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.5 }}
+                className="border-b border-gray-100 bg-white"
+            >
                 <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
                     <h1 className="text-2xl font-bold text-gray-900 sm:text-3xl">
                         Restaurants near you
@@ -610,10 +616,15 @@ const RestaurantsPage = () => {
                         </div>
                     </div>
                 </div>
-            </div>
+            </motion.div>
 
             {/* ============== Body ============== */}
-            <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+            <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.5, delay: 0.1 }}
+                className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8"
+            >
                 <div className="flex gap-8">
                     {/* ---------- Desktop Sidebar ---------- */}
                     <aside className="hidden w-72 shrink-0 lg:block">
@@ -686,7 +697,7 @@ const RestaurantsPage = () => {
                         )}
                     </section>
                 </div>
-            </div>
+            </motion.div>
 
             {/* ============== Mobile Filter Drawer ============== */}
             {mobileFilterOpen && (

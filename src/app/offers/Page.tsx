@@ -2,6 +2,7 @@
 
 import React, { useMemo, useState } from "react";
 import Link from "next/link";
+import { motion } from "framer-motion";
 import {
     Home,
     ChevronRight,
@@ -267,7 +268,12 @@ const OffersPage = () => {
             </div>
 
             {/* ============== Hero ============== */}
-            <section className="relative overflow-hidden bg-white">
+            <motion.section
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.5 }}
+                className="relative overflow-hidden bg-white"
+            >
                 <div className="pointer-events-none absolute -left-24 -top-24 h-72 w-72 rounded-full bg-orange-100/50 blur-3xl" />
                 <div className="pointer-events-none absolute -right-24 bottom-0 h-72 w-72 rounded-full bg-orange-50 blur-3xl" />
 
@@ -309,10 +315,15 @@ const OffersPage = () => {
                         </div>
                     </div>
                 </div>
-            </section>
+            </motion.section>
 
             {/* ============== Category Tabs ============== */}
-            <div className="sticky top-0 z-10 border-b border-gray-100 bg-white/90 backdrop-blur">
+            <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.5, delay: 0.1 }}
+                className="sticky top-0 z-10 border-b border-gray-100 bg-white/90 backdrop-blur"
+            >
                 <div className="mx-auto max-w-7xl px-4 py-4 sm:px-6 lg:px-8">
                     <div className="flex gap-2 overflow-x-auto pb-1">
                         {CATEGORIES.map((cat) => (
@@ -329,10 +340,15 @@ const OffersPage = () => {
                         ))}
                     </div>
                 </div>
-            </div>
+            </motion.div>
 
             {/* ============== Offers Grid ============== */}
-            <div className="mx-auto max-w-7xl px-4 py-10 sm:px-6 lg:px-8">
+            <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.5, delay: 0.2 }}
+                className="mx-auto max-w-7xl px-4 py-10 sm:px-6 lg:px-8"
+            >
                 {filteredOffers.length === 0 ? (
                     <EmptyState />
                 ) : (
@@ -342,10 +358,15 @@ const OffersPage = () => {
                         ))}
                     </div>
                 )}
-            </div>
+            </motion.div>
 
             {/* ============== Newsletter CTA ============== */}
-            <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+            <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.5, delay: 0.3 }}
+                className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8"
+            >
                 <div className="flex flex-col items-center gap-5 rounded-2xl bg-orange-50 px-6 py-10 text-center sm:px-10">
                     <div className="flex h-12 w-12 items-center justify-center rounded-full bg-orange-500">
                         <Tag className="h-5 w-5 text-white" />
@@ -378,7 +399,7 @@ const OffersPage = () => {
                         </button>
                     </form>
                 </div>
-            </div>
+            </motion.div>
         </main>
     );
 };
