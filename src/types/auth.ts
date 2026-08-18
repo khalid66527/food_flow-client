@@ -40,3 +40,30 @@ export interface RoleOption {
 }
 
 export type RoleRedirectMap = Record<PublicRole, string>;
+
+export type LoginFormFieldName = "email" | "password";
+
+export interface LoginFormData {
+  email: string;
+  password: string;
+  rememberMe: boolean;
+}
+
+export interface LoginFormErrors {
+  email?: string;
+  password?: string;
+}
+
+export type LoginTouchedFields = Record<LoginFormFieldName, boolean>;
+
+export interface MockLoginResponse {
+  success: boolean;
+  message: string;
+  user?: {
+    id: string;
+    email: string;
+    name: string;
+    role: PublicRole;
+  };
+}
+

@@ -9,9 +9,8 @@
     "lint": "eslint"
   },
   "dependencies": {
-    "better-auth": "^1.6.29",
+    "better-auth": "^1.7.0",
     "framer-motion": "^13.1.0",
-    "install": "^0.13.0",
     "lucide-react": "^1.31.0",
     "next": "16.3.1",
     "react": "19.2.8",
