@@ -30,6 +30,7 @@ import type {
   FormFieldName,
   RoleRedirectMap,
 } from "@/types/auth";
+import { signUp } from "@/lib/auth-client";
 
 // ---------------------------------------------------------------------------
 // Role configuration displayed in the public registration UI.
@@ -418,21 +419,26 @@ export default function RegisterPage() {
       setIsLoading(true);
 
       try {
-        // TODO (Better Auth integration):
-        // Replace mockRegister() with the real signUp call:
-        //   const { data, error } = await signUp.email({ ... });
-        //   if (error) throw new Error(error.message);
-        const response = await mockRegister(form);
+        const { data, error } = await signUp.email({
+          email: form.email,
+          password: form.password,
+          name: form.fullName,
+          // @ts-expect-error - role and phone are additionalFields in better-auth
+          role: form.role,
+          phone: form.phone,
+        });
 
-        if (response.success) {
-          console.log("[Register] Success:", response);
+        if (error) {
+          setServerError(error.message || "Registration failed. Please try again.");
+        } else if (data) {
           setIsSuccess(true);
           setRedirectCountdown(REDIRECT_COUNTDOWN_SECONDS);
         } else {
-          setServerError(response.message);
+          setServerError("Could not complete registration.");
         }
-      } catch {
-        setServerError("Something went wrong. Please try again.");
+      } catch (err: unknown) {
+        const errorMessage = err instanceof Error ? err.message : "Something went wrong. Please try again.";
+        setServerError(errorMessage);
       } finally {
         setIsLoading(false);
       }

@@ -2,7 +2,7 @@
 
 import React, { useState } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { 
   ShoppingCart, 
   MapPin, 
@@ -15,9 +15,10 @@ import {
   Menu, 
   X 
 } from "lucide-react";
+import { useSession, signOut } from "@/lib/auth-client";
 
 // Better Auth session ba user object-er type definition (Real implementation er jonno)
-type UserRole = "customer" | "restaurant" | "rider" | "admin" | null;
+type UserRole = "customer" | "restaurant" | "rider" | "admin" | string | null;
 
 interface UserSession {
   id: string;
@@ -32,13 +33,15 @@ interface NavbarProps {
   session?: {
     user: UserSession;
   } | null;
+  user?: UserSession | null;
   onLogout?: () => Promise<void> | void;
   cartItemCount?: number;
   userLocation?: string; // Real location tracking er jonno prop
 }
 
 export default function Navbar({ 
-  session, 
+  session: sessionProp, 
+  user: userProp,
   onLogout, 
   cartItemCount = 0,
   userLocation = "Chattogram" 
@@ -47,34 +50,56 @@ export default function Navbar({
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState<boolean>(false);
   
   const pathname = usePathname();
-  const user = session?.user || null;
+  const router = useRouter();
+  const { data: clientSession } = useSession();
+
+  const session = sessionProp || clientSession;
+  const user = (userProp || session?.user || null) as UserSession | null;
+
+  const handleLogout = async () => {
+    setIsDropdownOpen(false);
+    setIsMobileMenuOpen(false);
+    if (onLogout) {
+      await onLogout();
+    } else {
+      await signOut({
+        fetchOptions: {
+          onSuccess: () => {
+            router.push("/auth/login");
+            router.refresh();
+          },
+        },
+      });
+    }
+  };
 
   // Better Auth role onujayi dashboard ebong management routes gulo define kora
-  const getRoleBasedLinks = (role: UserRole) => {
-    switch (role) {
-      case "customer":
-        return [
-          { label: "Dashboard", href: "/customer/dashboard", icon: LayoutDashboard },
-          { label: "My Orders", href: "/customer/orders", icon: ShoppingBag },
-          { label: "Profile", href: "/customer/profile", icon: User },
-        ];
-      case "restaurant":
-        return [
-          { label: "Restaurant Dashboard", href: "/restaurant/dashboard", icon: LayoutDashboard },
-          { label: "Menu Management", href: "/restaurant/menu", icon: ShoppingBag },
-        ];
-      case "rider":
-        return [
-          { label: "Rider Dashboard", href: "/rider/dashboard", icon: LayoutDashboard },
-          { label: "Delivery History", href: "/rider/history", icon: Bike },
-        ];
-      case "admin":
-        return [
-          { label: "Admin Panel", href: "/admin/dashboard", icon: ShieldCheck },
-        ];
-      default:
-        return [];
+  const getRoleBasedLinks = (rawRole: UserRole) => {
+    if (!rawRole) return [];
+    const roleStr = String(rawRole).toLowerCase();
+
+    if (roleStr.includes("restaurant")) {
+      return [
+        { label: "Restaurant Dashboard", href: "/dashboard/restaurant", icon: LayoutDashboard },
+        { label: "Menu Management", href: "/restaurant/menu", icon: ShoppingBag },
+      ];
     }
+    if (roleStr.includes("delivery") || roleStr.includes("rider")) {
+      return [
+        { label: "Rider Dashboard", href: "/dashboard/delivery", icon: LayoutDashboard },
+        { label: "Delivery History", href: "/rider/history", icon: Bike },
+      ];
+    }
+    if (roleStr.includes("admin")) {
+      return [
+        { label: "Admin Panel", href: "/dashboard/admin", icon: ShieldCheck },
+      ];
+    }
+    return [
+      { label: "Dashboard", href: "/dashboard/customer", icon: LayoutDashboard },
+      { label: "My Orders", href: "/customer/orders", icon: ShoppingBag },
+      { label: "Profile", href: "/customer/profile", icon: User },
+    ];
   };
 
   return (
@@ -83,13 +108,13 @@ export default function Navbar({
         
         {/* 1. Logo Section */}
         <div className="flex items-center">
-          <div className="flex items-center group">
+          <Link href="/" className="flex items-center group">
             <img 
               src="https://i.ibb.co.com/jPhnCNFt/Food-Flow-Logo.png" 
               alt="Food Flow Logo" 
               className="h-9 sm:h-10 w-auto object-contain transition-transform duration-300 group-hover:scale-105" 
             />
-          </div>
+          </Link>
         </div>
 
         {/* 2. Desktop Navigation Links */}
@@ -130,13 +155,6 @@ export default function Navbar({
         
         <div className="flex items-center gap-2 sm:gap-3">
           
-          {/* Real/Dynamic Location Display */}
-
-          {/* <div className="hidden lg:flex items-center gap-1.5 text-xs text-gray-600 bg-orange-50/60 border border-orange-100 px-3.5 py-2 rounded-full">
-            <MapPin className="h-3.5 w-3.5 text-orange-500" />
-            <span className="font-semibold text-gray-700">{userLocation}</span>
-          </div> */}
-
           {/* Cart Link */}
           <Link 
             href="/cart" 
@@ -172,7 +190,7 @@ export default function Navbar({
                 <div className="absolute right-0 mt-3 w-56 origin-top-right rounded-2xl bg-white shadow-xl ring-1 ring-black/5 py-2 z-50">
                   <div className="px-4 py-2.5 border-b border-gray-100">
                     <p className="text-sm font-semibold text-gray-800 truncate">{user.name}</p>
-                    <p className="text-xs text-orange-600 font-medium capitalize">Role: {user.role}</p>
+                    <p className="text-xs text-orange-600 font-medium capitalize">Role: {user.role || "Customer"}</p>
                   </div>
 
                   <div className="py-1">
@@ -194,10 +212,7 @@ export default function Navbar({
 
                   <div className="border-t border-gray-100 pt-1 mt-1">
                     <button 
-                      onClick={async () => {
-                        setIsDropdownOpen(false);
-                        if (onLogout) await onLogout();
-                      }}
+                      onClick={handleLogout}
                       className="flex w-full items-center gap-2.5 px-4 py-2.5 text-sm text-red-600 hover:bg-red-50 transition-colors"
                     >
                       <LogOut className="h-4 w-4" />
@@ -273,7 +288,35 @@ export default function Navbar({
             Track Order
           </Link>
 
-          {!user && (
+          {user ? (
+            <div className="pt-3 border-t border-gray-100 space-y-2">
+              <div className="px-3 py-2 bg-orange-50 rounded-xl">
+                <p className="text-sm font-semibold text-gray-800">{user.name}</p>
+                <p className="text-xs text-orange-600 capitalize">Role: {user.role || "Customer"}</p>
+              </div>
+              {user.role && getRoleBasedLinks(user.role).map((link, idx) => {
+                const IconComponent = link.icon;
+                return (
+                  <Link 
+                    key={idx}
+                    href={link.href}
+                    onClick={() => setIsMobileMenuOpen(false)}
+                    className="flex items-center gap-2.5 px-3 py-2 text-sm text-gray-700 hover:bg-orange-50 hover:text-orange-600 rounded-lg transition-colors"
+                  >
+                    <IconComponent className="h-4 w-4 text-orange-500" />
+                    {link.label}
+                  </Link>
+                );
+              })}
+              <button 
+                onClick={handleLogout}
+                className="flex w-full items-center gap-2.5 px-3 py-2 text-sm text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+              >
+                <LogOut className="h-4 w-4" />
+                Logout
+              </button>
+            </div>
+          ) : (
             <div className="pt-3 border-t border-gray-100 flex gap-2">
               <Link 
                 href="/auth/login" 
