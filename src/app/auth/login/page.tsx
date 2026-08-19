@@ -121,10 +121,15 @@ async function attemptEmailSignIn(
     const { data: result, error } = await signIn.email({
       email: data.email,
       password: data.password,
-      callbackURL: "/dashboard/customer",
     });
 
-    if (error) throw new Error(error.message);
+    if (error) {
+      return {
+        success: false,
+        message: error.message || "Invalid email or password",
+      };
+    }
+
     if (result?.user) {
       const authUser = result.user as unknown as {
         id: string;
@@ -143,10 +148,17 @@ async function attemptEmailSignIn(
         },
       };
     }
-    throw new Error("Sign-in returned no user session");
-  } catch {
-    // Better Auth server is not running yet — fall back to the mock flow.
-    return mockLogin(data);
+
+    return {
+      success: false,
+      message: "Sign-in failed. Please check your credentials.",
+    };
+  } catch (err: unknown) {
+    const errorMessage = err instanceof Error ? err.message : "Invalid email or password. Please try again.";
+    return {
+      success: false,
+      message: errorMessage,
+    };
   }
 }
 
