@@ -1,10 +1,11 @@
 import Banner from "@/components/banner/Banner";
-import Image from "next/image";
+import FoodCategories from "@/components/categories/FoodCategories";
 
 export default function Home() {
   return (
     <div>
-      <Banner></Banner>
+      <Banner />
+      <FoodCategories />
     </div>
   );
 }
