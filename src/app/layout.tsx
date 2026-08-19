@@ -6,6 +6,7 @@ import { Inter, Plus_Jakarta_Sans } from "next/font/google";
 import "./globals.css";
 import Navbar from "@/components/common/Navbar";
 import Footer from "@/components/common/Footer";
+import ScrollToHash from "@/components/common/ScrollToHash";
 
 const inter = Inter({
   variable: "--font-inter",
@@ -28,15 +29,14 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  const user = null;
-
   return (
     <html
       lang="en"
       className={`${inter.variable} ${jakarta.variable} h-full antialiased`}
     >
-      <body className="min-h-full flex flex-col bg-background text-foreground">
-        <Navbar user={user} cartItemCount={0} />
+      <body className="min-h-full flex flex-col bg-gray-50 dark:bg-gray-950 text-gray-900 dark:text-gray-100">
+        <ScrollToHash />
+        <Navbar session={null} cartItemCount={0} />
         <main className="flex-grow">{children}</main>
         <Footer></Footer>
       </body>
