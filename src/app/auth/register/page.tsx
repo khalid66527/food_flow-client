@@ -80,7 +80,7 @@ const INITIAL_FORM: RegisterFormData = {
   phone: "",
   password: "",
   confirmPassword: "",
-  role: "",
+  role: "Customer",
   agreeToTerms: false,
 };
 
@@ -403,9 +403,17 @@ export default function RegisterPage() {
       setErrors(validationErrors);
 
       if (hasErrors(validationErrors)) {
+        console.warn("[Register] Validation failed:", validationErrors);
         setShakeSubmit(true);
         return;
       }
+
+      console.log("[Register] Validation passed. Submitting form data:", {
+        fullName: form.fullName,
+        email: form.email,
+        phone: form.phone,
+        role: form.role,
+      });
 
       setIsLoading(true);
 
@@ -417,6 +425,7 @@ export default function RegisterPage() {
         const response = await mockRegister(form);
 
         if (response.success) {
+          console.log("[Register] Success:", response);
           setIsSuccess(true);
           setRedirectCountdown(REDIRECT_COUNTDOWN_SECONDS);
         } else {

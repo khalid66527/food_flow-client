@@ -22,9 +22,6 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-
-  const user = null; 
-
   return (
     <html
       lang="en"
@@ -32,7 +29,7 @@ export default function RootLayout({
     >
       <body className="min-h-full flex flex-col bg-gray-50 dark:bg-gray-950 text-gray-900 dark:text-gray-100">
         
-        <Navbar user={user} cartItemCount={0} />
+        <Navbar session={null} cartItemCount={0} />
         <main className="flex-grow">
           {children}
         </main>
