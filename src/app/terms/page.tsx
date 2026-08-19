@@ -1,8 +1,8 @@
 "use client";
 
-import React, { useRef } from "react";
+import React, { useRef, useState } from "react";
 import Link from "next/link";
-import { motion, useInView } from "framer-motion";
+import { motion, useInView, AnimatePresence } from "framer-motion";
 import {
   FileText,
   UserCheck,
@@ -21,6 +21,11 @@ import {
   AlertTriangle,
   Star,
   Ban,
+  Leaf,
+  CloudLightning,
+  Accessibility,
+  List,
+  ChevronDown,
 } from "lucide-react";
 
 const lastUpdated = "August 19, 2026";
@@ -260,7 +265,141 @@ const sections = [
       },
     ],
   },
+  {
+    icon: Leaf,
+    title: "Food Safety & Allergen Disclaimer",
+    content: [
+      {
+        subtitle: "",
+        text: "Food Flow acts as an intermediary between customers and restaurant partners. We do not prepare, cook or handle food. While we require restaurant partners to provide accurate allergen information, we cannot guarantee that all allergen data is complete or error-free. Customers with food allergies or dietary restrictions should contact the restaurant directly before placing an order. Food Flow is not liable for allergic reactions, food-borne illnesses or adverse health outcomes resulting from food purchased through the Platform.",
+      },
+    ],
+  },
+  {
+    icon: CloudLightning,
+    title: "Force Majeure",
+    content: [
+      {
+        subtitle: "",
+        text: "Food Flow shall not be held liable for any failure or delay in performing its obligations under these Terms where such failure or delay results from circumstances beyond our reasonable control, including but not limited to natural disasters, pandemics, government restrictions, civil unrest, power outages, internet or telecommunications failures, cyber-attacks, or severe weather conditions. In such events, we will make reasonable efforts to resume services as soon as practicable and will notify affected users of any service disruptions.",
+      },
+    ],
+  },
+  {
+    icon: Scale,
+    title: "Severability",
+    content: [
+      {
+        subtitle: "",
+        text: "If any provision of these Terms is found to be invalid, illegal or unenforceable by a court of competent jurisdiction, the remaining provisions shall continue in full force and effect. The invalid or unenforceable provision shall be modified to the minimum extent necessary to make it valid and enforceable while preserving its original intent.",
+      },
+    ],
+  },
+  {
+    icon: FileText,
+    title: "Entire Agreement",
+    content: [
+      {
+        subtitle: "",
+        text: "These Terms, together with our Privacy Policy and any additional terms or policies referenced herein, constitute the entire agreement between you and Food Flow regarding your use of the Platform. They supersede all prior and contemporaneous agreements, understandings, representations and warranties, whether oral or written, relating to the Platform.",
+      },
+    ],
+  },
+  {
+    icon: Accessibility,
+    title: "Accessibility",
+    content: [
+      {
+        subtitle: "",
+        text: "Food Flow is committed to making our Platform accessible to all users, including those with disabilities. We strive to comply with WCAG 2.1 Level AA guidelines and continuously work to improve the accessibility of our website and dashboards. If you encounter any accessibility barriers while using the Platform, please contact us at support@foodflow.com and we will make reasonable efforts to address the issue.",
+      },
+    ],
+  },
 ];
+
+function TableOfContents({
+  sections,
+}: {
+  sections: { icon: React.ElementType; title: string }[];
+}) {
+  const [isOpen, setIsOpen] = useState(false);
+
+  const scrollToSection = (title: string) => {
+    const id = title.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
+    const el = document.getElementById(id);
+    if (el) {
+      el.scrollIntoView({ behavior: "smooth", block: "start" });
+      setIsOpen(false);
+    }
+  };
+
+  return (
+    <div className="mx-auto max-w-4xl">
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.5, duration: 0.5 }}
+      >
+        <button
+          onClick={() => setIsOpen(!isOpen)}
+          className="flex w-full items-center justify-between rounded-2xl border border-gray-100 bg-gray-50/80 px-5 py-4 text-left transition-all hover:border-orange-200 hover:bg-orange-50/50 sm:px-6"
+        >
+          <div className="flex items-center gap-3">
+            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-orange-100 text-orange-600">
+              <List className="h-4 w-4" />
+            </div>
+            <div>
+              <h2 className="text-sm font-bold text-gray-900">
+                Table of Contents
+              </h2>
+              <p className="text-xs text-gray-500">
+                {sections.length} sections — jump to any topic
+              </p>
+            </div>
+          </div>
+          <motion.div
+            animate={{ rotate: isOpen ? 180 : 0 }}
+            transition={{ duration: 0.3 }}
+          >
+            <ChevronDown className="h-5 w-5 text-gray-400" />
+          </motion.div>
+        </button>
+
+        <AnimatePresence>
+          {isOpen && (
+            <motion.div
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: "auto" }}
+              exit={{ opacity: 0, height: 0 }}
+              transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
+              className="overflow-hidden"
+            >
+              <div className="mt-3 grid gap-1.5 rounded-2xl border border-gray-100 bg-white p-3 shadow-sm sm:grid-cols-2 lg:grid-cols-3">
+                {sections.map((section, i) => {
+                  const Icon = section.icon;
+                  return (
+                    <button
+                      key={section.title}
+                      onClick={() => scrollToSection(section.title)}
+                      className="flex items-center gap-2.5 rounded-xl px-3 py-2.5 text-left text-sm text-gray-600 transition-all hover:bg-orange-50 hover:text-orange-600"
+                    >
+                      <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-lg bg-orange-50 text-orange-500">
+                        <Icon className="h-3.5 w-3.5" />
+                      </span>
+                      <span className="truncate font-medium">
+                        {i + 1}. {section.title}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </motion.div>
+    </div>
+  );
+}
 
 function AnimatedSection({
   children,
@@ -377,6 +516,12 @@ export default function TermsPage() {
       </section>
 
       <section className="border-b border-gray-100">
+        <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+          <TableOfContents sections={sections} />
+        </div>
+      </section>
+
+      <section className="border-b border-gray-100">
         <div className="mx-auto max-w-7xl px-4 py-12 sm:px-6 lg:px-8">
           <motion.div
             initial={{ opacity: 0, y: 30, scale: 0.98 }}
@@ -474,7 +619,10 @@ export default function TermsPage() {
                       <Icon className="h-5 w-5" />
                     </motion.div>
                     <div>
-                      <h2 className="text-xl font-bold tracking-tight text-gray-900 sm:text-2xl">
+                      <h2
+                        id={section.title.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "")}
+                        className="text-xl font-bold tracking-tight text-gray-900 sm:text-2xl scroll-mt-24"
+                      >
                         {section.title}
                       </h2>
                       <div className="mt-1 h-0.5 w-12 rounded-full bg-gradient-to-r from-orange-400 to-orange-200" />
