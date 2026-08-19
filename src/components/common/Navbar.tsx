@@ -149,6 +149,12 @@ export default function Navbar({
           >
             About
           </Link>
+          <Link 
+            href="/contact" 
+            className={`px-4 py-1.5 rounded-full transition-all ${pathname.startsWith("/contact") ? "bg-white text-orange-600 shadow-xs font-semibold" : "hover:bg-white hover:text-orange-600"}`}
+          >
+            Contact
+          </Link>
         </nav>
 
         {/* 3. Right Section: Location, Cart & Better Auth User Session */}
@@ -286,6 +292,13 @@ export default function Navbar({
             className={`block px-3 py-2 rounded-lg text-base font-medium transition-colors ${pathname.startsWith("/track") ? "bg-orange-50 text-orange-600" : "text-gray-700 hover:bg-orange-50 hover:text-orange-600"}`}
           >
             Track Order
+          </Link>
+          <Link 
+            href="/contact" 
+            onClick={() => setIsMobileMenuOpen(false)}
+            className={`block px-3 py-2 rounded-lg text-base font-medium transition-colors ${pathname.startsWith("/contact") ? "bg-orange-50 text-orange-600" : "text-gray-700 hover:bg-orange-50 hover:text-orange-600"}`}
+          >
+            Contact
           </Link>
 
           {user ? (

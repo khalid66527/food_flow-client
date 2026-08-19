@@ -152,7 +152,7 @@ const Footer = () => {
 
               <li>
                 <Link
-                  href="/faq"
+                  href="/#faq"
                   className="text-gray-500 transition-colors hover:text-orange-500"
                 >
                   FAQ
