@@ -3,7 +3,6 @@
 import React, { useState, useCallback, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { motion, AnimatePresence } from "framer-motion";
 import {
   Mail,
   Lock,
@@ -15,15 +14,12 @@ import {
   ArrowRight,
   Sparkles,
   ShoppingBag,
-  Bike,
-  Star,
-  Home,
+  ShieldCheck,
 } from "lucide-react";
 import { signIn } from "@/lib/auth-client";
 import type {
   LoginFormData,
   LoginFormErrors,
-  MockLoginResponse,
   LoginFormFieldName,
   LoginTouchedFields,
   PublicRole,
@@ -42,8 +38,6 @@ const ROLE_REDIRECT_MAP: RoleRedirectMap = {
 
 const REDIRECT_COUNTDOWN_SECONDS = 3;
 
-type SocialProvider = "google";
-
 const INITIAL_FORM: LoginFormData = {
   email: "",
   password: "",
@@ -60,7 +54,7 @@ const INITIAL_TOUCHED: LoginTouchedFields = {
 // ---------------------------------------------------------------------------
 function validateField(
   name: LoginFormFieldName,
-  form: LoginFormData,
+  form: LoginFormData
 ): string | undefined {
   switch (name) {
     case "email":
@@ -90,83 +84,7 @@ function hasErrors(errors: LoginFormErrors): boolean {
 }
 
 // ---------------------------------------------------------------------------
-// Sign-in handler — Better Auth first, mock fallback while the backend is
-// not available so the frontend flow can be demoed end-to-end.
-// ---------------------------------------------------------------------------
-function mockLogin(data: LoginFormData): Promise<MockLoginResponse> {
-  return new Promise((resolve) => {
-    setTimeout(() => {
-      console.log("[Mock] Login payload:", {
-        email: data.email,
-        rememberMe: data.rememberMe,
-      });
-      resolve({
-        success: true,
-        message: "Signed in successfully!",
-        user: {
-          id: "mock_user_" + Date.now(),
-          email: data.email,
-          name: data.email.split("@")[0] || "User",
-          role: "Customer",
-        },
-      });
-    }, 1200);
-  });
-}
-
-async function attemptEmailSignIn(
-  data: LoginFormData,
-): Promise<MockLoginResponse> {
-  try {
-    const { data: result, error } = await signIn.email({
-      email: data.email,
-      password: data.password,
-    });
-
-    if (error) {
-      return {
-        success: false,
-        message: error.message || "Invalid email or password",
-      };
-    }
-
-    if (result?.user) {
-      const authUser = result.user as unknown as {
-        id: string;
-        email: string;
-        name: string;
-        role?: string;
-      };
-      return {
-        success: true,
-        message: "Signed in successfully!",
-        user: {
-          id: authUser.id,
-          email: authUser.email,
-          name: authUser.name || authUser.email.split("@")[0],
-          role: (authUser.role as PublicRole) || "Customer",
-        },
-      };
-    }
-
-    return {
-      success: false,
-      message: "Sign-in failed. Please check your credentials.",
-    };
-  } catch (err: unknown) {
-    const errorMessage =
-      err instanceof Error
-        ? err.message
-        : "Invalid email or password. Please try again.";
-    return {
-      success: false,
-      message: errorMessage,
-    };
-  }
-}
-
-// ---------------------------------------------------------------------------
-// Shared UI bits
+// InputField
 // ---------------------------------------------------------------------------
 function InputField({
   id,
@@ -202,10 +120,10 @@ function InputField({
     <div className="space-y-1.5 group">
       <label
         htmlFor={id}
-        className={`block text-sm font-semibold transition-colors duration-200 ${
+        className={`block text-xs sm:text-sm font-semibold transition-colors duration-200 ${
           showError
-            ? "text-danger"
-            : "text-gray-700 group-focus-within:text-brand dark:text-gray-300"
+            ? "text-red-500"
+            : "text-gray-700 group-focus-within:text-orange-600"
         }`}
       >
         {label}
@@ -214,8 +132,8 @@ function InputField({
         <Icon
           className={`absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 transition-colors duration-200 ${
             showError
-              ? "text-danger/80"
-              : "text-gray-400 group-focus-within:text-brand"
+              ? "text-red-400"
+              : "text-gray-400 group-focus-within:text-orange-500"
           }`}
         />
         <input
@@ -229,16 +147,16 @@ function InputField({
           disabled={disabled}
           className={`w-full pl-10 ${
             trailing ? "pr-11" : "pr-4"
-          } py-3 rounded-btn border text-sm text-gray-900 placeholder:text-gray-400 outline-none transition-all duration-200 ease-out disabled:opacity-50 disabled:cursor-not-allowed disabled:bg-gray-50 dark:bg-gray-900 dark:text-gray-100 dark:placeholder:text-gray-500 dark:disabled:bg-gray-950 ${
+          } py-3 rounded-xl border text-sm text-gray-900 bg-white placeholder:text-gray-400 outline-none transition-all duration-200 ease-out disabled:opacity-50 disabled:cursor-not-allowed disabled:bg-gray-50 ${
             showError
-              ? "border-danger/40 focus:ring-2 focus:ring-danger/20 focus:border-danger animate-shake dark:border-danger/60"
-              : "border-gray-200 hover:border-gray-300 focus:ring-2 focus:ring-brand/20 focus:border-brand focus:shadow-[0_0_0_3px_rgba(255,107,53,0.08)] dark:border-gray-700 dark:hover:border-gray-600"
+              ? "border-red-300 focus:ring-2 focus:ring-red-500/20 focus:border-red-500 animate-shake"
+              : "border-gray-200 hover:border-gray-300 focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 focus:shadow-[0_0_0_3px_rgba(249,115,22,0.08)]"
           }`}
         />
         {trailing}
       </div>
       {showError && (
-        <p className="flex items-center gap-1 text-xs text-danger mt-0.5 animate-slide-down">
+        <p className="flex items-center gap-1 text-xs text-red-500 mt-0.5 animate-slide-down">
           <AlertCircle className="h-3 w-3 shrink-0" />
           {error}
         </p>
@@ -247,169 +165,8 @@ function InputField({
   );
 }
 
-function SocialButton({
-  provider,
-  label,
-  icon,
-  onClick,
-  disabled,
-}: {
-  provider: SocialProvider;
-  label: string;
-  icon: React.ReactNode;
-  onClick: (provider: SocialProvider) => void;
-  disabled: boolean;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={() => onClick(provider)}
-      disabled={disabled}
-      className="flex items-center justify-center gap-2.5 w-full px-4 py-3 rounded-btn border border-gray-200 bg-white text-sm font-semibold text-gray-700 shadow-sm transition-all duration-200 hover:border-brand/40 hover:bg-brand/5 hover:-translate-y-0.5 active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:translate-y-0 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200 dark:hover:border-brand/50 dark:hover:bg-brand/10"
-    >
-      {icon}
-      {label}
-    </button>
-  );
-}
-
 // ---------------------------------------------------------------------------
-// Left brand panel — premium food-tech showcase
-// ---------------------------------------------------------------------------
-function BrandPanel() {
-  const floatCard = (delay: number) => ({
-    initial: { opacity: 0, y: 24 },
-    animate: { opacity: 1, y: 0 },
-    transition: { delay, duration: 0.7, ease: "easeOut" as const },
-  });
-
-  return (
-    <div className="relative hidden lg:flex flex-col justify-between overflow-hidden bg-linear-to-br from-brand via-[#FF8A3D] to-accent px-12 py-12">
-      {/* Decorative blobs */}
-      <div className="pointer-events-none absolute -top-24 -left-24 h-80 w-80 rounded-full bg-white/10 blur-3xl" />
-      <div className="pointer-events-none absolute -bottom-32 -right-24 h-96 w-96 rounded-full bg-white/10 blur-3xl" />
-      <div className="pointer-events-none absolute top-1/3 right-10 h-40 w-40 rounded-full bg-white/10 blur-2xl" />
-
-      {/* Top: logo + tagline */}
-      <motion.div
-        initial={{ opacity: 0, y: -16 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.6, ease: "easeOut" }}
-        className="relative z-10 flex items-center gap-3"
-      >
-        <img
-          src="https://i.ibb.co.com/jPhnCNFt/Food-Flow-Logo.png"
-          alt="Food Flow Logo"
-          className="h-11 w-auto object-contain drop-shadow-lg"
-        />
-        <span className="rounded-full bg-white/20 px-3 py-1 text-xs font-bold text-white backdrop-blur-sm">
-          Food Delivery Platform
-        </span>
-      </motion.div>
-
-      {/* Middle: headline + food showcase */}
-      <div className="relative z-10 my-10">
-        <motion.h2
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.1, duration: 0.7, ease: "easeOut" }}
-          className="text-4xl xl:text-5xl font-extrabold leading-tight tracking-tight text-white"
-        >
-          Craving something
-          <span className="block">delicious today?</span>
-        </motion.h2>
-        <motion.p
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.2, duration: 0.7, ease: "easeOut" }}
-          className="mt-4 max-w-md text-sm leading-7 text-white/85"
-        >
-          Sign in to explore the best restaurants near you, track your orders in
-          real time and enjoy exclusive member-only offers.
-        </motion.p>
-
-        {/* Food image + floating cards */}
-        <div className="relative mt-10 max-w-md">
-          <motion.div
-            initial={{ opacity: 0, scale: 0.92 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{ delay: 0.3, duration: 0.8, ease: "easeOut" }}
-            className="overflow-hidden rounded-card shadow-2xl shadow-brand-dark/30 ring-4 ring-white/20"
-          >
-            <img
-              src="https://images.unsplash.com/photo-1568901346375-23c9450c58cd?q=80&w=900&auto=format&fit=crop"
-              alt="Delicious burger with fries"
-              className="h-64 w-full object-cover"
-            />
-          </motion.div>
-
-          {/* Floating rating card */}
-          <motion.div
-            {...floatCard(0.5)}
-            className="absolute -left-6 -top-6 flex items-center gap-2.5 rounded-widget bg-white/95 px-4 py-3 shadow-xl backdrop-blur-sm"
-          >
-            <div className="flex h-9 w-9 items-center justify-center rounded-widget bg-accent/15">
-              <Star className="h-4 w-4 fill-accent text-accent" />
-            </div>
-            <div>
-              <p className="text-sm font-extrabold text-gray-900">4.9 Rating</p>
-              <p className="text-[11px] font-medium text-gray-500">
-                2.4k+ reviews
-              </p>
-            </div>
-          </motion.div>
-
-          {/* Floating delivery card */}
-          <motion.div
-            {...floatCard(0.65)}
-            className="absolute -bottom-6 -left-8 flex items-center gap-2.5 rounded-widget bg-white/95 px-4 py-3 shadow-xl backdrop-blur-sm"
-          >
-            <div className="flex h-9 w-9 items-center justify-center rounded-widget bg-brand/10">
-              <Bike className="h-4 w-4 text-brand" />
-            </div>
-            <div>
-              <p className="text-sm font-extrabold text-gray-900">30 min</p>
-              <p className="text-[11px] font-medium text-gray-500">
-                Fast delivery
-              </p>
-            </div>
-          </motion.div>
-
-          {/* Floating offer card */}
-          <motion.div
-            {...floatCard(0.8)}
-            className="absolute -right-4 top-8 rounded-widget bg-white/95 px-4 py-2.5 shadow-xl backdrop-blur-sm"
-          >
-            <p className="text-xs font-extrabold text-brand">50% OFF</p>
-            <p className="text-[11px] font-medium text-gray-500">first order</p>
-          </motion.div>
-        </div>
-      </div>
-
-      {/* Bottom: stats */}
-      <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={{ delay: 0.9, duration: 0.6 }}
-        className="relative z-10 grid grid-cols-3 gap-4 border-t border-white/20 pt-6"
-      >
-        {[
-          { value: "500+", label: "Restaurants" },
-          { value: "10k+", label: "Happy customers" },
-          { value: "4.9", label: "Average rating" },
-        ].map((stat) => (
-          <div key={stat.label}>
-            <p className="text-xl font-extrabold text-white">{stat.value}</p>
-            <p className="text-xs font-medium text-white/70">{stat.label}</p>
-          </div>
-        ))}
-      </motion.div>
-    </div>
-  );
-}
-
-// ---------------------------------------------------------------------------
-// Sign-in page
+// LoginPage
 // ---------------------------------------------------------------------------
 export default function LoginPage() {
   const router = useRouter();
@@ -419,9 +176,7 @@ export default function LoginPage() {
   const [touched, setTouched] = useState<LoginTouchedFields>(INITIAL_TOUCHED);
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  const [isSocialLoading, setIsSocialLoading] = useState<SocialProvider | null>(
-    null,
-  );
+  const [isGoogleLoading, setIsGoogleLoading] = useState(false);
   const [serverError, setServerError] = useState<string | null>(null);
   const [isSuccess, setIsSuccess] = useState(false);
   const [shakeSubmit, setShakeSubmit] = useState(false);
@@ -431,7 +186,7 @@ export default function LoginPage() {
     role: PublicRole;
   } | null>(null);
   const [redirectCountdown, setRedirectCountdown] = useState(
-    REDIRECT_COUNTDOWN_SECONDS,
+    REDIRECT_COUNTDOWN_SECONDS
   );
 
   useEffect(() => {
@@ -446,14 +201,14 @@ export default function LoginPage() {
 
     if (redirectCountdown <= 0) {
       router.push(
-        ROLE_REDIRECT_MAP[loggedInUser.role] ?? "/dashboard/customer",
+        ROLE_REDIRECT_MAP[loggedInUser.role] ?? "/dashboard/customer"
       );
       return;
     }
 
     const timer = setTimeout(
       () => setRedirectCountdown((prev) => prev - 1),
-      1000,
+      1000
     );
     return () => clearTimeout(timer);
   }, [isSuccess, loggedInUser, redirectCountdown, router]);
@@ -479,7 +234,7 @@ export default function LoginPage() {
 
       setServerError(null);
     },
-    [form, touched],
+    [form, touched]
   );
 
   const handleBlur = useCallback(
@@ -488,7 +243,7 @@ export default function LoginPage() {
       const fieldError = validateField(name, form);
       setErrors((prev) => ({ ...prev, [name]: fieldError }));
     },
-    [form],
+    [form]
   );
 
   const handleSubmit = useCallback(
@@ -510,50 +265,64 @@ export default function LoginPage() {
       setIsLoading(true);
 
       try {
-        const response = await attemptEmailSignIn(form);
+        const { data, error } = await signIn.email({
+          email: form.email,
+          password: form.password,
+        });
 
-        if (response.success && response.user) {
+        if (error) {
+          setServerError(error.message || "Invalid email or password");
+        } else if (data?.user) {
+          const authUser = data.user as unknown as {
+            id: string;
+            email: string;
+            name: string;
+            role?: string;
+          };
           setLoggedInUser({
-            name: response.user.name,
-            email: response.user.email,
-            role: response.user.role,
+            name: authUser.name || authUser.email.split("@")[0],
+            email: authUser.email,
+            role: (authUser.role as PublicRole) || "Customer",
           });
           setIsSuccess(true);
           setRedirectCountdown(REDIRECT_COUNTDOWN_SECONDS);
         } else {
-          setServerError(response.message);
+          setServerError("Sign in failed. Please try again.");
         }
-      } catch {
-        setServerError("Invalid email or password. Please try again.");
+      } catch (err: unknown) {
+        const message =
+          err instanceof Error
+            ? err.message
+            : "Invalid email or password. Please try again.";
+        setServerError(message);
       } finally {
         setIsLoading(false);
       }
     },
-    [form],
+    [form]
   );
 
-  const handleSocialLogin = useCallback(async (provider: SocialProvider) => {
+  const handleGoogleLogin = useCallback(async () => {
     setServerError(null);
-    setIsSocialLoading(provider);
-
-    const notConfigured =
-      "Google login is not configured yet. Please sign in with your email instead.";
+    setIsGoogleLoading(true);
 
     try {
-      // Google is registered in src/lib/auth.ts only when GOOGLE_CLIENT_ID and
-      // GOOGLE_CLIENT_SECRET are set, so this can still fail on a checkout
-      // without those keys — hence the fallback message below.
       const { error } = await signIn.social({
-        provider,
+        provider: "google",
         callbackURL: "/dashboard/customer",
       });
       if (error) {
-        setServerError(notConfigured);
+        setServerError(
+          error.message ||
+            "Google sign in is not configured yet. Please sign in with email."
+        );
       }
     } catch {
-      setServerError(notConfigured);
+      setServerError(
+        "Google sign in failed. Please try again or use email."
+      );
     } finally {
-      setIsSocialLoading(null);
+      setIsGoogleLoading(false);
     }
   }, []);
 
@@ -565,56 +334,45 @@ export default function LoginPage() {
       ROLE_REDIRECT_MAP[loggedInUser.role] ?? "/dashboard/customer";
 
     return (
-      <div className="min-h-[80vh] flex items-center justify-center px-4 py-12 bg-cream dark:bg-gray-950">
-        <motion.div
-          initial={{ opacity: 0, scale: 0.94 }}
-          animate={{ opacity: 1, scale: 1 }}
-          transition={{ duration: 0.5, ease: "easeOut" }}
-          className="max-w-md w-full text-center space-y-7"
-        >
+      <div className="relative min-h-[85vh] flex items-center justify-center px-4 py-12 sm:py-16 overflow-hidden bg-white">
+        {/* Background Decorative Blur Orbs */}
+        <div className="pointer-events-none absolute -left-32 top-10 h-72 w-72 rounded-full bg-orange-100/50 blur-3xl" />
+        <div className="pointer-events-none absolute -right-32 bottom-0 h-80 w-80 rounded-full bg-orange-50/70 blur-3xl" />
+
+        <div className="relative max-w-md w-full text-center space-y-7 bg-white p-8 rounded-3xl border border-gray-100 shadow-xl shadow-gray-200/50 animate-scale-in">
           <div className="relative w-20 h-20 mx-auto">
-            <motion.div
-              initial={{ scale: 0 }}
-              animate={{ scale: 1 }}
-              transition={{ delay: 0.15, type: "spring", stiffness: 200 }}
-              className="absolute inset-0 bg-success/20 rounded-full animate-ping opacity-20"
-            />
-            <motion.div
-              initial={{ scale: 0.5, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              transition={{ delay: 0.1, type: "spring", stiffness: 260 }}
-              className="relative w-20 h-20 bg-success/10 rounded-full flex items-center justify-center border-2 border-success/20"
-            >
-              <CheckCircle2 className="w-10 h-10 text-success" />
-            </motion.div>
+            <div className="absolute inset-0 bg-orange-100 rounded-full animate-ping opacity-25" />
+            <div className="relative w-20 h-20 bg-orange-50 rounded-full flex items-center justify-center border-2 border-orange-100">
+              <CheckCircle2 className="w-10 h-10 text-orange-500" />
+            </div>
           </div>
 
           <div className="space-y-2">
-            <h1 className="text-2xl font-extrabold text-gray-900 tracking-tight dark:text-gray-100">
+            <h1 className="text-2xl sm:text-3xl font-extrabold text-gray-900 tracking-tight">
               Welcome Back!
             </h1>
-            <p className="text-sm text-gray-500 dark:text-gray-400 leading-relaxed">
+            <p className="text-sm text-gray-500 leading-relaxed">
               You have successfully signed in to Food Flow.
             </p>
           </div>
 
-          <div className="bg-gray-50 rounded-card border border-gray-100 p-5 space-y-4 text-left dark:bg-gray-900 dark:border-gray-800">
+          <div className="bg-orange-50/60 rounded-2xl border border-orange-100 p-5 space-y-4 text-left">
             <div className="flex items-center gap-3">
-              <div className="flex h-11 w-11 items-center justify-center rounded-widget bg-brand text-white shadow-md shadow-brand/25">
+              <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-orange-500 text-white shadow-md shadow-orange-500/25">
                 <ShoppingBag className="h-5 w-5" />
               </div>
               <div className="min-w-0">
-                <p className="text-sm font-semibold text-gray-900 truncate dark:text-gray-100">
+                <p className="text-sm font-bold text-gray-900 truncate">
                   {loggedInUser.name}
                 </p>
-                <p className="text-xs text-gray-500 truncate dark:text-gray-400">
+                <p className="text-xs text-gray-500 truncate">
                   {loggedInUser.email}
                 </p>
               </div>
             </div>
 
-            <div className="flex flex-wrap items-center gap-2 text-xs">
-              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-brand/10 text-brand-dark font-semibold dark:bg-brand/15 dark:text-brand">
+            <div className="flex items-center gap-2 text-xs">
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-orange-100 text-orange-700 font-semibold">
                 <Sparkles className="h-3 w-3" />
                 {loggedInUser.role}
               </span>
@@ -622,21 +380,21 @@ export default function LoginPage() {
           </div>
 
           <div className="space-y-3">
-            <p className="text-xs text-gray-400 dark:text-gray-500">
+            <p className="text-xs text-gray-400">
               Redirecting to your{" "}
-              <span className="font-semibold text-gray-600 dark:text-gray-300">
+              <span className="font-semibold text-gray-700">
                 dashboard
               </span>{" "}
               in{" "}
-              <span className="font-bold text-brand tabular-nums">
+              <span className="font-bold text-orange-500 tabular-nums">
                 {redirectCountdown}
               </span>{" "}
               seconds…
             </p>
 
-            <div className="w-full h-1 bg-gray-100 rounded-full overflow-hidden dark:bg-gray-800">
+            <div className="w-full h-1.5 bg-gray-100 rounded-full overflow-hidden">
               <div
-                className="h-full bg-success rounded-full transition-all duration-1000 ease-linear"
+                className="h-full bg-orange-500 rounded-full transition-all duration-1000 ease-linear"
                 style={{
                   width: `${
                     ((REDIRECT_COUNTDOWN_SECONDS - redirectCountdown) /
@@ -648,16 +406,16 @@ export default function LoginPage() {
             </div>
           </div>
 
-          <div className="flex flex-col sm:flex-row items-center justify-center gap-3 pt-2">
+          <div className="pt-2">
             <Link
               href={dashboardRoute}
-              className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-6 py-3 rounded-btn bg-brand text-white font-semibold text-sm shadow-lg shadow-brand/25 hover:bg-brand-dark hover:shadow-xl hover:shadow-brand/30 active:scale-95 transition-all duration-200"
+              className="w-full inline-flex items-center justify-center gap-2 px-6 py-3 rounded-full bg-orange-500 text-white font-semibold text-sm shadow-lg shadow-orange-500/25 hover:bg-orange-600 hover:shadow-xl hover:shadow-orange-500/30 active:scale-95 transition-all duration-200"
             >
               Go to Dashboard
               <ArrowRight className="h-4 w-4" />
             </Link>
           </div>
-        </motion.div>
+        </div>
       </div>
     );
   }
@@ -666,233 +424,196 @@ export default function LoginPage() {
   // Sign-in form
   // -------------------------------------------------------------------------
   return (
-    <div className="min-h-[80vh] bg-cream dark:bg-gray-950">
-      <div className="mx-auto grid min-h-[80vh] max-w-7xl lg:grid-cols-2">
-        {/* Left brand panel */}
-        <BrandPanel />
+    <div className="relative min-h-[85vh] flex items-center justify-center px-4 py-10 sm:py-16 overflow-hidden bg-white">
+      {/* Background Decorative Blur Orbs */}
+      <div className="pointer-events-none absolute -left-32 top-10 h-72 w-72 rounded-full bg-orange-100/50 blur-3xl" />
+      <div className="pointer-events-none absolute -right-32 bottom-0 h-80 w-80 rounded-full bg-orange-50/70 blur-3xl" />
 
-        {/* Right form panel */}
-        <div className="flex items-center justify-center px-4 py-12 sm:px-8 lg:px-16">
-          <div className="w-full max-w-md space-y-8">
-            {/* Mobile logo */}
-            <div className="flex items-center justify-center lg:hidden">
-              <img
-                src="https://i.ibb.co.com/jPhnCNFt/Food-Flow-Logo.png"
-                alt="Food Flow Logo"
-                className="h-10 w-auto object-contain"
-              />
+      <div className="relative w-full max-w-md">
+        {/* Main Card */}
+        <div className="bg-white rounded-3xl border border-gray-100 shadow-xl shadow-gray-200/50 p-6 sm:p-10 space-y-7 animate-fade-in-up">
+          
+          {/* Header */}
+          <div className="text-center space-y-2.5">
+            <div className="inline-flex items-center gap-1.5 px-3.5 py-1 rounded-full bg-orange-50 border border-orange-100 text-orange-600 text-xs font-bold tracking-wide uppercase">
+              <Sparkles className="h-3.5 w-3.5" />
+              Welcome Back
             </div>
+            <h1 className="text-2xl sm:text-3xl font-black text-gray-900 tracking-tight">
+              Sign In to Food Flow
+            </h1>
+            <p className="text-xs sm:text-sm text-gray-500">
+              Enter your credentials to access your account
+            </p>
+          </div>
 
-            {/* Header */}
-            <div className="text-center space-y-2">
-              <motion.h1
-                initial={{ opacity: 0, y: 16 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.5, ease: "easeOut" }}
-                className="text-3xl font-extrabold text-gray-900 tracking-tight dark:text-gray-100"
-              >
-                Sign In
-              </motion.h1>
-              <motion.p
-                initial={{ opacity: 0, y: 16 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.05, duration: 0.5, ease: "easeOut" }}
-                className="text-sm text-gray-500 dark:text-gray-400"
-              >
-                Enter your credentials to access your Food Flow account
-              </motion.p>
-            </div>
-
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.1, duration: 0.5, ease: "easeOut" }}
-              className="space-y-6"
+          {/* Social Sign In (Google) */}
+          <div className="space-y-3">
+            <button
+              type="button"
+              onClick={handleGoogleLogin}
+              disabled={isLoading || isGoogleLoading}
+              className="flex items-center justify-center gap-3 w-full px-4 py-3.5 rounded-xl border border-gray-200 bg-white text-sm font-semibold text-gray-700 shadow-xs hover:border-orange-200 hover:bg-orange-50/40 hover:text-orange-600 hover:shadow-md hover:shadow-orange-500/5 hover:-translate-y-0.5 active:scale-[0.99] disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:translate-y-0 transition-all duration-200"
             >
-              {/* Social login */}
-              <div className="space-y-3">
-                <SocialButton
-                  provider="google"
-                  label="Continue with Google"
-                  icon={
-                    <svg
-                      className="h-4 w-4"
-                      viewBox="0 0 24 24"
-                      aria-hidden="true"
-                    >
-                      <path
-                        fill="#4285F4"
-                        d="M23.49 12.27c0-.79-.07-1.54-.19-2.27H12v4.51h6.47a5.57 5.57 0 0 1-2.4 3.58v3h3.86c2.26-2.09 3.56-5.17 3.56-8.82Z"
-                      />
-                      <path
-                        fill="#34A853"
-                        d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.86-3c-1.08.72-2.45 1.16-4.07 1.16-3.13 0-5.78-2.11-6.73-4.96H1.29v3.09A11.99 11.99 0 0 0 12 24Z"
-                      />
-                      <path
-                        fill="#FBBC05"
-                        d="M5.27 14.29a7.19 7.19 0 0 1 0-4.58V6.62H1.29a12.04 12.04 0 0 0 0 10.76l3.98-3.09Z"
-                      />
-                      <path
-                        fill="#EA4335"
-                        d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0A11.99 11.99 0 0 0 1.29 6.62l3.98 3.09C6.22 6.86 8.87 4.75 12 4.75Z"
-                      />
-                    </svg>
-                  }
-                  onClick={handleSocialLogin}
-                  disabled={isLoading || isSocialLoading !== null}
-                />
-
-                {isSocialLoading && (
-                  <p className="flex items-center justify-center gap-2 text-xs text-gray-500 animate-fade-in-up">
-                    <Loader2 className="h-3.5 w-3.5 animate-spin text-brand" />
-                    Connecting to {isSocialLoading}…
-                  </p>
-                )}
-
-                {/* Divider */}
-                <div className="flex items-center gap-3 py-1">
-                  <div className="h-px flex-1 bg-gray-200 dark:bg-gray-800" />
-                  <span className="text-xs font-semibold text-gray-400 uppercase tracking-wide">
-                    or continue with email
-                  </span>
-                  <div className="h-px flex-1 bg-gray-200 dark:bg-gray-800" />
-                </div>
-              </div>
-
-              {/* Form */}
-              <form onSubmit={handleSubmit} className="space-y-5">
-                <AnimatePresence>
-                  {serverError && (
-                    <motion.div
-                      initial={{ opacity: 0, y: -8 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      exit={{ opacity: 0, y: -8 }}
-                      className="flex items-center gap-2 p-3 rounded-btn bg-danger/8 border border-danger/30 text-sm text-danger dark:bg-danger/10 dark:border-danger/30 dark:text-danger"
-                    >
-                      <AlertCircle className="h-4 w-4 shrink-0" />
-                      {serverError}
-                    </motion.div>
-                  )}
-                </AnimatePresence>
-
-                <InputField
-                  id="email"
-                  name="email"
-                  label="Email Address"
-                  type="email"
-                  placeholder="you@example.com"
-                  icon={Mail}
-                  value={form.email}
-                  error={errors.email}
-                  touched={touched.email}
-                  disabled={isLoading}
-                  onChange={handleChange}
-                  onBlur={() => handleBlur("email")}
-                />
-
-                <InputField
-                  id="password"
-                  name="password"
-                  label="Password"
-                  type={showPassword ? "text" : "password"}
-                  placeholder="Enter your password"
-                  icon={Lock}
-                  value={form.password}
-                  error={errors.password}
-                  touched={touched.password}
-                  disabled={isLoading}
-                  onChange={handleChange}
-                  onBlur={() => handleBlur("password")}
-                  trailing={
-                    <button
-                      type="button"
-                      onClick={() => setShowPassword(!showPassword)}
-                      disabled={isLoading}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-brand active:scale-90 transition-all duration-150 disabled:opacity-40"
-                      tabIndex={-1}
-                      aria-label={
-                        showPassword ? "Hide password" : "Show password"
-                      }
-                    >
-                      {showPassword ? (
-                        <EyeOff className="h-4 w-4" />
-                      ) : (
-                        <Eye className="h-4 w-4" />
-                      )}
-                    </button>
-                  }
-                />
-
-                {/* Remember Me & Forgot Password */}
-                <div className="flex items-center justify-between">
-                  <label className="flex items-center gap-2 cursor-pointer group">
-                    <input
-                      type="checkbox"
-                      name="rememberMe"
-                      checked={form.rememberMe}
-                      onChange={handleChange}
-                      disabled={isLoading}
-                      className="h-4 w-4 rounded border-gray-300 text-brand focus:ring-brand/20 accent-brand transition-transform duration-150 group-active:scale-90 disabled:opacity-40"
+              {isGoogleLoading ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin text-orange-500" />
+                  <span>Connecting with Google...</span>
+                </>
+              ) : (
+                <>
+                  <svg className="h-4 w-4 shrink-0" viewBox="0 0 24 24" aria-hidden="true">
+                    <path
+                      fill="#4285F4"
+                      d="M23.49 12.27c0-.79-.07-1.54-.19-2.27H12v4.51h6.47a5.57 5.57 0 0 1-2.4 3.58v3h3.86c2.26-2.09 3.56-5.17 3.56-8.82Z"
                     />
-                    <span className="text-sm text-gray-600 font-medium select-none dark:text-gray-300">
-                      Remember me
-                    </span>
-                  </label>
+                    <path
+                      fill="#34A853"
+                      d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.86-3c-1.08.72-2.45 1.16-4.07 1.16-3.13 0-5.78-2.11-6.73-4.96H1.29v3.09A11.99 11.99 0 0 0 12 24Z"
+                    />
+                    <path
+                      fill="#FBBC05"
+                      d="M5.27 14.29a7.19 7.19 0 0 1 0-4.58V6.62H1.29a12.04 12.04 0 0 0 0 10.76l3.98-3.09Z"
+                    />
+                    <path
+                      fill="#EA4335"
+                      d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0A11.99 11.99 0 0 0 1.29 6.62l3.98 3.09C6.22 6.86 8.87 4.75 12 4.75Z"
+                    />
+                  </svg>
+                  <span>Continue with Google</span>
+                </>
+              )}
+            </button>
 
-                  <Link
-                    href="/auth/forgot-password"
-                    className="text-sm font-semibold text-brand hover:text-brand-dark transition-colors duration-150 dark:text-brand dark:hover:text-brand"
-                  >
-                    Forgot password?
-                  </Link>
-                </div>
+            {/* Divider */}
+            <div className="flex items-center gap-3 py-1">
+              <div className="h-px flex-1 bg-gray-200" />
+              <span className="text-[11px] sm:text-xs font-semibold text-gray-400 uppercase tracking-wider">
+                or continue with email
+              </span>
+              <div className="h-px flex-1 bg-gray-200" />
+            </div>
+          </div>
 
-                {/* Submit */}
+          {/* Form */}
+          <form onSubmit={handleSubmit} className="space-y-4">
+            {serverError && (
+              <div className="flex items-center gap-2 p-3 rounded-xl bg-red-50 border border-red-200 text-xs sm:text-sm text-red-600 animate-slide-down">
+                <AlertCircle className="h-4 w-4 shrink-0" />
+                <span>{serverError}</span>
+              </div>
+            )}
+
+            <InputField
+              id="email"
+              name="email"
+              label="Email Address"
+              type="email"
+              placeholder="you@example.com"
+              icon={Mail}
+              value={form.email}
+              error={errors.email}
+              touched={touched.email}
+              disabled={isLoading || isGoogleLoading}
+              onChange={handleChange}
+              onBlur={() => handleBlur("email")}
+            />
+
+            <InputField
+              id="password"
+              name="password"
+              label="Password"
+              type={showPassword ? "text" : "password"}
+              placeholder="Enter your password"
+              icon={Lock}
+              value={form.password}
+              error={errors.password}
+              touched={touched.password}
+              disabled={isLoading || isGoogleLoading}
+              onChange={handleChange}
+              onBlur={() => handleBlur("password")}
+              trailing={
                 <button
-                  type="submit"
-                  disabled={isLoading}
-                  className={`w-full flex items-center justify-center gap-2 px-6 py-3.5 rounded-btn bg-brand text-white font-semibold text-sm shadow-lg shadow-brand/25 hover:bg-brand-dark hover:shadow-xl hover:shadow-brand/30 hover:-translate-y-0.5 active:scale-[0.98] active:shadow-md disabled:opacity-60 disabled:cursor-not-allowed disabled:hover:translate-y-0 disabled:active:scale-100 transition-all duration-200 ease-out ${
-                    shakeSubmit ? "animate-shake" : ""
-                  }`}
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  disabled={isLoading || isGoogleLoading}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-orange-500 active:scale-90 transition-all duration-150"
+                  tabIndex={-1}
+                  aria-label={showPassword ? "Hide password" : "Show password"}
                 >
-                  {isLoading ? (
-                    <>
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                      Signing in...
-                    </>
+                  {showPassword ? (
+                    <EyeOff className="h-4 w-4" />
                   ) : (
-                    <>
-                      Sign In
-                      <ArrowRight className="h-4 w-4" />
-                    </>
+                    <Eye className="h-4 w-4" />
                   )}
                 </button>
-              </form>
+              }
+            />
 
-              {/* Footer */}
-              <div className="space-y-3 pt-1">
-                <p className="text-center text-sm text-gray-500 dark:text-gray-400">
-                  Don&apos;t have an account?{" "}
-                  <Link
-                    href="/auth/register"
-                    className="font-semibold text-brand hover:text-brand-dark transition-colors duration-150 dark:text-brand dark:hover:text-brand"
-                  >
-                    Create account
-                  </Link>
-                </p>
+            {/* Remember Me & Forgot Password */}
+            <div className="flex items-center justify-between pt-1">
+              <label className="flex items-center gap-2 cursor-pointer select-none group">
+                <input
+                  type="checkbox"
+                  name="rememberMe"
+                  checked={form.rememberMe}
+                  onChange={handleChange}
+                  disabled={isLoading || isGoogleLoading}
+                  className="h-4 w-4 rounded border-gray-300 text-orange-500 focus:ring-orange-500/20 accent-orange-500 transition-transform duration-150 group-active:scale-90"
+                />
+                <span className="text-xs sm:text-sm text-gray-600">
+                  Remember me
+                </span>
+              </label>
 
-                <div className="flex items-center justify-center gap-2 text-xs text-gray-400">
-                  <Home className="h-3.5 w-3.5" />
-                  <Link
-                    href="/"
-                    className="font-medium hover:text-brand transition-colors duration-150"
-                  >
-                    Back to Home
-                  </Link>
-                </div>
-              </div>
-            </motion.div>
+              <Link
+                href="/auth/forgot-password"
+                className="text-xs sm:text-sm font-semibold text-orange-600 hover:text-orange-700 hover:underline transition-colors"
+              >
+                Forgot password?
+              </Link>
+            </div>
+
+            {/* Submit Button */}
+            <button
+              type="submit"
+              disabled={isLoading || isGoogleLoading}
+              className={`w-full flex items-center justify-center gap-2 px-6 py-3.5 rounded-full bg-orange-500 text-white font-bold text-sm sm:text-base shadow-lg shadow-orange-500/25 hover:bg-orange-600 hover:shadow-xl hover:shadow-orange-500/30 hover:-translate-y-0.5 active:scale-[0.98] disabled:opacity-60 disabled:cursor-not-allowed disabled:hover:translate-y-0 transition-all duration-200 ease-out ${
+                shakeSubmit ? "animate-shake" : ""
+              }`}
+            >
+              {isLoading ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  <span>Signing in...</span>
+                </>
+              ) : (
+                <>
+                  <span>Sign In</span>
+                  <ArrowRight className="h-4 w-4" />
+                </>
+              )}
+            </button>
+          </form>
+
+          {/* Footer & Register Link */}
+          <div className="pt-2 border-t border-gray-100 flex flex-col items-center gap-3">
+            <div className="flex items-center gap-1.5 text-[11px] text-gray-400">
+              <ShieldCheck className="h-3.5 w-3.5 text-emerald-500" />
+              <span>Safe & Secure login credentials</span>
+            </div>
+
+            <p className="text-center text-xs sm:text-sm text-gray-500">
+              Don&apos;t have an account?{" "}
+              <Link
+                href="/auth/register"
+                className="font-bold text-orange-600 hover:text-orange-700 hover:underline transition-colors duration-150"
+              >
+                Create Account
+              </Link>
+            </p>
           </div>
+
         </div>
       </div>
     </div>
