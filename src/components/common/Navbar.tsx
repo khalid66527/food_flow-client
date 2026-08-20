@@ -13,7 +13,8 @@ import {
   Bike, 
   ShieldCheck, 
   Menu, 
-  X 
+  X,
+  ChevronDown
 } from "lucide-react";
 import { useSession, signOut } from "@/lib/auth-client";
 
@@ -180,7 +181,7 @@ export default function Navbar({
             <div className="relative">
               <button 
                 onClick={() => setIsDropdownOpen(!isDropdownOpen)}
-                className="flex items-center gap-2 rounded-full focus:outline-none focus:ring-2 focus:ring-orange-500 focus:ring-offset-2 transition-all"
+                className="group flex items-center gap-1.5 rounded-full focus:outline-none focus:ring-2 focus:ring-orange-500 focus:ring-offset-2 transition-all"
               >
                 {user.image ? (
                   <img src={user.image} alt={user.name} className="h-9 w-9 sm:h-10 sm:w-10 rounded-full object-cover border-2 border-orange-400 shadow-xs" />
@@ -189,6 +190,7 @@ export default function Navbar({
                     {user.name ? user.name.charAt(0).toUpperCase() : "U"}
                   </div>
                 )}
+                <ChevronDown className="h-5 w-5 text-slate-600 transition-transform duration-200 group-hover:text-orange-600" />
               </button>
 
               {/* User Dropdown Menu */}
