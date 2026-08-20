@@ -271,7 +271,7 @@ function ReviewCard({
       </div>
 
       {/* Review text */}
-      <p className="mt-3 flex-1 text-[13px] leading-relaxed text-gray-600 sm:text-sm">{review.text}</p>
+      <p className="mt-3 flex-1 truncate whitespace-nowrap text-[13px] text-gray-600 sm:text-sm" title={review.text}>{review.text}</p>
 
       {/* Food ordered badge */}
       <div className="mt-4 border-t border-gray-100 pt-3">
