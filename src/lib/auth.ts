@@ -1,5 +1,4 @@
 // const dns = require("node:dns");
-
 // dns.setServers(["8.8.8.8", "8.8.4.4"]);
 
 import { betterAuth } from "better-auth";
@@ -13,7 +12,6 @@ if (!mongodbUri) {
 }
 
 const client = new MongoClient(mongodbUri);
-
 const db = client.db("food-delivery-platform");
 
 // Google OAuth is enabled only when both credentials are available
