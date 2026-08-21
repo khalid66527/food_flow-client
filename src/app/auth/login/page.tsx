@@ -33,7 +33,7 @@ import type {
 const ROLE_REDIRECT_MAP: RoleRedirectMap = {
   Customer: "/dashboard/customer",
   "Restaurant Partner": "/dashboard/restaurant",
-  "Delivery Partner": "/dashboard/delivery",
+  "Delivery Partner": "/dashboard/rider",
 };
 
 const REDIRECT_COUNTDOWN_SECONDS = 3;
