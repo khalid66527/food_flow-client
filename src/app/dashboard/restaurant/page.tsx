@@ -1,9 +1,10 @@
+import RestaurantOverview from '@/components/dashboardComponents/restaurantDashboard/RestaurantOverview';
 import React from 'react';
 
 const page = () => {
     return (
         <div>
-            <h1>Restaurant page</h1>
+            <RestaurantOverview />
         </div>
     );
 };
