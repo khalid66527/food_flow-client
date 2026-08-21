@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
@@ -23,6 +23,9 @@ import {
   Utensils,
   ChevronLeft,
   Sparkles,
+  Truck,
+  Store,
+  Plus,
 } from "lucide-react";
 import { useSession, signOut } from "@/lib/auth-client";
 
@@ -47,6 +50,36 @@ export default function DashboardSideBar() {
   const [isMobileOpen, setIsMobileOpen] = useState(false);
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [isOnline, setIsOnline] = useState(true);
+  const [hasRestaurant, setHasRestaurant] = useState<boolean>(true);
+
+  // Sync restaurant creation status from localStorage
+  useEffect(() => {
+    const checkRestaurant = () => {
+      if (typeof window === "undefined") return;
+      const savedStatus = localStorage.getItem("foodflow_has_restaurant");
+      const savedData = localStorage.getItem("foodflow_restaurant_data");
+      
+      if (savedStatus !== null) {
+        setHasRestaurant(savedStatus === "true");
+      } else if (savedData) {
+        setHasRestaurant(true);
+      } else {
+        // default to false to guide new users to open their restaurant first
+        setHasRestaurant(false);
+      }
+    };
+
+    checkRestaurant();
+
+    const handleCustomEvent = () => checkRestaurant();
+    window.addEventListener("storage", handleCustomEvent);
+    window.addEventListener("restaurantStatusChanged", handleCustomEvent);
+
+    return () => {
+      window.removeEventListener("storage", handleCustomEvent);
+      window.removeEventListener("restaurantStatusChanged", handleCustomEvent);
+    };
+  }, []);
 
   const handleLogout = async () => {
     try {
@@ -78,6 +111,13 @@ export default function DashboardSideBar() {
           icon: ClipboardList,
           badge: "8 Active",
           badgeType: "brand",
+        },
+        {
+          label: "Delivery",
+          href: "/dashboard/restaurant/delivery",
+          icon: Truck,
+          badge: "Live",
+          badgeType: "accent",
         },
       ],
     },
@@ -140,11 +180,21 @@ export default function DashboardSideBar() {
     {
       title: "Account & System",
       items: [
-        {
-          label: "Profile",
-          href: "/dashboard/restaurant/profile",
-          icon: User,
-        },
+        hasRestaurant
+          ? {
+              label: "Restaurant Profile",
+              href: "/dashboard/restaurant/profile",
+              icon: User,
+              badge: "Verified",
+              badgeType: "success",
+            }
+          : {
+              label: "Open Restaurant",
+              href: "/dashboard/restaurant/create-restaurant",
+              icon: Store,
+              badge: "Setup",
+              badgeType: "brand",
+            },
         {
           label: "Settings",
           href: "/dashboard/restaurant/settings",
