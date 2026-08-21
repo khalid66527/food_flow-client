@@ -1,10 +1,10 @@
-import RiderHome from '@/components/dashboardComponents/riderDashboard/RiderHome';
+import RiderEarnings from '@/components/dashboardComponents/riderDashboard/RiderEarnings';
 import React from 'react';
 
 const page = () => {
     return (
         <div>
-            <RiderHome />
+            <RiderEarnings />
         </div>
     );
 };
