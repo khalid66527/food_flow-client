@@ -1,9 +1,10 @@
+import RestaurantAnalytics from '@/components/dashboardComponents/restaurantDashboard/RestaurantAnalytics';
 import React from 'react';
 
 const page = () => {
     return (
         <div>
-            Analytics
+            <RestaurantAnalytics />
         </div>
     );
 };

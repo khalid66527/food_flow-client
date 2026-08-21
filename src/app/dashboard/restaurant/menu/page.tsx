@@ -1,9 +1,10 @@
+import RestaurantMenu from '@/components/dashboardComponents/restaurantDashboard/RestaurantMenu';
 import React from 'react';
 
 const page = () => {
     return (
         <div>
-            Restaurant Menu
+            <RestaurantMenu />
         </div>
     );
 };

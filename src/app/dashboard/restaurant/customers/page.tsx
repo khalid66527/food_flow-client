@@ -1,9 +1,10 @@
+import RestaurantCustomers from '@/components/dashboardComponents/restaurantDashboard/RestaurantCustomers';
 import React from 'react';
 
 const page = () => {
     return (
         <div>
-            Customers
+            <RestaurantCustomers />
         </div>
     );
 };
