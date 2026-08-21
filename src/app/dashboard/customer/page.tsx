@@ -1,9 +1,10 @@
+import CustomerHome from '@/components/dashboardComponents/customerDashboard/CustomerHome';
 import React from 'react';
 
 const page = () => {
     return (
         <div>
-            <h1>Customer page</h1>
+            <CustomerHome />
         </div>
     );
 };
