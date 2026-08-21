@@ -87,7 +87,7 @@ export default function Navbar({
     }
     if (roleStr.includes("delivery") || roleStr.includes("rider")) {
       return [
-        { label: "Rider Dashboard", href: "/dashboard/delivery", icon: LayoutDashboard },
+        { label: "Rider Dashboard", href: "/dashboard/rider", icon: LayoutDashboard },
         { label: "Delivery History", href: "/rider/history", icon: Bike },
       ];
     }

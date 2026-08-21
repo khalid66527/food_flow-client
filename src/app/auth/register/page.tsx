@@ -66,7 +66,7 @@ const ROLES: {
 const ROLE_REDIRECT_MAP: RoleRedirectMap = {
   Customer: "/dashboard/customer",
   "Restaurant Partner": "/dashboard/restaurant",
-  "Delivery Partner": "/dashboard/delivery",
+  "Delivery Partner": "/dashboard/rider",
 };
 
 // Seconds to wait before auto-redirecting after successful registration.
