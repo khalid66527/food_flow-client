@@ -1,4 +1,7 @@
 "use client"
+
+import Link from "next/link";
+
 export default function NotFound() {
   return (
     <div className="min-h-[80vh] flex items-center justify-center px-4 py-12 bg-white">
@@ -37,12 +40,12 @@ export default function NotFound() {
 
         {/* Action Buttons */}
         <div className="flex flex-col sm:flex-row items-center justify-center gap-3 pt-4">
-          <a
+          <Link
             href="/"
             className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-6 py-3 rounded-full bg-orange-500 text-white font-semibold text-sm shadow-lg shadow-orange-500/25 hover:bg-orange-600 transition-all duration-200"
           >
             Back to Home
-          </a>
+          </Link>
           
           <button
             onClick={() => window.history.back()}
