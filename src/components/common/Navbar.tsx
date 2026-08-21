@@ -82,13 +82,13 @@ export default function Navbar({
     if (roleStr.includes("restaurant")) {
       return [
         { label: "Restaurant Dashboard", href: "/dashboard/restaurant", icon: LayoutDashboard },
-        { label: "Menu Management", href: "/restaurant/menu", icon: ShoppingBag },
+        { label: "Menu Management", href: "/dashboard/restaurant/menu", icon: ShoppingBag },
       ];
     }
     if (roleStr.includes("delivery") || roleStr.includes("rider")) {
       return [
         { label: "Rider Dashboard", href: "/dashboard/rider", icon: LayoutDashboard },
-        { label: "Delivery History", href: "/rider/history", icon: Bike },
+        { label: "Delivery History", href: "/dashboard/rider/history", icon: Bike },
       ];
     }
     if (roleStr.includes("admin")) {
@@ -98,8 +98,8 @@ export default function Navbar({
     }
     return [
       { label: "Dashboard", href: "/dashboard/customer", icon: LayoutDashboard },
-      { label: "My Orders", href: "/customer/orders", icon: ShoppingBag },
-      { label: "Profile", href: "/customer/profile", icon: User },
+      { label: "My Cart", href: "/dashboard/customer/cart", icon: ShoppingBag },
+      { label: "Profile", href: "/dashboard/customer/profile", icon: User },
     ];
   };
 

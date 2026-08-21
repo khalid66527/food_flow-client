@@ -1,8 +1,8 @@
 "use client";
 
-import React, { useState, useCallback, useEffect } from "react";
+import React, { useState, useCallback, useEffect, Suspense } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import {
   Mail,
   Lock,
@@ -28,15 +28,35 @@ import type {
 
 // ---------------------------------------------------------------------------
 // Role-based destination after a successful sign-in.
-// Kept in sync with the public registration role selection.
 // ---------------------------------------------------------------------------
-const ROLE_REDIRECT_MAP: RoleRedirectMap = {
-  Customer: "/dashboard/customer",
-  "Restaurant Partner": "/dashboard/restaurant",
-  "Delivery Partner": "/dashboard/rider",
-};
+function getDestination(role?: string | null, callbackUrl?: string | null): string {
+  const normRole = (role || "Customer").toLowerCase();
+  const defaultDashboard = normRole.includes("admin")
+    ? "/dashboard/admin"
+    : normRole.includes("restaurant")
+    ? "/dashboard/restaurant"
+    : normRole.includes("rider") || normRole.includes("delivery")
+    ? "/dashboard/rider"
+    : "/dashboard/customer";
 
-const REDIRECT_COUNTDOWN_SECONDS = 3;
+  if (!callbackUrl) return defaultDashboard;
+
+  try {
+    const decoded = decodeURIComponent(callbackUrl);
+    // Allow redirect to target callbackUrl if user has matching role or it's a general page
+    if (decoded.startsWith("/dashboard/admin") && normRole.includes("admin")) return decoded;
+    if (decoded.startsWith("/dashboard/restaurant") && normRole.includes("restaurant")) return decoded;
+    if (decoded.startsWith("/dashboard/rider") && (normRole.includes("rider") || normRole.includes("delivery"))) return decoded;
+    if (decoded.startsWith("/dashboard/customer") && normRole.includes("customer")) return decoded;
+    if (!decoded.startsWith("/dashboard/")) return decoded;
+  } catch {
+    return defaultDashboard;
+  }
+
+  return defaultDashboard;
+}
+
+const REDIRECT_COUNTDOWN_SECONDS = 2;
 
 const INITIAL_FORM: LoginFormData = {
   email: "",
@@ -167,9 +187,10 @@ function InputField({
 
 // ---------------------------------------------------------------------------
 // LoginPage
-// ---------------------------------------------------------------------------
-export default function LoginPage() {
+function LoginForm() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const callbackUrl = searchParams.get("callbackUrl");
 
   const [form, setForm] = useState<LoginFormData>(INITIAL_FORM);
   const [errors, setErrors] = useState<LoginFormErrors>({});
@@ -200,9 +221,8 @@ export default function LoginPage() {
     if (!isSuccess || !loggedInUser) return;
 
     if (redirectCountdown <= 0) {
-      router.push(
-        ROLE_REDIRECT_MAP[loggedInUser.role] ?? "/dashboard/customer"
-      );
+      const destination = getDestination(loggedInUser.role, callbackUrl);
+      router.push(destination);
       return;
     }
 
@@ -211,7 +231,7 @@ export default function LoginPage() {
       1000
     );
     return () => clearTimeout(timer);
-  }, [isSuccess, loggedInUser, redirectCountdown, router]);
+  }, [isSuccess, loggedInUser, redirectCountdown, router, callbackUrl]);
 
   const handleChange = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -330,8 +350,7 @@ export default function LoginPage() {
   // Success state
   // -------------------------------------------------------------------------
   if (isSuccess && loggedInUser) {
-    const dashboardRoute =
-      ROLE_REDIRECT_MAP[loggedInUser.role] ?? "/dashboard/customer";
+    const dashboardRoute = getDestination(loggedInUser.role, callbackUrl);
 
     return (
       <div className="relative min-h-[85vh] flex items-center justify-center px-4 py-12 sm:py-16 overflow-hidden bg-white">
@@ -617,5 +636,21 @@ export default function LoginPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-[85vh] flex items-center justify-center">
+          <div className="w-10 h-10 rounded-2xl bg-orange-100 flex items-center justify-center text-orange-500">
+            <Loader2 className="w-5 h-5 animate-spin" />
+          </div>
+        </div>
+      }
+    >
+      <LoginForm />
+    </Suspense>
   );
 }
