@@ -10,6 +10,8 @@
   },
   "dependencies": {
     "@better-auth/mongo-adapter": "^1.7.1",
+    "@types/aos": "^3.0.8",
+    "aos": "^2.3.4",
     "better-auth": "^1.7.0",
     "framer-motion": "^13.1.0",
     "lucide-react": "^1.31.0",

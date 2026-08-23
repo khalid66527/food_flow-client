@@ -1,12 +1,12 @@
-import CreateRestaurant from '@/components/dashboardComponents/restaurantDashboard/CreateRestaurant';
+import RestaurantProfile from '@/components/dashboardComponents/restaurantDashboard/RestaurantProfile';
 import React from 'react';
 
-const page = () => {
-    return (
-        <div>
-            <CreateRestaurant />
-        </div>
-    );
+const CreateRestaurantPage = () => {
+  return (
+    <div className="space-y-6">
+      <RestaurantProfile />
+    </div>
+  );
 };
 
-export default page;
+export default CreateRestaurantPage;
