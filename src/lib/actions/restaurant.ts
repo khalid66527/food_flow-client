@@ -1,0 +1,120 @@
+import { ApiResponse, IRestaurant } from "@/lib/api/restaurant";
+
+const API_BASE_URL =
+  process.env.NEXT_PUBLIC_SERVER_API_URL || "http://localhost:5000/api";
+
+// -------------------------------------------------------------
+// Mutating Actions (POST, PATCH, DELETE) for Restaurant
+// -------------------------------------------------------------
+
+/**
+ * Create a new restaurant profile
+ */
+export async function createRestaurantProfile(
+  payload: Partial<IRestaurant>
+): Promise<ApiResponse<IRestaurant>> {
+  try {
+    const res = await fetch(`${API_BASE_URL}/restaurants`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(payload),
+    });
+
+    const data = await res.json();
+    return data;
+  } catch (err: any) {
+    console.error("Error creating restaurant profile:", err);
+    return {
+      success: false,
+      message: err.message || "Failed to submit restaurant form to server.",
+    };
+  }
+}
+
+/**
+ * Update an existing restaurant profile
+ */
+export async function updateRestaurantProfile(
+  ownerEmail: string,
+  payload: Partial<IRestaurant>
+): Promise<ApiResponse<IRestaurant>> {
+  try {
+    const url = new URL(`${API_BASE_URL}/restaurants/my-profile`);
+    url.searchParams.append("ownerEmail", ownerEmail);
+
+    const res = await fetch(url.toString(), {
+      method: "PATCH",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(payload),
+    });
+
+    const data = await res.json();
+    return data;
+  } catch (err: any) {
+    console.error("Error updating restaurant profile:", err);
+    return {
+      success: false,
+      message: err.message || "Failed to update restaurant profile.",
+    };
+  }
+}
+
+/**
+ * Toggle restaurant Open / Closed status
+ */
+export async function toggleRestaurantStatus(
+  ownerEmail: string,
+  isOpen: boolean
+): Promise<ApiResponse<IRestaurant>> {
+  try {
+    const res = await fetch(`${API_BASE_URL}/restaurants/toggle-status`, {
+      method: "PATCH",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ ownerEmail, isOpen }),
+    });
+
+    const data = await res.json();
+    return data;
+  } catch (err: any) {
+    console.error("Error toggling restaurant status:", err);
+    return {
+      success: false,
+      message: err.message || "Failed to update restaurant status.",
+    };
+  }
+}
+
+/**
+ * Delete restaurant profile
+ */
+export async function deleteRestaurantProfile(
+  id: string,
+  ownerEmail?: string
+): Promise<ApiResponse<IRestaurant>> {
+  try {
+    const url = new URL(`${API_BASE_URL}/restaurants/${id}`);
+    if (ownerEmail) url.searchParams.append("ownerEmail", ownerEmail);
+
+    const res = await fetch(url.toString(), {
+      method: "DELETE",
+      headers: {
+        "Content-Type": "application/json",
+      },
+    });
+
+    const data = await res.json();
+    return data;
+  } catch (err: any) {
+    console.error("Error deleting restaurant:", err);
+    return {
+      success: false,
+      message: err.message || "Failed to delete restaurant.",
+    };
+  }
+}

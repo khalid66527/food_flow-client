@@ -52,19 +52,34 @@ export default function DashboardSideBar() {
   const [isOnline, setIsOnline] = useState(true);
   const [hasRestaurant, setHasRestaurant] = useState<boolean>(true);
 
-  // Sync restaurant creation status from localStorage
+  // Sync restaurant creation status from localStorage and API
   useEffect(() => {
-    const checkRestaurant = () => {
+    const checkRestaurant = async () => {
       if (typeof window === "undefined") return;
       const savedStatus = localStorage.getItem("foodflow_has_restaurant");
       const savedData = localStorage.getItem("foodflow_restaurant_data");
-      
-      if (savedStatus !== null) {
-        setHasRestaurant(savedStatus === "true");
-      } else if (savedData) {
+      const savedEmail = localStorage.getItem("restaurant_owner_email");
+
+      if (savedStatus === "true" || savedData || savedEmail) {
         setHasRestaurant(true);
-      } else {
-        // default to false to guide new users to open their restaurant first
+        return;
+      }
+
+      // Fetch from API to check if profile exists
+      try {
+        const { getMyRestaurantProfile } = await import("@/lib/api/restaurant");
+        const res = await getMyRestaurantProfile(session?.user?.email || savedEmail || "");
+        if (res.success && res.data) {
+          setHasRestaurant(true);
+          localStorage.setItem("foodflow_has_restaurant", "true");
+          localStorage.setItem("foodflow_restaurant_data", JSON.stringify(res.data));
+          if (res.data.ownerEmail) {
+            localStorage.setItem("restaurant_owner_email", res.data.ownerEmail);
+          }
+        } else {
+          setHasRestaurant(false);
+        }
+      } catch {
         setHasRestaurant(false);
       }
     };
@@ -79,7 +94,7 @@ export default function DashboardSideBar() {
       window.removeEventListener("storage", handleCustomEvent);
       window.removeEventListener("restaurantStatusChanged", handleCustomEvent);
     };
-  }, []);
+  }, [session?.user?.email]);
 
   const handleLogout = async () => {
     try {
