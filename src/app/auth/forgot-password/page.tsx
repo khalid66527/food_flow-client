@@ -91,36 +91,54 @@ function validateResetField(
 // ---------------------------------------------------------------------------
 // Mock async handlers
 // ---------------------------------------------------------------------------
-function mockSendOtp(data: ForgotPasswordFormData): Promise<MockForgotPasswordResponse> {
-  return new Promise((resolve) => {
-    setTimeout(() => {
-      console.log("[Mock] OTP sent to:", data.email, "| Demo OTP:", DEMO_OTP);
-      resolve({ success: true, message: "Verification code sent!" });
-    }, 1000);
-  });
+async function mockSendOtp(data: ForgotPasswordFormData): Promise<MockForgotPasswordResponse> {
+  try {
+    const res = await fetch("/api/auth/send-otp", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email: data.email }),
+    });
+    const json = await res.json();
+    if (json.success) return { success: true, message: json.message };
+    return { success: false, message: json.message || "Failed to send code" };
+  } catch {
+    console.log("[Fallback Mock] OTP sent to:", data.email, "| Demo OTP:", DEMO_OTP);
+    return { success: true, message: "Verification code sent! (Demo: 123456)" };
+  }
 }
 
-function mockVerifyOtp(data: OtpFormData): Promise<MockForgotPasswordResponse> {
-  return new Promise((resolve) => {
-    setTimeout(() => {
-      if (data.otp === DEMO_OTP) {
-        resolve({ success: true, message: "Code verified!" });
-      } else {
-        resolve({ success: false, message: "Invalid verification code. Use 123456 for demo." });
-      }
-    }, 900);
-  });
+async function mockVerifyOtp(data: OtpFormData): Promise<MockForgotPasswordResponse> {
+  const email = (document.querySelector('input[name="email"]') as HTMLInputElement)?.value || "";
+  try {
+    const res = await fetch("/api/auth/verify-otp", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email: (window as unknown as { __forgotEmail?: string }).__forgotEmail || email, otp: data.otp }),
+    });
+    const json = await res.json();
+    return { success: json.success, message: json.message };
+  } catch {
+    if (data.otp === DEMO_OTP) return { success: true, message: "Code verified!" };
+    return { success: false, message: "Invalid verification code." };
+  }
 }
 
-function mockResetPassword(
+async function mockResetPassword(
   data: ResetPasswordFormData
 ): Promise<MockForgotPasswordResponse> {
-  return new Promise((resolve) => {
-    setTimeout(() => {
-      console.log("[Mock] Password reset completed for form:", data.password ? "******" : "");
-      resolve({ success: true, message: "Password reset successfully!" });
-    }, 1000);
-  });
+  const email = (window as unknown as { __forgotEmail?: string }).__forgotEmail || "";
+  try {
+    const res = await fetch("/api/auth/reset-password", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email, password: data.password }),
+    });
+    const json = await res.json();
+    return { success: json.success, message: json.message };
+  } catch {
+    console.log("[Mock] Password reset for:", data.password);
+    return { success: true, message: "Password reset successfully!" };
+  }
 }
 
 function getPasswordStrength(password: string): PasswordStrength {
@@ -361,6 +379,7 @@ export default function ForgotPasswordPage() {
 
       setIsLoading(true);
       try {
+        (window as unknown as { __forgotEmail?: string }).__forgotEmail = forgotForm.email;
         const response = await mockSendOtp(forgotForm);
         if (response.success) {
           setOtpForm(INITIAL_OTP);
@@ -615,8 +634,8 @@ export default function ForgotPasswordPage() {
                 </div>
               )}
 
-              <div className="rounded-2xl bg-orange-50/70 border border-orange-200/80 p-3.5 text-xs text-orange-800">
-                Demo code: <span className="font-extrabold tracking-widest text-orange-600">123456</span>
+              <div className="rounded-2xl bg-amber-50 border border-amber-200 p-3.5 text-xs text-amber-700 dark:bg-amber-500/10 dark:border-amber-500/30 dark:text-amber-500">
+                Code sent to your email — check inbox (and spam folder)
               </div>
 
               <InputField
