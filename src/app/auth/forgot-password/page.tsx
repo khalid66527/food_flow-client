@@ -3,7 +3,6 @@
 import React, { useState, useCallback, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { motion, AnimatePresence } from "framer-motion";
 import {
   Mail,
   Lock,
@@ -17,6 +16,7 @@ import {
   KeyRound,
   ShieldCheck,
   Smartphone,
+  Sparkles,
 } from "lucide-react";
 import type {
   ForgotPasswordStep,
@@ -32,8 +32,7 @@ import type {
 } from "@/types/auth";
 
 // ---------------------------------------------------------------------------
-// Mock OTP flow — replace with the real email/OTP API once the backend is
-// available. The demo OTP is fixed to "123456" so the flow can be tested.
+// Mock OTP flow — demo OTP is fixed to "123456" for frontend testing.
 // ---------------------------------------------------------------------------
 const DEMO_OTP = "123456";
 const OTP_RESEND_SECONDS = 30;
@@ -90,7 +89,7 @@ function validateResetField(
 }
 
 // ---------------------------------------------------------------------------
-// Mock async handlers — swap with real API calls later
+// Mock async handlers
 // ---------------------------------------------------------------------------
 async function mockSendOtp(data: ForgotPasswordFormData): Promise<MockForgotPasswordResponse> {
   try {
@@ -161,14 +160,14 @@ const STRENGTH_LABELS: Record<PasswordStrength, string> = {
 
 const STRENGTH_COLORS: Record<PasswordStrength, string> = {
   0: "bg-gray-200",
-  1: "bg-red-400",
+  1: "bg-red-500",
   2: "bg-orange-400",
-  3: "bg-yellow-400",
-  4: "bg-green-500",
+  3: "bg-amber-400",
+  4: "bg-emerald-500",
 };
 
 // ---------------------------------------------------------------------------
-// Shared input
+// InputField
 // ---------------------------------------------------------------------------
 function InputField({
   id,
@@ -208,10 +207,10 @@ function InputField({
     <div className="space-y-1.5 group">
       <label
         htmlFor={id}
-        className={`block text-sm font-semibold transition-colors duration-200 ${
+        className={`block text-xs sm:text-sm font-semibold transition-colors duration-200 ${
           showError
             ? "text-red-500"
-            : "text-gray-700 group-focus-within:text-orange-600 dark:text-gray-300"
+            : "text-gray-700 group-focus-within:text-orange-600"
         }`}
       >
         {label}
@@ -238,10 +237,10 @@ function InputField({
           autoComplete="off"
           className={`w-full pl-10 ${
             trailing ? "pr-11" : "pr-4"
-          } py-3 rounded-xl border text-sm text-gray-900 placeholder:text-gray-400 outline-none transition-all duration-200 ease-out disabled:opacity-50 disabled:cursor-not-allowed disabled:bg-gray-50 dark:bg-gray-900 dark:text-gray-100 dark:placeholder:text-gray-500 dark:disabled:bg-gray-950 ${
+          } py-3 rounded-xl border text-sm text-gray-900 bg-white placeholder:text-gray-400 outline-none transition-all duration-200 ease-out disabled:opacity-50 disabled:cursor-not-allowed disabled:bg-gray-50 ${
             showError
-              ? "border-red-300 focus:ring-2 focus:ring-red-500/20 focus:border-red-500 animate-shake dark:border-red-600"
-              : "border-gray-200 hover:border-gray-300 focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 focus:shadow-[0_0_0_3px_rgba(249,115,22,0.08)] dark:border-gray-700 dark:hover:border-gray-600"
+              ? "border-red-300 focus:ring-2 focus:ring-red-500/20 focus:border-red-500 animate-shake"
+              : "border-gray-200 hover:border-gray-300 focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 focus:shadow-[0_0_0_3px_rgba(249,115,22,0.08)]"
           }`}
         />
         {trailing}
@@ -273,7 +272,7 @@ function StepIndicator({ step }: { step: Exclude<ForgotPasswordStep, "done"> }) 
   const currentIndex = order.indexOf(step);
 
   return (
-    <div className="flex items-center justify-center gap-2">
+    <div className="flex items-center justify-center gap-2 py-1">
       {order.map((s, idx) => {
         const meta = STEP_META[s];
         const Icon = meta.icon;
@@ -283,31 +282,31 @@ function StepIndicator({ step }: { step: Exclude<ForgotPasswordStep, "done"> }) 
           <React.Fragment key={s}>
             {idx > 0 && (
               <div
-                className={`h-0.5 w-8 rounded-full transition-colors duration-300 ${
-                  idx <= currentIndex ? "bg-orange-500" : "bg-gray-200 dark:bg-gray-700"
+                className={`h-0.5 w-6 sm:w-10 rounded-full transition-colors duration-300 ${
+                  idx <= currentIndex ? "bg-orange-500" : "bg-gray-200"
                 }`}
               />
             )}
-            <div className="flex flex-col items-center gap-1.5">
+            <div className="flex flex-col items-center gap-1">
               <div
-                className={`flex h-9 w-9 items-center justify-center rounded-full border-2 transition-all duration-300 ${
+                className={`flex h-8 w-8 sm:h-9 sm:w-9 items-center justify-center rounded-full border-2 transition-all duration-300 ${
                   isDone
-                    ? "bg-orange-500 border-orange-500 text-white"
+                    ? "bg-orange-500 border-orange-500 text-white shadow-xs"
                     : isActive
-                    ? "border-orange-500 text-orange-500 bg-orange-50 dark:bg-orange-500/10"
-                    : "border-gray-200 text-gray-400 dark:border-gray-700"
+                    ? "border-orange-500 text-orange-600 bg-orange-50 font-bold"
+                    : "border-gray-200 text-gray-400 bg-white"
                 }`}
               >
                 {isDone ? (
                   <CheckCircle2 className="h-4 w-4" />
                 ) : (
-                  <Icon className="h-4 w-4" />
+                  <Icon className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
                 )}
               </div>
               <span
-                className={`text-[11px] font-semibold ${
+                className={`text-[10px] sm:text-xs font-semibold ${
                   isActive || isDone
-                    ? "text-orange-600 dark:text-orange-400"
+                    ? "text-orange-600"
                     : "text-gray-400"
                 }`}
               >
@@ -322,7 +321,7 @@ function StepIndicator({ step }: { step: Exclude<ForgotPasswordStep, "done"> }) 
 }
 
 // ---------------------------------------------------------------------------
-// Page
+// ForgotPasswordPage
 // ---------------------------------------------------------------------------
 export default function ForgotPasswordPage() {
   const router = useRouter();
@@ -367,7 +366,7 @@ export default function ForgotPasswordPage() {
     return () => clearTimeout(timer);
   }, [step, redirectCountdown, router]);
 
-  // Step 1: send OTP to email
+  // Step 1: Send OTP
   const handleSendOtp = useCallback(
     async (e: React.FormEvent) => {
       e.preventDefault();
@@ -392,7 +391,7 @@ export default function ForgotPasswordPage() {
           setServerError(response.message);
         }
       } catch {
-        setServerError("Failed to send the verification code. Try again.");
+        setServerError("Failed to send verification code. Please try again.");
       } finally {
         setIsLoading(false);
       }
@@ -400,7 +399,7 @@ export default function ForgotPasswordPage() {
     [forgotForm]
   );
 
-  // Step 2: verify OTP
+  // Step 2: Verify OTP
   const handleVerifyOtp = useCallback(
     async (e: React.FormEvent) => {
       e.preventDefault();
@@ -423,7 +422,7 @@ export default function ForgotPasswordPage() {
           setServerError(response.message);
         }
       } catch {
-        setServerError("Verification failed. Try again.");
+        setServerError("Verification failed. Please try again.");
       } finally {
         setIsLoading(false);
       }
@@ -431,7 +430,7 @@ export default function ForgotPasswordPage() {
     [otpForm]
   );
 
-  // Step 3: set new password
+  // Step 3: Reset Password
   const handleResetPassword = useCallback(
     async (e: React.FormEvent) => {
       e.preventDefault();
@@ -457,7 +456,7 @@ export default function ForgotPasswordPage() {
           setServerError(response.message);
         }
       } catch {
-        setServerError("Password reset failed. Try again.");
+        setServerError("Password reset failed. Please try again.");
       } finally {
         setIsLoading(false);
       }
@@ -476,44 +475,32 @@ export default function ForgotPasswordPage() {
   // -------------------------------------------------------------------------
   if (step === "done") {
     return (
-      <div className="min-h-[80vh] flex items-center justify-center px-4 py-12 bg-white dark:bg-gray-950">
-        <motion.div
-          initial={{ opacity: 0, scale: 0.94 }}
-          animate={{ opacity: 1, scale: 1 }}
-          transition={{ duration: 0.5, ease: "easeOut" }}
-          className="max-w-md w-full text-center space-y-7"
-        >
+      <div className="relative min-h-[85vh] flex items-center justify-center px-4 py-12 sm:py-16 overflow-hidden bg-white">
+        {/* Background Decorative Blur Orbs */}
+        <div className="pointer-events-none absolute -left-32 top-10 h-72 w-72 rounded-full bg-orange-100/50 blur-3xl" />
+        <div className="pointer-events-none absolute -right-32 bottom-0 h-80 w-80 rounded-full bg-orange-50/70 blur-3xl" />
+
+        <div className="relative max-w-md w-full text-center space-y-7 bg-white p-8 rounded-3xl border border-gray-100 shadow-xl shadow-gray-200/50 animate-scale-in">
           <div className="relative w-20 h-20 mx-auto">
-            <motion.div
-              initial={{ scale: 0 }}
-              animate={{ scale: 1 }}
-              transition={{ delay: 0.15, type: "spring", stiffness: 200 }}
-              className="absolute inset-0 bg-orange-100 rounded-full animate-ping opacity-20 dark:bg-orange-500/20"
-            />
-            <motion.div
-              initial={{ scale: 0.5, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              transition={{ delay: 0.1, type: "spring", stiffness: 260 }}
-              className="relative w-20 h-20 bg-orange-50 rounded-full flex items-center justify-center border-2 border-orange-100 dark:bg-orange-500/10 dark:border-orange-500/20"
-            >
+            <div className="absolute inset-0 bg-orange-100 rounded-full animate-ping opacity-25" />
+            <div className="relative w-20 h-20 bg-orange-50 rounded-full flex items-center justify-center border-2 border-orange-100">
               <CheckCircle2 className="w-10 h-10 text-orange-500" />
-            </motion.div>
+            </div>
           </div>
 
           <div className="space-y-2">
-            <h1 className="text-2xl font-extrabold text-gray-900 tracking-tight dark:text-gray-100">
+            <h1 className="text-2xl sm:text-3xl font-extrabold text-gray-900 tracking-tight">
               Password Reset!
             </h1>
-            <p className="text-sm text-gray-500 dark:text-gray-400 leading-relaxed">
-              Your password has been reset successfully. You can now sign in
-              with your new password.
+            <p className="text-sm text-gray-500 leading-relaxed">
+              Your password has been successfully updated. You can now sign in with your new password.
             </p>
           </div>
 
           <div className="space-y-3">
-            <p className="text-xs text-gray-400 dark:text-gray-500">
+            <p className="text-xs text-gray-400">
               Redirecting to{" "}
-              <span className="font-semibold text-gray-600 dark:text-gray-300">
+              <span className="font-semibold text-gray-700">
                 Sign In
               </span>{" "}
               in{" "}
@@ -522,7 +509,7 @@ export default function ForgotPasswordPage() {
               </span>{" "}
               seconds…
             </p>
-            <div className="w-full h-1 bg-gray-100 rounded-full overflow-hidden dark:bg-gray-800">
+            <div className="w-full h-1.5 bg-gray-100 rounded-full overflow-hidden">
               <div
                 className="h-full bg-orange-500 rounded-full transition-all duration-1000 ease-linear"
                 style={{
@@ -536,59 +523,60 @@ export default function ForgotPasswordPage() {
             </div>
           </div>
 
-          <Link
-            href="/auth/login"
-            className="w-full inline-flex items-center justify-center gap-2 px-6 py-3 rounded-full bg-orange-500 text-white font-semibold text-sm shadow-lg shadow-orange-500/25 hover:bg-orange-600 hover:shadow-xl hover:shadow-orange-500/30 active:scale-95 transition-all duration-200"
-          >
-            Go to Sign In
-            <ArrowRight className="h-4 w-4" />
-          </Link>
-        </motion.div>
+          <div className="pt-2">
+            <Link
+              href="/auth/login"
+              className="w-full inline-flex items-center justify-center gap-2 px-6 py-3 rounded-full bg-orange-500 text-white font-semibold text-sm shadow-lg shadow-orange-500/25 hover:bg-orange-600 hover:shadow-xl hover:shadow-orange-500/30 active:scale-95 transition-all duration-200"
+            >
+              <span>Go to Sign In</span>
+              <ArrowRight className="h-4 w-4" />
+            </Link>
+          </div>
+        </div>
       </div>
     );
   }
 
   // -------------------------------------------------------------------------
-  // Flow states
+  // Multi-step Forgot Password Card
   // -------------------------------------------------------------------------
   return (
-    <div className="min-h-[80vh] flex items-center justify-center px-4 py-12 bg-white dark:bg-gray-950">
-      <div className="w-full max-w-md space-y-8">
-        {/* Header */}
-        <div className="text-center space-y-2">
-          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-orange-500 to-amber-500 text-white shadow-lg shadow-orange-500/25 animate-scale-in">
-            <ShieldCheck className="h-7 w-7" />
+    <div className="relative min-h-[85vh] flex items-center justify-center px-4 py-10 sm:py-16 overflow-hidden bg-white">
+      {/* Background Decorative Blur Orbs */}
+      <div className="pointer-events-none absolute -left-32 top-10 h-72 w-72 rounded-full bg-orange-100/50 blur-3xl" />
+      <div className="pointer-events-none absolute -right-32 bottom-0 h-80 w-80 rounded-full bg-orange-50/70 blur-3xl" />
+
+      <div className="relative w-full max-w-md">
+        {/* Main Card */}
+        <div className="bg-white rounded-3xl border border-gray-100 shadow-xl shadow-gray-200/50 p-6 sm:p-10 space-y-7 animate-fade-in-up">
+          
+          {/* Header */}
+          <div className="text-center space-y-2.5">
+            <div className="inline-flex items-center gap-1.5 px-3.5 py-1 rounded-full bg-orange-50 border border-orange-100 text-orange-600 text-xs font-bold tracking-wide uppercase">
+              <Sparkles className="h-3.5 w-3.5" />
+              Account Recovery
+            </div>
+            <h1 className="text-2xl sm:text-3xl font-black text-gray-900 tracking-tight">
+              Forgot Password
+            </h1>
+            <p className="text-xs sm:text-sm text-gray-500">
+              {step === "email" &&
+                "Enter your registered email to receive a verification code"}
+              {step === "otp" && `We sent a 6-digit code to ${forgotForm.email}`}
+              {step === "reset" && "Choose a strong new password for your account"}
+            </p>
           </div>
-          <h1 className="text-3xl font-extrabold text-gray-900 tracking-tight dark:text-gray-100">
-            Forgot Password
-          </h1>
-          <p className="text-sm text-gray-500 dark:text-gray-400">
-            {step === "email" &&
-              "Enter your email and we will send you a verification code"}
-            {step === "otp" && `We sent a 6-digit code to ${forgotForm.email}`}
-            {step === "reset" && "Choose a new password for your account"}
-          </p>
-        </div>
 
-        {/* Step indicator */}
-        <StepIndicator step={step} />
+          {/* Step Indicator */}
+          <StepIndicator step={step} />
 
-        <AnimatePresence mode="wait">
-          {/* STEP 1 — EMAIL */}
+          {/* Step 1: Enter Email */}
           {step === "email" && (
-            <motion.form
-              key="email"
-              onSubmit={handleSendOtp}
-              initial={{ opacity: 0, x: -24 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: -24 }}
-              transition={{ duration: 0.3, ease: "easeOut" }}
-              className="space-y-5"
-            >
+            <form onSubmit={handleSendOtp} className="space-y-4">
               {serverError && (
-                <div className="flex items-center gap-2 p-3 rounded-xl bg-red-50 border border-red-200 text-sm text-red-600 dark:bg-red-500/10 dark:border-red-500/30 dark:text-red-400 animate-slide-down">
+                <div className="flex items-center gap-2 p-3 rounded-xl bg-red-50 border border-red-200 text-xs sm:text-sm text-red-600 animate-slide-down">
                   <AlertCircle className="h-4 w-4 shrink-0" />
-                  {serverError}
+                  <span>{serverError}</span>
                 </div>
               )}
 
@@ -619,38 +607,30 @@ export default function ForgotPasswordPage() {
               <button
                 type="submit"
                 disabled={isLoading}
-                className="w-full flex items-center justify-center gap-2 px-6 py-3.5 rounded-full bg-orange-500 text-white font-semibold text-sm shadow-lg shadow-orange-500/25 hover:bg-orange-600 hover:shadow-xl hover:shadow-orange-500/30 hover:-translate-y-0.5 active:scale-[0.98] disabled:opacity-60 disabled:cursor-not-allowed disabled:hover:translate-y-0 transition-all duration-200 ease-out"
+                className="w-full flex items-center justify-center gap-2 px-6 py-3.5 rounded-full bg-orange-500 text-white font-bold text-sm sm:text-base shadow-lg shadow-orange-500/25 hover:bg-orange-600 hover:shadow-xl hover:shadow-orange-500/30 hover:-translate-y-0.5 active:scale-[0.98] disabled:opacity-60 disabled:cursor-not-allowed disabled:hover:translate-y-0 transition-all duration-200 ease-out"
               >
                 {isLoading ? (
                   <>
                     <Loader2 className="h-4 w-4 animate-spin" />
-                    Sending code...
+                    <span>Sending code...</span>
                   </>
                 ) : (
                   <>
-                    Send Verification Code
+                    <span>Send Verification Code</span>
                     <ArrowRight className="h-4 w-4" />
                   </>
                 )}
               </button>
-            </motion.form>
+            </form>
           )}
 
-          {/* STEP 2 — OTP */}
+          {/* Step 2: Enter OTP */}
           {step === "otp" && (
-            <motion.form
-              key="otp"
-              onSubmit={handleVerifyOtp}
-              initial={{ opacity: 0, x: 24 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: -24 }}
-              transition={{ duration: 0.3, ease: "easeOut" }}
-              className="space-y-5"
-            >
+            <form onSubmit={handleVerifyOtp} className="space-y-4">
               {serverError && (
-                <div className="flex items-center gap-2 p-3 rounded-xl bg-red-50 border border-red-200 text-sm text-red-600 dark:bg-red-500/10 dark:border-red-500/30 dark:text-red-400 animate-slide-down">
+                <div className="flex items-center gap-2 p-3 rounded-xl bg-red-50 border border-red-200 text-xs sm:text-sm text-red-600 animate-slide-down">
                   <AlertCircle className="h-4 w-4 shrink-0" />
-                  {serverError}
+                  <span>{serverError}</span>
                 </div>
               )}
 
@@ -686,60 +666,60 @@ export default function ForgotPasswordPage() {
               <button
                 type="submit"
                 disabled={isLoading}
-                className="w-full flex items-center justify-center gap-2 px-6 py-3.5 rounded-full bg-orange-500 text-white font-semibold text-sm shadow-lg shadow-orange-500/25 hover:bg-orange-600 hover:shadow-xl hover:shadow-orange-500/30 hover:-translate-y-0.5 active:scale-[0.98] disabled:opacity-60 disabled:cursor-not-allowed disabled:hover:translate-y-0 transition-all duration-200 ease-out"
+                className="w-full flex items-center justify-center gap-2 px-6 py-3.5 rounded-full bg-orange-500 text-white font-bold text-sm sm:text-base shadow-lg shadow-orange-500/25 hover:bg-orange-600 hover:shadow-xl hover:shadow-orange-500/30 hover:-translate-y-0.5 active:scale-[0.98] disabled:opacity-60 disabled:cursor-not-allowed disabled:hover:translate-y-0 transition-all duration-200 ease-out"
               >
                 {isLoading ? (
                   <>
                     <Loader2 className="h-4 w-4 animate-spin" />
-                    Verifying...
+                    <span>Verifying code...</span>
                   </>
                 ) : (
                   <>
-                    Verify Code
+                    <span>Verify Code</span>
                     <ArrowRight className="h-4 w-4" />
                   </>
                 )}
               </button>
 
-              <p className="text-center text-xs text-gray-500 dark:text-gray-400">
-                {resendCountdown > 0 ? (
-                  <>
-                    Resend code in{" "}
-                    <span className="font-bold text-orange-500 tabular-nums">
-                      {resendCountdown}s
+              <div className="flex items-center justify-between text-xs text-gray-500 pt-1">
+                <button
+                  type="button"
+                  onClick={() => setStep("email")}
+                  className="inline-flex items-center gap-1 text-gray-600 hover:text-orange-600 font-medium transition-colors"
+                >
+                  <ArrowLeft className="h-3.5 w-3.5" />
+                  Change email
+                </button>
+
+                <div>
+                  {resendCountdown > 0 ? (
+                    <span>
+                      Resend in{" "}
+                      <span className="font-bold text-orange-500 tabular-nums">
+                        {resendCountdown}s
+                      </span>
                     </span>
-                  </>
-                ) : (
-                  <>
-                    Did not receive the code?{" "}
+                  ) : (
                     <button
                       type="button"
                       onClick={handleResendOtp}
-                      className="font-semibold text-orange-600 hover:text-orange-700 transition-colors duration-150 dark:text-orange-500"
+                      className="font-bold text-orange-600 hover:underline transition-colors"
                     >
-                      Resend
+                      Resend code
                     </button>
-                  </>
-                )}
-              </p>
-            </motion.form>
+                  )}
+                </div>
+              </div>
+            </form>
           )}
 
-          {/* STEP 3 — NEW PASSWORD */}
+          {/* Step 3: Set New Password */}
           {step === "reset" && (
-            <motion.form
-              key="reset"
-              onSubmit={handleResetPassword}
-              initial={{ opacity: 0, x: 24 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: 24 }}
-              transition={{ duration: 0.3, ease: "easeOut" }}
-              className="space-y-5"
-            >
+            <form onSubmit={handleResetPassword} className="space-y-4">
               {serverError && (
-                <div className="flex items-center gap-2 p-3 rounded-xl bg-red-50 border border-red-200 text-sm text-red-600 dark:bg-red-500/10 dark:border-red-500/30 dark:text-red-400 animate-slide-down">
+                <div className="flex items-center gap-2 p-3 rounded-xl bg-red-50 border border-red-200 text-xs sm:text-sm text-red-600 animate-slide-down">
                   <AlertCircle className="h-4 w-4 shrink-0" />
-                  {serverError}
+                  <span>{serverError}</span>
                 </div>
               )}
 
@@ -780,7 +760,7 @@ export default function ForgotPasswordPage() {
                     type="button"
                     onClick={() => setShowPassword(!showPassword)}
                     disabled={isLoading}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-orange-500 active:scale-90 transition-all duration-150 disabled:opacity-40"
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-orange-500 active:scale-90 transition-all duration-150"
                     tabIndex={-1}
                     aria-label={showPassword ? "Hide password" : "Show password"}
                   >
@@ -795,33 +775,35 @@ export default function ForgotPasswordPage() {
 
               {/* Password strength */}
               {resetForm.password && (
-                <div className="space-y-1.5 -mt-2 animate-slide-down">
-                  <div className="flex gap-1.5">
+                <div className="space-y-1 pt-0.5 animate-slide-down">
+                  <div className="flex gap-1">
                     {[1, 2, 3, 4].map((bar) => (
                       <div
                         key={bar}
-                        className={`h-1.5 flex-1 rounded-full transition-colors duration-300 ${
+                        className={`h-1 flex-1 rounded-full transition-all duration-300 ease-out ${
                           bar <= getPasswordStrength(resetForm.password)
                             ? STRENGTH_COLORS[getPasswordStrength(resetForm.password)]
-                            : "bg-gray-200 dark:bg-gray-700"
+                            : "bg-gray-200"
                         }`}
                       />
                     ))}
                   </div>
-                  <p className="text-[11px] font-semibold text-gray-500 dark:text-gray-400">
-                    Password strength:{" "}
+                  <div className="flex items-center justify-between text-[10px]">
+                    <span className="text-gray-400">Strength:</span>
                     <span
-                      className={
-                        getPasswordStrength(resetForm.password) >= 3
-                          ? "text-green-600 dark:text-green-500"
-                          : getPasswordStrength(resetForm.password) >= 2
-                          ? "text-yellow-600 dark:text-yellow-500"
-                          : "text-red-500"
-                      }
+                      className={`font-semibold ${
+                        getPasswordStrength(resetForm.password) <= 1
+                          ? "text-red-500"
+                          : getPasswordStrength(resetForm.password) === 2
+                          ? "text-orange-500"
+                          : getPasswordStrength(resetForm.password) === 3
+                          ? "text-amber-500"
+                          : "text-emerald-500"
+                      }`}
                     >
                       {STRENGTH_LABELS[getPasswordStrength(resetForm.password)]}
                     </span>
-                  </p>
+                  </div>
                 </div>
               )}
 
@@ -862,11 +844,9 @@ export default function ForgotPasswordPage() {
                     type="button"
                     onClick={() => setShowConfirmPassword(!showConfirmPassword)}
                     disabled={isLoading}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-orange-500 active:scale-90 transition-all duration-150 disabled:opacity-40"
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-orange-500 active:scale-90 transition-all duration-150"
                     tabIndex={-1}
-                    aria-label={
-                      showConfirmPassword ? "Hide password" : "Show password"
-                    }
+                    aria-label={showConfirmPassword ? "Hide password" : "Show password"}
                   >
                     {showConfirmPassword ? (
                       <EyeOff className="h-4 w-4" />
@@ -880,49 +860,41 @@ export default function ForgotPasswordPage() {
               <button
                 type="submit"
                 disabled={isLoading}
-                className="w-full flex items-center justify-center gap-2 px-6 py-3.5 rounded-full bg-orange-500 text-white font-semibold text-sm shadow-lg shadow-orange-500/25 hover:bg-orange-600 hover:shadow-xl hover:shadow-orange-500/30 hover:-translate-y-0.5 active:scale-[0.98] disabled:opacity-60 disabled:cursor-not-allowed disabled:hover:translate-y-0 transition-all duration-200 ease-out"
+                className="w-full flex items-center justify-center gap-2 px-6 py-3.5 rounded-full bg-orange-500 text-white font-bold text-sm sm:text-base shadow-lg shadow-orange-500/25 hover:bg-orange-600 hover:shadow-xl hover:shadow-orange-500/30 hover:-translate-y-0.5 active:scale-[0.98] disabled:opacity-60 disabled:cursor-not-allowed disabled:hover:translate-y-0 transition-all duration-200 ease-out"
               >
                 {isLoading ? (
                   <>
                     <Loader2 className="h-4 w-4 animate-spin" />
-                    Resetting...
+                    <span>Updating password...</span>
                   </>
                 ) : (
                   <>
-                    Reset Password
+                    <span>Reset Password</span>
                     <ArrowRight className="h-4 w-4" />
                   </>
                 )}
               </button>
-            </motion.form>
-          )}
-        </AnimatePresence>
-
-        {/* Back navigation */}
-        <div className="flex items-center justify-between text-sm">
-          {step === "otp" || step === "reset" ? (
-            <button
-              type="button"
-              onClick={() => {
-                setServerError(null);
-                setStep(step === "otp" ? "email" : "otp");
-              }}
-              disabled={isLoading}
-              className="inline-flex items-center gap-1.5 font-semibold text-gray-500 hover:text-orange-600 transition-colors duration-150 disabled:opacity-40"
-            >
-              <ArrowLeft className="h-4 w-4" />
-              Back
-            </button>
-          ) : (
-            <span />
+            </form>
           )}
 
-          <Link
-            href="/auth/login"
-            className="font-semibold text-orange-600 hover:text-orange-700 transition-colors duration-150 dark:text-orange-500 dark:hover:text-orange-400"
-          >
-            Back to Sign In
-          </Link>
+          {/* Footer */}
+          <div className="pt-2 border-t border-gray-100 flex flex-col items-center gap-3">
+            <div className="flex items-center gap-1.5 text-[11px] text-gray-400">
+              <ShieldCheck className="h-3.5 w-3.5 text-emerald-500" />
+              <span>Protected by Food Flow security protocols</span>
+            </div>
+
+            <p className="text-center text-xs sm:text-sm text-gray-500">
+              Remember your password?{" "}
+              <Link
+                href="/auth/login"
+                className="font-bold text-orange-600 hover:text-orange-700 hover:underline transition-colors duration-150"
+              >
+                Sign In
+              </Link>
+            </p>
+          </div>
+
         </div>
       </div>
     </div>
