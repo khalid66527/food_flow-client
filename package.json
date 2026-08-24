@@ -10,7 +10,6 @@
   },
   "dependencies": {
     "@better-auth/mongo-adapter": "^1.7.1",
-    "@types/aos": "^3.0.8",
     "aos": "^2.3.4",
     "better-auth": "^1.7.0",
     "framer-motion": "^13.1.0",
@@ -24,6 +23,7 @@
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
+    "@types/aos": "^3.0.8",
     "@types/node": "^20",
     "@types/nodemailer": "^8.0.1",
     "@types/react": "^19",

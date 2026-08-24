@@ -6,8 +6,6 @@ import { betterAuth } from "better-auth";
 import { mongodbAdapter } from "@better-auth/mongo-adapter";
 import { MongoClient } from "mongodb";
 
-
-
 const mongodbUri = process.env.MONGODB_URI;
 
 if (!mongodbUri) {
@@ -17,17 +15,14 @@ if (!mongodbUri) {
 const client = new MongoClient(mongodbUri);
 const db = client.db("food-delivery-platform");
 
-// Google OAuth is enabled only when both credentials are available
 const googleClientId = process.env.GOOGLE_CLIENT_ID;
 const googleClientSecret = process.env.GOOGLE_CLIENT_SECRET;
 
 export const auth = betterAuth({
   database: mongodbAdapter(db),
-
   emailAndPassword: {
     enabled: true,
   },
-
   socialProviders: {
     ...(googleClientId && googleClientSecret
       ? {
@@ -38,7 +33,6 @@ export const auth = betterAuth({
         }
       : {}),
   },
-
   user: {
     additionalFields: {
       role: {
@@ -46,14 +40,12 @@ export const auth = betterAuth({
         required: false,
         defaultValue: "Customer",
       },
-
       phone: {
         type: "string",
         required: false,
       },
     },
   },
-  
   secret: process.env.BETTER_AUTH_SECRET,
   baseURL: process.env.BETTER_AUTH_URL,
 });
