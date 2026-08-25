@@ -25,26 +25,59 @@ import {
   Coffee,
 } from 'lucide-react';
 import { IGlobalFoodItem, FoodSortOption, IPaginationMeta } from '@/types/restaurant';
-import { getAllGlobalFoodItems } from '@/lib/api/restaurant';
+import { getAllGlobalFoodItems, getFoodCategories } from '@/lib/api/restaurant';
 import FoodCard from '@/components/restaurants/FoodCard';
 import { useCart } from '@/contexts/CartContext';
 
 // ---------------------------------------------------------------------------
-// SIDEBAR CATEGORY DEFINITIONS
+// SIDEBAR CATEGORY DEFINITIONS (dynamic, fetched from database)
 // ---------------------------------------------------------------------------
-const CATEGORIES = [
-  { id: 'all', label: 'All Cuisines', emoji: '🍽️' },
-  { id: 'Pizza', label: 'Pizza', emoji: '🍕' },
-  { id: 'Burgers', label: 'Burgers', emoji: '🍔' },
-  { id: 'Asian', label: 'Asian', emoji: '🍜' },
-  { id: 'Sushi', label: 'Sushi & Seafood', emoji: '🍣' },
-  { id: 'Dessert', label: 'Desserts', emoji: '🍰' },
-  { id: 'Healthy', label: 'Healthy', emoji: '🥗' },
-  { id: 'Mexican', label: 'Mexican', emoji: '🌮' },
-  { id: 'Biryani', label: 'Biryani & Rice', emoji: '🍛' },
-  { id: 'BBQ', label: 'BBQ & Grill', emoji: '🍖' },
-  { id: 'Beverages', label: 'Drinks', emoji: '🥤' },
-];
+interface SidebarCategory {
+  id: string;
+  label: string;
+  emoji: string;
+}
+
+const CATEGORY_EMOJIS: Record<string, string> = {
+  pizza: '🍕',
+  burger: '🍔',
+  sushi: '🍣',
+  seafood: '🐟',
+  dessert: '🍰',
+  healthy: '🥗',
+  salad: '🥗',
+  mexican: '🌮',
+  biryani: '🍛',
+  rice: '🍛',
+  bbq: '🍖',
+  grill: '🍖',
+  beverage: '🥤',
+  drink: '🥤',
+  appetizer: '🍴',
+  starter: '🍴',
+  main: '🍽️',
+  snack: '🍿',
+  sandwich: '🥪',
+  chicken: '🍗',
+  steak: '🥩',
+  pasta: '🍝',
+  noodle: '🍜',
+  soup: '🍲',
+  breakfast: '🥞',
+  lunch: '☀️',
+  dinner: '🌙',
+  combo: '📦',
+  side: '🥗',
+  default: '🏷️',
+};
+
+function getCategoryEmoji(categoryName: string): string {
+  const lower = categoryName.toLowerCase();
+  for (const [key, emoji] of Object.entries(CATEGORY_EMOJIS)) {
+    if (key !== 'default' && lower.includes(key)) return emoji;
+  }
+  return CATEGORY_EMOJIS.default;
+}
 
 // ---------------------------------------------------------------------------
 // RESPONSIVE ITEMS-PER-PAGE HOOK
@@ -110,6 +143,9 @@ export default function ExploreFoodPage() {
   // Mobile sidebar overlay
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
+  // Dynamic categories from database
+  const [categories, setCategories] = useState<SidebarCategory[]>([]);
+
   // ---------------------------------------------------------------------------
   // DEBOUNCE SEARCH
   // ---------------------------------------------------------------------------
@@ -120,6 +156,29 @@ export default function ExploreFoodPage() {
     }, 400);
     return () => clearTimeout(timer);
   }, [searchQuery]);
+
+  // Fetch dynamic categories from database
+  useEffect(() => {
+    const fetchCategories = async () => {
+      try {
+        const res = await getFoodCategories();
+        if (res.success && Array.isArray(res.data)) {
+          const dynamicCategories: SidebarCategory[] = [
+            { id: 'all', label: 'All Cuisines', emoji: '🍽️' },
+            ...res.data.map((cat) => ({
+              id: cat,
+              label: cat,
+              emoji: getCategoryEmoji(cat),
+            })),
+          ];
+          setCategories(dynamicCategories);
+        }
+      } catch {
+        // Silently fall back to empty list
+      }
+    };
+    fetchCategories();
+  }, []);
 
   // Reset to page 1 when the responsive limit changes (viewport resize)
   useEffect(() => {
@@ -218,7 +277,7 @@ export default function ExploreFoodPage() {
       <div>
         <h3 className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-3 px-1">Categories</h3>
         <div className="space-y-0.5">
-          {CATEGORIES.map((cat) => {
+          {categories.map((cat) => {
             const isActive = selectedCategory === cat.id;
             return (
               <button
@@ -397,7 +456,7 @@ export default function ExploreFoodPage() {
           <div className="mt-3 flex items-center gap-2 flex-wrap text-xs">
             {selectedCategory !== 'all' && (
               <span className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-orange-50 text-orange-700 font-semibold rounded-full border border-orange-200">
-                {CATEGORIES.find((c) => c.id === selectedCategory)?.label || selectedCategory}
+                {categories.find((c) => c.id === selectedCategory)?.label || selectedCategory}
                 <button type="button" onClick={() => { setSelectedCategory('all'); setCurrentPage(1); }} className="text-orange-400 hover:text-orange-700 cursor-pointer">
                   <X className="w-3 h-3" />
                 </button>

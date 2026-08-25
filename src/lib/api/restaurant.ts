@@ -206,6 +206,30 @@ export async function getAllGlobalFoodItems(
 }
 
 /**
+ * Get all distinct food categories from the database
+ */
+export async function getFoodCategories(): Promise<ApiResponse<string[]>> {
+  try {
+    const res = await fetch(`${API_BASE_URL}/food/categories`, {
+      method: "GET",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      cache: "no-store",
+    });
+
+    const data = await res.json();
+    return { ...data, data: Array.isArray(data?.data) ? data.data : [] };
+  } catch (err: any) {
+    return {
+      success: false,
+      message: err.message || "Failed to fetch categories.",
+      data: [],
+    };
+  }
+}
+
+/**
  * Get all menu items for a specific restaurant
  */
 export async function getRestaurantMenuItems(

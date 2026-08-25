@@ -15,11 +15,17 @@ import {
   Store,
   RotateCcw,
   Plus,
+  ChevronDown,
+  X,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import AOS from "aos";
 import { useSession } from "@/lib/auth-client";
-import { getMyRestaurantProfile, IRestaurant } from "@/lib/api/restaurant";
+import {
+  getMyRestaurantProfile,
+  getFoodCategories,
+  IRestaurant,
+} from "@/lib/api/restaurant";
 import { createFoodItem } from "@/lib/actions/restaurant";
 
 type FoodStatus = "available" | "unavailable";
@@ -31,20 +37,6 @@ interface FoodFormData {
   description: string;
   status: FoodStatus;
 }
-
-const FOOD_CATEGORIES = [
-  "Appetizers & Starters",
-  "Main Course",
-  "Biryani & Rice",
-  "Burgers & Sandwiches",
-  "Pizza",
-  "Snacks & Sides",
-  "Salads & Healthy",
-  "Seafood",
-  "Desserts",
-  "Beverages",
-  "Combo Meals",
-];
 
 const MAX_IMAGE_SIZE_MB = 5;
 
@@ -73,8 +65,37 @@ const AddFoodForm = () => {
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  const [existingCategories, setExistingCategories] = useState<string[]>([]);
+  const [showCategoryDropdown, setShowCategoryDropdown] = useState(false);
+  const [categorySearch, setCategorySearch] = useState("");
+  const categoryInputRef = useRef<HTMLInputElement>(null);
+  const categoryDropdownRef = useRef<HTMLDivElement>(null);
+
   useEffect(() => {
     AOS.refresh();
+  }, []);
+
+  useEffect(() => {
+    getFoodCategories().then((res) => {
+      if (res.success && Array.isArray(res.data)) {
+        setExistingCategories(res.data);
+      }
+    });
+  }, []);
+
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (
+        categoryDropdownRef.current &&
+        !categoryDropdownRef.current.contains(e.target as Node) &&
+        categoryInputRef.current &&
+        !categoryInputRef.current.contains(e.target as Node)
+      ) {
+        setShowCategoryDropdown(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
   useEffect(() => {
@@ -188,6 +209,8 @@ const AddFoodForm = () => {
 
   const handleReset = () => {
     setFormData({ name: "", category: "", price: "", description: "", status: "available" });
+    setCategorySearch("");
+    setShowCategoryDropdown(false);
     removeImage();
     setErrorMsg(null);
     setSuccessMsg(null);
@@ -228,6 +251,7 @@ const AddFoodForm = () => {
       if (res.success && res.data) {
         setSuccessMsg(`"${res.data.name}" has been added to your menu successfully!`);
         setFormData({ name: "", category: "", price: "", description: "", status: "available" });
+        setCategorySearch("");
         removeImage();
         setTimeout(() => {
           router.push("/dashboard/restaurant/menu");
@@ -243,6 +267,12 @@ const AddFoodForm = () => {
       setLoading(false);
     }
   };
+
+  const filteredCategories = categorySearch.trim()
+    ? existingCategories.filter((c) =>
+        c.toLowerCase().includes(categorySearch.trim().toLowerCase())
+      )
+    : existingCategories;
 
   /* ---------------------------------------------------------- */
   /* Loading state while resolving owner's restaurant profile   */
@@ -364,27 +394,98 @@ const AddFoodForm = () => {
                 <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1.5">
                   Category <span className="text-rose-500">*</span>
                 </label>
-                <div className="relative">
-                  <Tag className="w-4 h-4 text-gray-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
-                  <select
-                    name="category"
-                    value={formData.category}
-                    onChange={handleInputChange}
+                <div className="relative" ref={categoryDropdownRef}>
+                  <Tag className="w-4 h-4 text-gray-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none z-10" />
+                  <input
+                    ref={categoryInputRef}
+                    type="text"
+                    value={showCategoryDropdown ? categorySearch : formData.category}
+                    onChange={(e) => {
+                      setCategorySearch(e.target.value);
+                      setShowCategoryDropdown(true);
+                    }}
+                    onFocus={() => {
+                      setCategorySearch(formData.category);
+                      setShowCategoryDropdown(true);
+                    }}
+                    placeholder="Select or type a category"
                     required
-                    className={`w-full pl-10 pr-4 py-3 rounded-xl bg-gray-50/80 border border-gray-200 focus:bg-white focus:border-[#FF6B35] focus:ring-4 focus:ring-orange-500/10 outline-none text-sm font-medium transition appearance-none cursor-pointer ${
+                    autoComplete="off"
+                    className={`w-full pl-10 pr-10 py-3 rounded-xl bg-gray-50/80 border border-gray-200 focus:bg-white focus:border-[#FF6B35] focus:ring-4 focus:ring-orange-500/10 outline-none text-sm font-medium transition ${
                       formData.category ? "text-gray-900" : "text-gray-400"
                     }`}
-                  >
-                    <option value="" disabled>
-                      Select a category
-                    </option>
-                    {FOOD_CATEGORIES.map((category) => (
-                      <option key={category} value={category} className="text-gray-900">
-                        {category}
-                      </option>
-                    ))}
-                  </select>
+                  />
+                  <div className="absolute right-0 top-0 h-full flex items-center pr-2 pointer-events-none">
+                    {formData.category && !showCategoryDropdown ? (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setFormData((prev) => ({ ...prev, category: "" }));
+                          setCategorySearch("");
+                          setShowCategoryDropdown(true);
+                          categoryInputRef.current?.focus();
+                        }}
+                        className="pointer-events-auto text-gray-400 hover:text-gray-600 cursor-pointer"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    ) : (
+                      <ChevronDown className="w-4 h-4 text-gray-400" />
+                    )}
+                  </div>
+                  {showCategoryDropdown && (
+                    <div className="absolute z-30 top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-xl shadow-lg max-h-48 overflow-y-auto">
+                      {filteredCategories.length > 0 ? (
+                        filteredCategories.map((cat) => (
+                          <button
+                            key={cat}
+                            type="button"
+                            onClick={() => {
+                              setFormData((prev) => ({ ...prev, category: cat }));
+                              setCategorySearch("");
+                              setShowCategoryDropdown(false);
+                            }}
+                            className={`w-full text-left px-4 py-2.5 text-sm hover:bg-orange-50 hover:text-orange-600 transition cursor-pointer ${
+                              formData.category === cat
+                                ? "bg-orange-50 text-orange-600 font-semibold"
+                                : "text-gray-700"
+                            }`}
+                          >
+                            {cat}
+                          </button>
+                        ))
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const newCategory = categorySearch.trim();
+                            if (newCategory) {
+                              setFormData((prev) => ({ ...prev, category: newCategory }));
+                              if (!existingCategories.includes(newCategory)) {
+                                setExistingCategories((prev) =>
+                                  [...prev, newCategory].sort((a, b) => a.localeCompare(b))
+                                );
+                              }
+                              setCategorySearch("");
+                              setShowCategoryDropdown(false);
+                            }
+                          }}
+                          className="w-full text-left px-4 py-2.5 text-sm text-orange-600 hover:bg-orange-50 transition cursor-pointer flex items-center gap-2"
+                        >
+                          <Plus className="w-3.5 h-3.5" />
+                          Create &quot;{categorySearch.trim()}&quot;
+                        </button>
+                      )}
+                    </div>
+                  )}
                 </div>
+                {formData.category && !existingCategories.includes(formData.category) && (
+                  <p className="text-[11px] text-orange-500 mt-1.5 flex items-center gap-1">
+                    <Sparkles className="w-3 h-3" />
+                    New custom category
+                  </p>
+                )}
               </div>
 
               <div>
