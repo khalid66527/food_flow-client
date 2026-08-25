@@ -45,6 +45,51 @@ export interface IMenuItem {
   rating?: number;
 }
 
+export type FoodSortOption =
+  | 'relevance'
+  | 'price_asc'
+  | 'price_desc'
+  | 'newest';
+
+export interface IGlobalFoodItem {
+  _id: string;
+  restaurantId: string;
+  name: string;
+  description: string;
+  price: number;
+  discountPrice?: number;
+  category: string;
+  image: string;
+  status: string;
+  isAvailable: boolean;
+  isVegetarian?: boolean;
+  isSpicy?: boolean;
+  tags?: string[];
+  restaurantName: string;
+  restaurantSlug: string;
+  restaurantLogo: string;
+  restaurantIsOpen: boolean;
+  restaurantRating: number;
+  restaurantReviewCount: number;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface IFoodFilterParams {
+  searchQuery: string;
+  category: string;
+  restaurantId: string;
+  sortBy: FoodSortOption;
+  isVegetarian: boolean;
+  isSpicy: boolean;
+  minPrice: number;
+  maxPrice: number;
+  openNow: boolean;
+  featuredOnly: boolean;
+  currentPage: number;
+  limit: number;
+}
+
 export interface IRestaurant {
   _id: string;
   name: string;

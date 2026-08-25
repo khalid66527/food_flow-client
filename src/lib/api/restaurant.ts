@@ -1,3 +1,5 @@
+import { IMenuItem, IGlobalFoodItem } from "@/types/restaurant";
+
 export type TOpeningHoursDay = {
   open: string;
   close: string;
@@ -23,6 +25,7 @@ export type TAddress = {
   latitude?: number;
   longitude?: number;
   fullAddress?: string;
+  area?: string;
 };
 
 export type TPricing = {
@@ -59,6 +62,7 @@ export interface IRestaurant {
   tagline?: string;
   description: string;
   cuisineTypes: string[];
+  cuisines?: string[];
   logo: string;
   bannerImage: string;
   contactNumber: string;
@@ -73,9 +77,16 @@ export interface IRestaurant {
   socialLinks?: TSocialLinks;
   rating?: number;
   totalReviews?: number;
+  reviewCount?: number;
+  deliveryTimeMin?: number;
+  deliveryTimeMax?: number;
+  deliveryFee?: number;
+  minOrderAmount?: number;
+  priceRange?: string;
   isOpen: boolean;
   status: "pending" | "active" | "suspended" | "closed";
   isFeatured?: boolean;
+  discountOffer?: string;
   createdAt?: string;
   updatedAt?: string;
 }
@@ -165,37 +176,13 @@ export async function getMyRestaurantProfile(
 }
 
 /**
- * Get single restaurant by ID or slug
+ * Get all global food items across all restaurants with filters/pagination
  */
-export async function getRestaurantById(
-  idOrSlug: string
-): Promise<ApiResponse<IRestaurant>> {
-  try {
-    const res = await fetch(`${API_BASE_URL}/restaurants/${idOrSlug}`, {
-      method: "GET",
-      headers: {
-        "Content-Type": "application/json",
-      },
-    });
-
-    const data = await res.json();
-    return data;
-  } catch (err: any) {
-    return {
-      success: false,
-      message: err.message || "Failed to fetch restaurant.",
-    };
-  }
-}
-
-/**
- * Get all restaurants with filter/search queries
- */
-export async function getAllRestaurants(
+export async function getAllGlobalFoodItems(
   query: Record<string, string> = {}
-): Promise<ApiResponse<IRestaurant[]>> {
+): Promise<ApiResponse<IGlobalFoodItem[]>> {
   try {
-    const url = new URL(`${API_BASE_URL}/restaurants`);
+    const url = new URL(`${API_BASE_URL}/food`);
     Object.entries(query).forEach(([key, val]) => {
       if (val) url.searchParams.append(key, val);
     });
@@ -208,11 +195,46 @@ export async function getAllRestaurants(
     });
 
     const data = await res.json();
-    return data;
+    return { ...data, data: Array.isArray(data?.data) ? data.data : [] };
   } catch (err: any) {
     return {
       success: false,
-      message: err.message || "Failed to retrieve restaurants.",
+      message: err.message || "Failed to retrieve food items.",
+      data: [],
+    };
+  }
+}
+
+/**
+ * Get all menu items for a specific restaurant
+ */
+export async function getRestaurantMenuItems(
+  restaurantId: string
+): Promise<ApiResponse<IMenuItem[]>> {
+  try {
+    if (!restaurantId) {
+      return { success: false, message: "Restaurant ID is required." };
+    }
+
+    const res = await fetch(
+      `${API_BASE_URL}/restaurants/food/${restaurantId}`,
+      {
+        method: "GET",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        cache: "no-store",
+      }
+    );
+
+    const data = await res.json();
+    return { ...data, data: Array.isArray(data?.data) ? data.data : [] };
+  } catch (err) {
+    return {
+      success: false,
+      message:
+        err instanceof Error ? err.message : "Failed to fetch menu items.",
+      data: [],
     };
   }
 }

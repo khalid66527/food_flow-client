@@ -1,3 +1,6 @@
+// Optional: uncomment if you face network/DNS issues with MongoDB Atlas
+const dns = require("node:dns");
+dns.setServers(["8.8.8.8", "8.8.4.4"]);
 import { betterAuth } from "better-auth";
 import { mongodbAdapter } from "@better-auth/mongo-adapter";
 import { MongoClient } from "mongodb";
