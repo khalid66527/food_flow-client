@@ -8,6 +8,7 @@ import Navbar from "@/components/common/Navbar";
 import Footer from "@/components/common/Footer";
 import ScrollToHash from "@/components/common/ScrollToHash";
 import AOSInit from "@/components/common/AOSInit";
+import AIChatbot from "@/components/ai/AIChatbot";
 import { CartProvider } from "@/contexts/CartContext";
 
 const inter = Inter({
@@ -44,6 +45,7 @@ export default function RootLayout({
           <Navbar session={null} cartItemCount={0} />
           <main className="flex-grow">{children}</main>
           <Footer></Footer>
+          <AIChatbot />
         </CartProvider>
       </body>
     </html>
