@@ -31,6 +31,7 @@ export interface ICategory {
 
 export interface IMenuItem {
   _id: string;
+  id?: string;
   restaurantId: string;
   name: string;
   description: string;
@@ -40,6 +41,7 @@ export interface IMenuItem {
   image: string;
   images?: string[];
   isAvailable: boolean;
+  status?: string;
   isVegetarian?: boolean;
   isSpicy?: boolean;
   tags?: string[];
@@ -48,6 +50,8 @@ export interface IMenuItem {
   sizeOptions?: { id: string; name: string; label?: string; priceDelta: number; popular?: boolean }[];
   extras?: { id: string; name: string; price: number; icon?: string }[];
   categoryDetails?: Record<string, any>;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 export type FoodSortOption =

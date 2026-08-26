@@ -145,3 +145,83 @@ export async function deleteRestaurantProfile(
     };
   }
 }
+
+/**
+ * Update an existing food item
+ */
+export async function updateFoodItemAction(
+  foodId: string,
+  payload: Partial<IMenuItem>
+): Promise<ApiResponse<IMenuItem>> {
+  try {
+    const res = await fetch(`${API_BASE_URL}/restaurants/food/${foodId}`, {
+      method: "PATCH",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(payload),
+    });
+
+    const data = await res.json();
+    return data;
+  } catch (err: any) {
+    console.error("Error updating food item:", err);
+    return {
+      success: false,
+      message: err?.message || "Failed to update food item.",
+    };
+  }
+}
+
+/**
+ * Toggle food item availability (In Stock / Out of Stock)
+ */
+export async function toggleFoodItemAvailabilityAction(
+  foodId: string,
+  isAvailable: boolean
+): Promise<ApiResponse<IMenuItem>> {
+  try {
+    const res = await fetch(`${API_BASE_URL}/restaurants/food/${foodId}/status`, {
+      method: "PATCH",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ isAvailable, status: isAvailable ? "available" : "unavailable" }),
+    });
+
+    const data = await res.json();
+    return data;
+  } catch (err: any) {
+    console.error("Error toggling food availability:", err);
+    return {
+      success: false,
+      message: err?.message || "Failed to update availability.",
+    };
+  }
+}
+
+/**
+ * Delete a food item from menu
+ */
+export async function deleteFoodItemAction(
+  foodId: string
+): Promise<ApiResponse<null>> {
+  try {
+    const res = await fetch(`${API_BASE_URL}/restaurants/food/${foodId}`, {
+      method: "DELETE",
+      headers: {
+        "Content-Type": "application/json",
+      },
+    });
+
+    const data = await res.json();
+    return data;
+  } catch (err: any) {
+    console.error("Error deleting food item:", err);
+    return {
+      success: false,
+      message: err?.message || "Failed to delete food item.",
+    };
+  }
+}
+
