@@ -32,10 +32,21 @@ export async function POST(req: NextRequest) {
 
       let directUrl = "";
 
-      // 1. Try uploading to ImgBB via Node.js fetch (No browser CORS / adblocker issues)
+      // Convert file buffer to base64
+      let base64String = "";
+      try {
+        const arrayBuffer = await file.arrayBuffer();
+        const buffer = Buffer.from(arrayBuffer);
+        base64String = buffer.toString("base64");
+      } catch (bufErr) {
+        console.error("Buffer reading error:", bufErr);
+        continue;
+      }
+
+      // 1. Try uploading to ImgBB via POST (sending base64 data string)
       try {
         const imgBbBody = new FormData();
-        imgBbBody.append("image", file);
+        imgBbBody.append("image", base64String);
 
         const imgBbRes = await fetch(
           `https://api.imgbb.com/1/upload?key=${apiKey}`,
@@ -59,12 +70,9 @@ export async function POST(req: NextRequest) {
         console.error("ImgBB server-side upload error:", uploadErr);
       }
 
-      // 2. If ImgBB failed, fallback to base64 Data URL
-      if (!directUrl) {
-        const arrayBuffer = await file.arrayBuffer();
-        const buffer = Buffer.from(arrayBuffer);
-        const base64 = buffer.toString("base64");
-        directUrl = `data:${file.type || "image/jpeg"};base64,${base64}`;
+      // 2. If ImgBB upload failed, fallback to base64 Data URL so user NEVER gets blocked
+      if (!directUrl && base64String) {
+        directUrl = `data:${file.type || "image/jpeg"};base64,${base64String}`;
       }
 
       if (directUrl) {

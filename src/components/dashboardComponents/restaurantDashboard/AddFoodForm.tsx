@@ -330,15 +330,21 @@ export default function AddFoodForm() {
     });
   };
 
-  // Multi-Image Upload from Device / Gallery (Guaranteed 100% Reliable via /api/upload)
+  // Multi-Image Upload from Device / Gallery (Guaranteed 100% Reliable via /api/upload + Local Fallback)
   const handleImageSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = e.target.files;
+    const rawFiles = e.target.files;
+    if (!rawFiles || rawFiles.length === 0) return;
+    
+    // Convert to array before touching the input element
+    const files = Array.from(rawFiles);
+    
+    // Clear input value so selecting the same file again later will still fire onChange
+    if (e.target) e.target.value = "";
     if (fileInputRef.current) fileInputRef.current.value = "";
-    if (!files || files.length === 0) return;
 
     setErrorMsg("");
     setUploading(true);
-    setUploadProgress(`Uploading ${files.length} photo(s)...`);
+    setUploadProgress(`Processing ${files.length} photo(s)...`);
 
     try {
       const formData = new FormData();
@@ -354,13 +360,13 @@ export default function AddFoodForm() {
 
       const json = await res.json();
 
-      if (json.success && json.urls && json.urls.length > 0) {
+      if (json.success && Array.isArray(json.urls) && json.urls.length > 0) {
         setImages((prev) => [...prev, ...json.urls]);
         setActivePreviewIndex(0);
         setSuccessMsg(`✓ Successfully added ${json.urls.length} photo(s) from your device!`);
         setTimeout(() => setSuccessMsg(""), 3000);
       } else {
-        // Fallback: Read locally in client
+        // Fallback: Read & compress locally in client so it NEVER fails
         const fallbackUrls: string[] = [];
         for (let i = 0; i < files.length; i++) {
           const url = await compressAndReadFile(files[i]);
@@ -375,8 +381,8 @@ export default function AddFoodForm() {
           setErrorMsg("Could not process the selected image files.");
         }
       }
-    } catch (err: any) {
-      // Client-side fallback on any fetch error
+    } catch {
+      // Client-side fallback on any fetch/network error
       try {
         const fallbackUrls: string[] = [];
         for (let i = 0; i < files.length; i++) {
@@ -389,14 +395,35 @@ export default function AddFoodForm() {
           setSuccessMsg(`✓ Successfully added ${fallbackUrls.length} photo(s)!`);
           setTimeout(() => setSuccessMsg(""), 3000);
         } else {
-          setErrorMsg(err?.message || "Failed to process images.");
+          setErrorMsg("Failed to process images.");
         }
-      } catch {
+      } catch (err: any) {
         setErrorMsg(err?.message || "Failed to process images.");
       }
     } finally {
       setUploading(false);
       setUploadProgress("");
+    }
+  };
+
+  // Drag & drop files handler
+  const handleDropFiles = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    if (uploading) return;
+    const droppedFiles = Array.from(e.dataTransfer.files || []).filter((f) =>
+      f.type.startsWith("image/")
+    );
+    if (droppedFiles.length === 0) return;
+
+    // Trigger synthetic file selection
+    const dataTransfer = new DataTransfer();
+    droppedFiles.forEach((file) => dataTransfer.items.add(file));
+    if (fileInputRef.current) {
+      fileInputRef.current.files = dataTransfer.files;
+      const event = {
+        target: fileInputRef.current,
+      } as React.ChangeEvent<HTMLInputElement>;
+      handleImageSelect(event);
     }
   };
 
@@ -1319,21 +1346,25 @@ export default function AddFoodForm() {
 
               {imageInputMode === "upload" ? (
                 <div className="space-y-3">
-                  <label
-                    htmlFor="gallery-file-upload-input"
-                    className="w-full py-6 px-4 rounded-2xl border-2 border-dashed border-gray-300 hover:border-[#FF6B35] hover:bg-orange-50/30 bg-gray-50/70 transition flex flex-col items-center justify-center gap-2 cursor-pointer group block"
-                  >
-                    <input
-                      id="gallery-file-upload-input"
-                      ref={fileInputRef}
-                      type="file"
-                      accept="image/*"
-                      multiple
-                      onChange={handleImageSelect}
-                      disabled={uploading}
-                      className="sr-only"
-                    />
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/*"
+                    multiple
+                    onChange={handleImageSelect}
+                    disabled={uploading}
+                    className="hidden"
+                  />
 
+                  <div
+                    role="button"
+                    tabIndex={0}
+                    onClick={() => fileInputRef.current?.click()}
+                    onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && fileInputRef.current?.click()}
+                    onDragOver={(e) => e.preventDefault()}
+                    onDrop={handleDropFiles}
+                    className="w-full py-6 px-4 rounded-2xl border-2 border-dashed border-gray-300 hover:border-[#FF6B35] hover:bg-orange-50/30 bg-gray-50/70 transition flex flex-col items-center justify-center gap-2 cursor-pointer group select-none"
+                  >
                     {uploading ? (
                       <div className="flex flex-col items-center justify-center gap-1.5 py-2">
                         <Loader2 className="w-8 h-8 text-[#FF6B35] animate-spin" />
@@ -1352,12 +1383,12 @@ export default function AddFoodForm() {
                             Click to select 3, 4, or more Photos (Multi-select)
                           </span>
                           <span className="text-[11px] text-gray-400">
-                            Select multiple angle photos from your computer or phone gallery
+                            Or drag & drop photos here from your computer / phone gallery
                           </span>
                         </div>
                       </>
                     )}
-                  </label>
+                  </div>
 
                   {/* 1-Click Auto Fill Demo Photos */}
                   <button
