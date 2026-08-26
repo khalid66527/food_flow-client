@@ -99,7 +99,7 @@ export default function FoodCard({
           {/* Action buttons */}
           <div className="flex items-center gap-2.5">
             <Link
-              href={`/food/${item._id}`}
+              href={`/restaurants/${item._id}`}
               onClick={(e) => e.stopPropagation()}
               className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-xs font-semibold border-2 border-gray-200 text-gray-600 hover:border-[#FF6B35] hover:text-[#FF6B35] bg-white transition-all cursor-pointer"
             >
@@ -208,7 +208,7 @@ export default function FoodCard({
         {/* Action buttons */}
         <div className="flex items-center gap-2.5">
           <Link
-            href={`/food/${item._id}`}
+            href={`/restaurants/${item._id}`}
             onClick={(e) => e.stopPropagation()}
             className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-xs font-semibold border-2 border-gray-200 text-gray-600 hover:border-[#FF6B35] hover:text-[#FF6B35] bg-white transition-all cursor-pointer"
           >
