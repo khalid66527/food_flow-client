@@ -38,11 +38,16 @@ export interface IMenuItem {
   discountPrice?: number;
   category: string;
   image: string;
+  images?: string[];
   isAvailable: boolean;
   isVegetarian?: boolean;
   isSpicy?: boolean;
   tags?: string[];
   rating?: number;
+  ingredients?: string[];
+  sizeOptions?: { id: string; name: string; label?: string; priceDelta: number; popular?: boolean }[];
+  extras?: { id: string; name: string; price: number; icon?: string }[];
+  categoryDetails?: Record<string, any>;
 }
 
 export type FoodSortOption =
@@ -60,11 +65,16 @@ export interface IGlobalFoodItem {
   discountPrice?: number;
   category: string;
   image: string;
+  images?: string[];
   status: string;
   isAvailable: boolean;
   isVegetarian?: boolean;
   isSpicy?: boolean;
   tags?: string[];
+  ingredients?: string[];
+  sizeOptions?: { id: string; name: string; label?: string; priceDelta: number; popular?: boolean }[];
+  extras?: { id: string; name: string; price: number; icon?: string }[];
+  categoryDetails?: Record<string, any>;
   restaurantName: string;
   restaurantSlug: string;
   restaurantLogo: string;

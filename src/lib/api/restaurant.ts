@@ -230,6 +230,64 @@ export async function getFoodCategories(): Promise<ApiResponse<string[]>> {
 }
 
 /**
+ * Get a single food item by ID
+ */
+export async function getSingleFoodItem(
+  foodId: string
+): Promise<ApiResponse<IGlobalFoodItem>> {
+  try {
+    if (!foodId) {
+      return { success: false, message: "Food ID is required." };
+    }
+
+    const res = await fetch(`${API_BASE_URL}/food/${foodId}`, {
+      method: "GET",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      cache: "no-store",
+    });
+
+    const data = await res.json();
+    return data;
+  } catch (err: any) {
+    return {
+      success: false,
+      message: err.message || "Failed to fetch food item.",
+    };
+  }
+}
+
+/**
+ * Get a single restaurant profile by ID or Slug
+ */
+export async function getSingleRestaurantById(
+  restaurantId: string
+): Promise<ApiResponse<IRestaurant>> {
+  try {
+    if (!restaurantId) {
+      return { success: false, message: "Restaurant ID is required." };
+    }
+
+    const res = await fetch(`${API_BASE_URL}/restaurants/${restaurantId}`, {
+      method: "GET",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      cache: "no-store",
+    });
+
+    const data = await res.json();
+    return data;
+  } catch (err: any) {
+    return {
+      success: false,
+      message: err.message || "Failed to fetch restaurant profile.",
+    };
+  }
+}
+
+/**
  * Get all menu items for a specific restaurant
  */
 export async function getRestaurantMenuItems(
