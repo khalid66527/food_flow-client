@@ -232,6 +232,7 @@ export default function AIChatbot() {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
   const [isTyping, setIsTyping] = useState(false);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const greetedRef = useRef(false);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -288,22 +289,38 @@ export default function AIChatbot() {
         timestamp: new Date(),
       };
       setMessages((prev) => [...prev, userMsg]);
-      setInput("");
       setIsTyping(true);
+      setErrorMsg(null);
+
+      const chatHistory = messages.map((m) => ({
+        role: m.role === "assistant" ? "model" : "user",
+        parts: [{ text: m.content }],
+      }));
+
+      const userRole =
+        user?.role?.toLowerCase().includes("restaurant")
+          ? "restaurant"
+          : user?.role?.toLowerCase().includes("rider") ||
+            user?.role?.toLowerCase().includes("delivery")
+            ? "rider"
+            : "customer";
 
       try {
         const res = await fetch(`${API_BASE_URL}/ai/chat`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
+            userRole,
             message: content,
-            role: user?.role || "guest",
-            userId: user?.id,
-            history: messages.map((m) => ({ role: m.role, content: m.content })),
+            chatHistory,
           }),
         });
 
         const data = await res.json();
+
+        if (!res.ok) {
+          throw new Error(data?.error || data?.message || `Request failed (${res.status})`);
+        }
 
         const reply: ChatMessage = {
           id: generateId(),
@@ -316,22 +333,18 @@ export default function AIChatbot() {
           timestamp: new Date(),
         };
         setMessages((prev) => [...prev, reply]);
-      } catch {
-        setMessages((prev) => [
-          ...prev,
-          {
-            id: generateId(),
-            role: "assistant",
-            content:
-              "Oops! Something went wrong. Please check your connection and try again.",
-            timestamp: new Date(),
-          },
-        ]);
+        setInput("");
+      } catch (err) {
+        const text =
+          err instanceof Error
+            ? err.message
+            : "Oops! Something went wrong. Please check your connection and try again.";
+        setErrorMsg(text);
       } finally {
         setIsTyping(false);
       }
     },
-    [input, isTyping, messages, user]
+    [input, isTyping, user, messages]
   );
 
   /* ---- Key down ---- */
@@ -446,6 +459,19 @@ export default function AIChatbot() {
 
               <div ref={messagesEndRef} />
             </div>
+
+            {errorMsg && (
+              <div className="mx-4 mb-2 rounded-xl border border-red-200 bg-red-50 px-4 py-2.5 text-xs text-red-700">
+                <p className="font-medium">Error</p>
+                <p>{errorMsg}</p>
+                <button
+                  onClick={() => setErrorMsg(null)}
+                  className="mt-1 text-[11px] font-medium text-red-500 underline hover:text-red-700"
+                >
+                  Dismiss
+                </button>
+              </div>
+            )}
 
             {/* ---- Quick Actions ---- */}
             {messages.length <= 1 && (
