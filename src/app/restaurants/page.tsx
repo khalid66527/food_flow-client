@@ -208,7 +208,9 @@ export default function ExploreFoodPage() {
       const res = await getAllGlobalFoodItems(query);
       if (res.success && Array.isArray(res.data)) {
         setFoodItems(res.data);
-        if (res.pagination) setPagination(res.pagination);
+        if ((res as unknown as { pagination?: typeof pagination }).pagination) {
+          setPagination((res as unknown as { pagination: typeof pagination }).pagination);
+        }
 
         const restaurantMap = new Map<string, string>();
         res.data.forEach((item) => {
