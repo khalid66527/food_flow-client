@@ -184,6 +184,13 @@ export default function FoodDetails({ foodId }: FoodDetailsProps) {
   // Fetch food item and restaurant info
   useEffect(() => {
     let isMounted = true;
+    const SERVER_BASE_URL = (
+      process.env.NEXT_PUBLIC_SERVER_API_URL ||
+      process.env.NEXT_PUBLIC_SERVER_URL ||
+      "http://localhost:5000"
+    ).replace(/\/api\/?$/, "").replace(/\/$/, "");
+
+    const API_BASE_URL = `${SERVER_BASE_URL}/api`;
 
     async function loadDetails() {
       if (!targetId) {
@@ -194,7 +201,7 @@ export default function FoodDetails({ foodId }: FoodDetailsProps) {
       try {
         setLoading(true);
         // 1. Try single food details endpoint with restaurant populated
-        const res = await fetch(`http://localhost:5000/api/restaurants/food/item/${targetId}`);
+        const res = await fetch(`${API_BASE_URL}/restaurants/food/item/${targetId}`);
         if (res.ok) {
           const json = await res.json();
           if (json.success && json.data) {
@@ -213,7 +220,7 @@ export default function FoodDetails({ foodId }: FoodDetailsProps) {
         }
 
         // 2. If targetId is restaurant ID, check restaurant endpoint
-        const restRes = await fetch(`http://localhost:5000/api/restaurants/${targetId}`);
+        const restRes = await fetch(`${API_BASE_URL}/restaurants/${targetId}`);
         if (restRes.ok) {
           const restJson = await restRes.json();
           if (restJson.success && restJson.data) {
@@ -240,7 +247,7 @@ export default function FoodDetails({ foodId }: FoodDetailsProps) {
 
     async function fetchRestaurant(restId: string) {
       try {
-        const res = await fetch(`http://localhost:5000/api/restaurants/${restId}`);
+        const res = await fetch(`${API_BASE_URL}/restaurants/${restId}`);
         if (res.ok) {
           const json = await res.json();
           if (json.success && json.data && isMounted) {
