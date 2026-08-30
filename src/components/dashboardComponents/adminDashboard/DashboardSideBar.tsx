@@ -66,94 +66,50 @@ export default function DashboardSideBar() {
 
   const navSections: NavSection[] = [
     {
-      title: "Core & User Management",
+      title: "Core Overview",
       items: [
         {
-          label: "Dashboard",
+          label: "Overview / Main Dashboard",
           href: "/dashboard/admin",
           icon: LayoutDashboard,
         },
+      ],
+    },
+    {
+      title: "Management & Control",
+      items: [
         {
-          label: "Users",
+          label: "All User Management",
           href: "/dashboard/admin/users",
-          icon: UserCheck,
-        },
-        {
-          label: "Customers",
-          href: "/dashboard/admin/customers",
           icon: Users,
         },
         {
-          label: "Restaurants",
+          label: "Restaurant Approval & Control",
           href: "/dashboard/admin/restaurants",
           icon: Store,
         },
         {
-          label: "Riders",
-          href: "/dashboard/admin/riders",
-          icon: Bike,
-        },
-      ],
-    },
-    {
-      title: "Food & Orders",
-      items: [
-        {
-          label: "Orders",
-          href: "/dashboard/admin/orders",
-          icon: ClipboardList,
-          badge: "Live",
-          badgeType: "brand",
-        },
-        {
-          label: "Foods",
+          label: "Global Food Catalog",
           href: "/dashboard/admin/foods",
           icon: Utensils,
         },
         {
-          label: "Categories",
-          href: "/dashboard/admin/categories",
-          icon: FolderTree,
-        },
-      ],
-    },
-    {
-      title: "Finance & Growth",
-      items: [
-        {
-          label: "Payments",
-          href: "/dashboard/admin/payments",
-          icon: CreditCard,
-        },
-        {
-          label: "Promotions",
-          href: "/dashboard/admin/promotions",
-          icon: BadgePercent,
-          badge: "Active",
-          badgeType: "accent",
-        },
-        {
-          label: "Reviews",
+          label: "Review & Rating Moderation",
           href: "/dashboard/admin/reviews",
           icon: Star,
         },
       ],
     },
     {
-      title: "Analytics & Settings",
+      title: "System & Reports",
       items: [
         {
-          label: "Reports",
+          label: "Exportable Business Reports",
           href: "/dashboard/admin/reports",
           icon: FileBarChart,
         },
         {
-          label: "Analytics",
-          href: "/dashboard/admin/analytics",
-          icon: TrendingUp,
-        },
-        {
-          label: "Settings",
+          label: "Platform Settings",
           href: "/dashboard/admin/settings",
           icon: Settings,
         },
