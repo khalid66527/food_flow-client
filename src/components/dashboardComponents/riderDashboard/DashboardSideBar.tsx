@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
@@ -42,6 +42,38 @@ export default function DashboardSideBar() {
   const [isMobileOpen, setIsMobileOpen] = useState(false);
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [isOnline, setIsOnline] = useState(true);
+  const [hasRiderProfile, setHasRiderProfile] = useState<boolean>(false);
+
+  // Sync rider profile status
+  useEffect(() => {
+    const checkRiderProfile = async () => {
+      const email = session?.user?.email;
+      if (!email) return;
+
+      try {
+        const { getMyRiderProfile } = await import("@/lib/api/rider");
+        const res = await getMyRiderProfile(email, session?.user?.id);
+        if (res.success && res.data) {
+          setHasRiderProfile(true);
+        } else {
+          setHasRiderProfile(false);
+        }
+      } catch {
+        setHasRiderProfile(false);
+      }
+    };
+
+    checkRiderProfile();
+
+    const handleCustomEvent = () => checkRiderProfile();
+    window.addEventListener("storage", handleCustomEvent);
+    window.addEventListener("riderProfileChanged", handleCustomEvent);
+
+    return () => {
+      window.removeEventListener("storage", handleCustomEvent);
+      window.removeEventListener("riderProfileChanged", handleCustomEvent);
+    };
+  }, [session?.user?.email, session?.user?.id]);
 
   const handleLogout = async () => {
     try {
@@ -102,11 +134,9 @@ export default function DashboardSideBar() {
       title: "Account",
       items: [
         {
-          label: "Rider Profile",
+          label: hasRiderProfile ? "Rider Profile" : "Create Profile",
           href: "/dashboard/rider/profile",
           icon: User,
-          badge: "Verified",
-          badgeType: "success",
         },
       ],
     },
@@ -117,7 +147,7 @@ export default function DashboardSideBar() {
     { label: "Deliveries", href: "/dashboard/rider/delivery-details", icon: Package },
     { label: "Map", href: "/dashboard/rider/active-delivery", icon: MapPin },
     { label: "Earnings", href: "/dashboard/rider/earnings", icon: DollarSign },
-    { label: "Profile", href: "/dashboard/rider/profile", icon: User },
+    { label: hasRiderProfile ? "Profile" : "Create Profile", href: "/dashboard/rider/profile", icon: User },
   ];
 
   const getBadgeClass = (type?: "brand" | "accent" | "success" | "muted", isActive?: boolean) => {
