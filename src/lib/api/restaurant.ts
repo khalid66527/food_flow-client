@@ -58,6 +58,7 @@ export interface IRestaurant {
   ownerName?: string;
   ownerPhone?: string;
   restaurantName: string;
+  name?: string;
   slug?: string;
   tagline?: string;
   description: string;

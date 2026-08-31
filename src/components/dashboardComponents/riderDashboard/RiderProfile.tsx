@@ -10,6 +10,7 @@ import {
   Star,
   CheckCircle2,
   AlertCircle,
+  XCircle,
   Loader2,
   Edit3,
   Power,
@@ -23,6 +24,7 @@ import {
   Zap,
   AlertTriangle,
   RefreshCw,
+  Clock,
 } from "lucide-react";
 import { useSession } from "@/lib/auth-client";
 import { IRiderProfile, getMyRiderProfile } from "@/lib/api/rider";
@@ -186,9 +188,12 @@ export default function RiderProfile() {
     }
   };
 
-  // 3. Full Rider Profile View
+  const status = (rider.status || "pending").toLowerCase();
+  const isActive = status === "active" || status === "approved";
+
+  // 3. Full Rider Profile View with Pending Modal Guard if not active
   return (
-    <div className="w-full max-w-5xl mx-auto space-y-6 pb-12">
+    <div className="relative w-full max-w-5xl mx-auto space-y-6 pb-12">
       {/* Toast Notification */}
       {statusMessage && (
         <div className="fixed top-6 right-6 z-50 animate-bounce duration-300">
@@ -208,6 +213,90 @@ export default function RiderProfile() {
           </div>
         </div>
       )}
+
+      {/* PENDING APPROVAL MODAL OVERLAY (Shown when rider is pending / rejected / not active) */}
+      {!isActive && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-md flex items-center justify-center p-4 overflow-y-auto">
+          <div
+            data-aos="zoom-in"
+            data-aos-duration="400"
+            className="bg-white rounded-3xl max-w-lg w-full border border-gray-100 shadow-2xl p-6 sm:p-8 text-center space-y-6"
+          >
+            {/* Header Icon */}
+            <div className="relative mx-auto w-20 h-20 rounded-3xl bg-gradient-to-br from-amber-400 to-orange-500 flex items-center justify-center text-white shadow-lg shadow-orange-500/25">
+              <Clock className="w-10 h-10 animate-pulse" />
+              <div className="absolute -top-1 -right-1 w-6 h-6 rounded-full bg-white flex items-center justify-center shadow">
+                <Bike className="w-3.5 h-3.5 text-[#FF6B35]" />
+              </div>
+            </div>
+
+            {/* Title & Status */}
+            <div className="space-y-2">
+              <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-50 border border-amber-200 text-amber-800 text-[11px] font-extrabold uppercase tracking-wider">
+                <span className="w-2 h-2 rounded-full bg-amber-500 animate-ping" />
+                <span>Status: {status === "rejected" ? "Application Rejected" : "Awaiting Admin Verification"}</span>
+              </div>
+              <h2 className="text-2xl font-black text-gray-900 tracking-tight">
+                {status === "rejected" ? "Application Needs Revision" : "Delivery Partner Under Review"}
+              </h2>
+              <p className="text-xs sm:text-sm text-gray-600 leading-relaxed max-w-md mx-auto">
+                {status === "rejected"
+                  ? "Your rider registration was not approved by the admin. Please update your license/vehicle details or contact support."
+                  : "Your delivery credentials and vehicle documents have been submitted to Food Flow Admin for verification."}
+              </p>
+            </div>
+
+            {/* Application Summary Box */}
+            <div className="p-4 rounded-2xl bg-gray-50 border border-gray-100 text-left text-xs space-y-2.5">
+              <div className="flex items-center justify-between">
+                <span className="text-gray-400 font-bold">Rider Name:</span>
+                <span className="font-extrabold text-gray-900">{rider.name}</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-gray-400 font-bold">Phone:</span>
+                <span className="font-bold text-gray-800">{rider.phone}</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-gray-400 font-bold">Vehicle Type:</span>
+                <span className="font-bold text-gray-800 capitalize">{rider.vehicleType?.replace("_", " ") || "Motorcycle"}</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-gray-400 font-bold">Operating Zone:</span>
+                <span className="font-bold text-[#FF6B35]">
+                  {rider.deliveryZone}, {rider.city}
+                </span>
+              </div>
+            </div>
+
+            <p className="text-[11px] text-gray-400 leading-normal">
+              🔒 Once approved by admin, you will be able to go &quot;Online&quot; and begin accepting delivery orders in your zone.
+            </p>
+
+            {/* Action Buttons */}
+            <div className="pt-2 flex flex-col sm:flex-row items-center gap-3">
+              <button
+                onClick={() => setIsEditMode(true)}
+                className="w-full flex-1 flex items-center justify-center gap-2 px-5 py-3 rounded-2xl bg-gradient-to-r from-[#FF6B35] to-[#FF8C42] text-white font-bold text-xs shadow-md shadow-[#FF6B35]/25 hover:opacity-95 transition-all cursor-pointer active:scale-95"
+              >
+                <Edit3 className="w-4 h-4" />
+                <span>Edit Rider Details</span>
+              </button>
+
+              <button
+                onClick={fetchProfile}
+                disabled={loading}
+                className="w-full sm:w-auto flex items-center justify-center gap-2 px-5 py-3 rounded-2xl border border-gray-200 text-gray-700 hover:bg-gray-50 text-xs font-bold transition-all cursor-pointer active:scale-95"
+              >
+                <RefreshCw className={`w-3.5 h-3.5 ${loading ? "animate-spin" : ""}`} />
+                <span>Check Status</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Main Profile View Container (Disabled / Locked when not active) */}
+      <div className={`${!isActive ? "pointer-events-none opacity-20 filter blur-xs select-none grayscale-[40%]" : ""} space-y-6 transition-all duration-300`}>
 
       {/* Hero Profile Banner */}
       <div className="bg-white rounded-3xl border border-gray-100 shadow-sm overflow-hidden">
@@ -251,9 +340,13 @@ export default function RiderProfile() {
               <div className="space-y-1 sm:pb-2">
                 <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2">
                   <h1 className="text-2xl font-black text-gray-900">{rider.name}</h1>
-                  <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-orange-50 text-[#FF6B35] border border-orange-200">
+                  <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold ${
+                    (rider.status || "").toLowerCase() === "active"
+                      ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
+                      : "bg-amber-50 text-amber-700 border border-amber-200"
+                  }`}>
                     <ShieldCheck className="w-3.5 h-3.5" />
-                    Verified Delivery Partner
+                    {(rider.status || "").toLowerCase() === "active" ? "Verified Partner" : "Pending Verification"}
                   </span>
                 </div>
                 <div className="flex flex-wrap items-center justify-center sm:justify-start gap-3 text-xs text-gray-500 font-medium">
@@ -277,25 +370,34 @@ export default function RiderProfile() {
 
             {/* Availability Live Toggle Button */}
             <div className="sm:pb-2 flex flex-col items-center sm:items-end gap-1.5">
-              <button
-                onClick={handleToggleOnlineStatus}
-                disabled={toggleLoading}
-                className={`flex items-center gap-2 px-5 py-2.5 rounded-2xl text-xs font-bold border transition-all active:scale-95 shadow-sm ${
-                  rider.isAvailable
-                    ? "bg-emerald-50 border-emerald-300 text-emerald-700 hover:bg-emerald-100"
-                    : "bg-gray-100 border-gray-300 text-gray-600 hover:bg-gray-200"
-                }`}
-              >
-                {toggleLoading ? (
-                  <RefreshCw className="w-4 h-4 animate-spin" />
-                ) : (
-                  <Power className={`w-4 h-4 ${rider.isAvailable ? "text-emerald-600" : "text-gray-400"}`} />
-                )}
-                <span>{rider.isAvailable ? "Online • Ready for Deliveries" : "Offline • Shift Paused"}</span>
-              </button>
-              <span className="text-[11px] text-gray-400 font-medium">
-                Click to switch your delivery availability
-              </span>
+              {(rider.status || "").toLowerCase() === "active" ? (
+                <>
+                  <button
+                    onClick={handleToggleOnlineStatus}
+                    disabled={toggleLoading}
+                    className={`flex items-center gap-2 px-5 py-2.5 rounded-2xl text-xs font-bold border transition-all active:scale-95 shadow-sm ${
+                      rider.isAvailable
+                        ? "bg-emerald-50 border-emerald-300 text-emerald-700 hover:bg-emerald-100"
+                        : "bg-gray-100 border-gray-300 text-gray-600 hover:bg-gray-200"
+                    }`}
+                  >
+                    {toggleLoading ? (
+                      <RefreshCw className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <Power className={`w-4 h-4 ${rider.isAvailable ? "text-emerald-600" : "text-gray-400"}`} />
+                    )}
+                    <span>{rider.isAvailable ? "Online • Ready for Deliveries" : "Offline • Shift Paused"}</span>
+                  </button>
+                  <span className="text-[11px] text-gray-400 font-medium">
+                    Click to switch your delivery availability
+                  </span>
+                </>
+              ) : (
+                <div className="flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-amber-100 border border-amber-300 text-amber-800 text-xs font-bold shadow-sm">
+                  <Clock className="w-4 h-4 text-amber-700" />
+                  <span>Offline (Verification Required)</span>
+                </div>
+              )}
             </div>
           </div>
 
@@ -578,6 +680,7 @@ export default function RiderProfile() {
             </div>
           </div>
         </div>
+      </div>
       </div>
     </div>
   );
