@@ -17,6 +17,7 @@ import {
   ShieldCheck,
   Smartphone,
   Sparkles,
+  RefreshCw,
 } from "lucide-react";
 import type {
   ForgotPasswordStep,
@@ -27,14 +28,9 @@ import type {
   ResetPasswordFormData,
   ResetPasswordFormErrors,
   ResetPasswordTouchedFields,
-  MockForgotPasswordResponse,
   PasswordStrength,
 } from "@/types/auth";
 
-// ---------------------------------------------------------------------------
-// Mock OTP flow — demo OTP is fixed to "123456" for frontend testing.
-// ---------------------------------------------------------------------------
-const DEMO_OTP = "123456";
 const OTP_RESEND_SECONDS = 30;
 const REDIRECT_COUNTDOWN_SECONDS = 3;
 
@@ -57,14 +53,14 @@ const INITIAL_RESET_TOUCHED: ResetPasswordTouchedFields = {
 // ---------------------------------------------------------------------------
 function validateEmail(email: string): string | undefined {
   if (!email.trim()) return "Email address is required";
-  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))
-    return "Enter a valid email address";
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim()))
+    return "Please enter a valid email address";
   return undefined;
 }
 
 function validateOtp(otp: string): string | undefined {
   if (!otp.trim()) return "Verification code is required";
-  if (!/^\d{6}$/.test(otp)) return "Enter the 6-digit verification code";
+  if (!/^\d{6}$/.test(otp.trim())) return "Please enter the 6-digit verification code";
   return undefined;
 }
 
@@ -89,55 +85,62 @@ function validateResetField(
 }
 
 // ---------------------------------------------------------------------------
-// Mock async handlers
+// API Handlers
 // ---------------------------------------------------------------------------
-async function mockSendOtp(data: ForgotPasswordFormData): Promise<MockForgotPasswordResponse> {
+async function sendOtpApi(email: string): Promise<{ success: boolean; message: string }> {
   try {
     const res = await fetch("/api/auth/send-otp", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email: data.email }),
+      body: JSON.stringify({ email: email.trim() }),
     });
     const json = await res.json();
-    if (json.success) return { success: true, message: json.message };
-    return { success: false, message: json.message || "Failed to send code" };
+    return {
+      success: !!json.success,
+      message: json.message || (json.success ? "Code sent!" : "Failed to send code"),
+    };
   } catch {
-    console.log("[Fallback Mock] OTP sent to:", data.email, "| Demo OTP:", DEMO_OTP);
-    return { success: true, message: "Verification code sent! (Demo: 123456)" };
+    return { success: false, message: "Network error. Please try again." };
   }
 }
 
-async function mockVerifyOtp(data: OtpFormData): Promise<MockForgotPasswordResponse> {
-  const email = (document.querySelector('input[name="email"]') as HTMLInputElement)?.value || "";
+async function verifyOtpApi(
+  email: string,
+  otp: string
+): Promise<{ success: boolean; message: string }> {
   try {
     const res = await fetch("/api/auth/verify-otp", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email: (window as unknown as { __forgotEmail?: string }).__forgotEmail || email, otp: data.otp }),
+      body: JSON.stringify({ email: email.trim(), otp: otp.trim() }),
     });
     const json = await res.json();
-    return { success: json.success, message: json.message };
+    return {
+      success: !!json.success,
+      message: json.message || (json.success ? "Code verified!" : "Invalid code"),
+    };
   } catch {
-    if (data.otp === DEMO_OTP) return { success: true, message: "Code verified!" };
-    return { success: false, message: "Invalid verification code." };
+    return { success: false, message: "Network error. Please try again." };
   }
 }
 
-async function mockResetPassword(
-  data: ResetPasswordFormData
-): Promise<MockForgotPasswordResponse> {
-  const email = (window as unknown as { __forgotEmail?: string }).__forgotEmail || "";
+async function resetPasswordApi(
+  email: string,
+  password: string
+): Promise<{ success: boolean; message: string }> {
   try {
     const res = await fetch("/api/auth/reset-password", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email, password: data.password }),
+      body: JSON.stringify({ email: email.trim(), password }),
     });
     const json = await res.json();
-    return { success: json.success, message: json.message };
+    return {
+      success: !!json.success,
+      message: json.message || (json.success ? "Password updated!" : "Failed to update password"),
+    };
   } catch {
-    console.log("[Mock] Password reset for:", data.password);
-    return { success: true, message: "Password reset successfully!" };
+    return { success: false, message: "Network error. Please try again." };
   }
 }
 
@@ -167,7 +170,7 @@ const STRENGTH_COLORS: Record<PasswordStrength, string> = {
 };
 
 // ---------------------------------------------------------------------------
-// InputField
+// Reusable InputField
 // ---------------------------------------------------------------------------
 function InputField({
   id,
@@ -185,6 +188,7 @@ function InputField({
   trailing,
   maxLength,
   inputMode,
+  className,
 }: {
   id: string;
   name: string;
@@ -201,6 +205,7 @@ function InputField({
   trailing?: React.ReactNode;
   maxLength?: number;
   inputMode?: "numeric" | "text" | "email";
+  className?: string;
 }) {
   const showError = touched && error;
   return (
@@ -239,9 +244,9 @@ function InputField({
             trailing ? "pr-11" : "pr-4"
           } py-3 rounded-xl border text-sm text-gray-900 bg-white placeholder:text-gray-400 outline-none transition-all duration-200 ease-out disabled:opacity-50 disabled:cursor-not-allowed disabled:bg-gray-50 ${
             showError
-              ? "border-red-300 focus:ring-2 focus:ring-red-500/20 focus:border-red-500 animate-shake"
+              ? "border-red-300 focus:ring-2 focus:ring-red-500/20 focus:border-red-500"
               : "border-gray-200 hover:border-gray-300 focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 focus:shadow-[0_0_0_3px_rgba(249,115,22,0.08)]"
-          }`}
+          } ${className || ""}`}
         />
         {trailing}
       </div>
@@ -256,7 +261,7 @@ function InputField({
 }
 
 // ---------------------------------------------------------------------------
-// Step indicator
+// Step Indicator
 // ---------------------------------------------------------------------------
 const STEP_META: Record<
   Exclude<ForgotPasswordStep, "done">,
@@ -293,7 +298,7 @@ function StepIndicator({ step }: { step: Exclude<ForgotPasswordStep, "done"> }) 
                   isDone
                     ? "bg-orange-500 border-orange-500 text-white shadow-xs"
                     : isActive
-                    ? "border-orange-500 text-orange-600 bg-orange-50 font-bold"
+                    ? "border-orange-500 text-orange-600 bg-orange-50 font-bold shadow-xs"
                     : "border-gray-200 text-gray-400 bg-white"
                 }`}
               >
@@ -305,9 +310,7 @@ function StepIndicator({ step }: { step: Exclude<ForgotPasswordStep, "done"> }) 
               </div>
               <span
                 className={`text-[10px] sm:text-xs font-semibold ${
-                  isActive || isDone
-                    ? "text-orange-600"
-                    : "text-gray-400"
+                  isActive || isDone ? "text-orange-600" : "text-gray-400"
                 }`}
               >
                 {meta.label}
@@ -321,7 +324,7 @@ function StepIndicator({ step }: { step: Exclude<ForgotPasswordStep, "done"> }) 
 }
 
 // ---------------------------------------------------------------------------
-// ForgotPasswordPage
+// ForgotPasswordPage Component
 // ---------------------------------------------------------------------------
 export default function ForgotPasswordPage() {
   const router = useRouter();
@@ -341,36 +344,38 @@ export default function ForgotPasswordPage() {
   const [resetTouched, setResetTouched] = useState<ResetPasswordTouchedFields>(INITIAL_RESET_TOUCHED);
 
   const [isLoading, setIsLoading] = useState(false);
+  const [isResending, setIsResending] = useState(false);
   const [serverError, setServerError] = useState<string | null>(null);
+  const [infoMessage, setInfoMessage] = useState<string | null>(null);
   const [resendCountdown, setResendCountdown] = useState(0);
   const [redirectCountdown, setRedirectCountdown] = useState(REDIRECT_COUNTDOWN_SECONDS);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
+  // Resend Countdown Timer
   useEffect(() => {
     if (resendCountdown <= 0) return;
     const timer = setTimeout(() => setResendCountdown((prev) => prev - 1), 1000);
     return () => clearTimeout(timer);
   }, [resendCountdown]);
 
+  // Auto-Redirect to Login on Success
   useEffect(() => {
     if (step !== "done") return;
     if (redirectCountdown <= 0) {
       router.push("/auth/login");
       return;
     }
-    const timer = setTimeout(
-      () => setRedirectCountdown((prev) => prev - 1),
-      1000
-    );
+    const timer = setTimeout(() => setRedirectCountdown((prev) => prev - 1), 1000);
     return () => clearTimeout(timer);
   }, [step, redirectCountdown, router]);
 
-  // Step 1: Send OTP
+  // Step 1: Send OTP to Email
   const handleSendOtp = useCallback(
     async (e: React.FormEvent) => {
       e.preventDefault();
       setServerError(null);
+      setInfoMessage(null);
       setForgotTouched(true);
 
       const emailError = validateEmail(forgotForm.email);
@@ -379,14 +384,14 @@ export default function ForgotPasswordPage() {
 
       setIsLoading(true);
       try {
-        (window as unknown as { __forgotEmail?: string }).__forgotEmail = forgotForm.email;
-        const response = await mockSendOtp(forgotForm);
+        const response = await sendOtpApi(forgotForm.email);
         if (response.success) {
           setOtpForm(INITIAL_OTP);
           setOtpErrors(INITIAL_OTP_ERRORS);
           setOtpTouched(false);
           setStep("otp");
           setResendCountdown(OTP_RESEND_SECONDS);
+          setInfoMessage("Verification code has been sent to your email.");
         } else {
           setServerError(response.message);
         }
@@ -404,6 +409,7 @@ export default function ForgotPasswordPage() {
     async (e: React.FormEvent) => {
       e.preventDefault();
       setServerError(null);
+      setInfoMessage(null);
       setOtpTouched(true);
 
       const otpError = validateOtp(otpForm.otp);
@@ -412,29 +418,53 @@ export default function ForgotPasswordPage() {
 
       setIsLoading(true);
       try {
-        const response = await mockVerifyOtp(otpForm);
+        const response = await verifyOtpApi(forgotForm.email, otpForm.otp);
         if (response.success) {
           setResetForm(INITIAL_RESET);
           setResetErrors(INITIAL_RESET_ERRORS);
           setResetTouched(INITIAL_RESET_TOUCHED);
           setStep("reset");
+          setInfoMessage("Verification successful! Please enter your new password.");
         } else {
           setServerError(response.message);
         }
       } catch {
-        setServerError("Verification failed. Please try again.");
+        setServerError("Verification failed. Please check the code and try again.");
       } finally {
         setIsLoading(false);
       }
     },
-    [otpForm]
+    [forgotForm.email, otpForm]
   );
 
-  // Step 3: Reset Password
+  // Resend OTP Action
+  const handleResendOtp = useCallback(async () => {
+    if (resendCountdown > 0 || isResending) return;
+    setServerError(null);
+    setInfoMessage(null);
+    setIsResending(true);
+
+    try {
+      const response = await sendOtpApi(forgotForm.email);
+      if (response.success) {
+        setResendCountdown(OTP_RESEND_SECONDS);
+        setInfoMessage("A new verification code has been sent to your email!");
+      } else {
+        setServerError(response.message);
+      }
+    } catch {
+      setServerError("Failed to resend verification code. Please try again.");
+    } finally {
+      setIsResending(false);
+    }
+  }, [forgotForm.email, resendCountdown, isResending]);
+
+  // Step 3: Reset Password in Database
   const handleResetPassword = useCallback(
     async (e: React.FormEvent) => {
       e.preventDefault();
       setServerError(null);
+      setInfoMessage(null);
       setResetTouched({ password: true, confirmPassword: true });
 
       const passwordError = validateResetField("password", resetForm);
@@ -448,7 +478,7 @@ export default function ForgotPasswordPage() {
 
       setIsLoading(true);
       try {
-        const response = await mockResetPassword(resetForm);
+        const response = await resetPasswordApi(forgotForm.email, resetForm.password);
         if (response.success) {
           setStep("done");
           setRedirectCountdown(REDIRECT_COUNTDOWN_SECONDS);
@@ -461,17 +491,11 @@ export default function ForgotPasswordPage() {
         setIsLoading(false);
       }
     },
-    [resetForm]
+    [forgotForm.email, resetForm]
   );
 
-  const handleResendOtp = useCallback(() => {
-    if (resendCountdown > 0) return;
-    setServerError(null);
-    setResendCountdown(OTP_RESEND_SECONDS);
-  }, [resendCountdown]);
-
   // -------------------------------------------------------------------------
-  // Success state
+  // Done / Success State
   // -------------------------------------------------------------------------
   if (step === "done") {
     return (
@@ -480,7 +504,7 @@ export default function ForgotPasswordPage() {
         <div className="pointer-events-none absolute -left-32 top-10 h-72 w-72 rounded-full bg-orange-100/50 blur-3xl" />
         <div className="pointer-events-none absolute -right-32 bottom-0 h-80 w-80 rounded-full bg-orange-50/70 blur-3xl" />
 
-        <div className="relative max-w-md w-full text-center space-y-7 bg-white p-8 rounded-3xl border border-gray-100 shadow-xl shadow-gray-200/50 animate-scale-in">
+        <div className="relative max-w-md w-full text-center space-y-7 bg-white p-8 rounded-3xl border border-gray-100 shadow-xl shadow-gray-200/50">
           <div className="relative w-20 h-20 mx-auto">
             <div className="absolute inset-0 bg-orange-100 rounded-full animate-ping opacity-25" />
             <div className="relative w-20 h-20 bg-orange-50 rounded-full flex items-center justify-center border-2 border-orange-100">
@@ -493,17 +517,14 @@ export default function ForgotPasswordPage() {
               Password Reset!
             </h1>
             <p className="text-sm text-gray-500 leading-relaxed">
-              Your password has been successfully updated. You can now sign in with your new password.
+              Your password has been successfully updated in the database. You can now sign in with your new password.
             </p>
           </div>
 
           <div className="space-y-3">
             <p className="text-xs text-gray-400">
               Redirecting to{" "}
-              <span className="font-semibold text-gray-700">
-                Sign In
-              </span>{" "}
-              in{" "}
+              <span className="font-semibold text-gray-700">Sign In</span> in{" "}
               <span className="font-bold text-orange-500 tabular-nums">
                 {redirectCountdown}
               </span>{" "}
@@ -538,7 +559,7 @@ export default function ForgotPasswordPage() {
   }
 
   // -------------------------------------------------------------------------
-  // Multi-step Forgot Password Card
+  // Main Multi-step Card
   // -------------------------------------------------------------------------
   return (
     <div className="relative min-h-[85vh] flex items-center justify-center px-4 py-10 sm:py-16 overflow-hidden bg-white">
@@ -548,7 +569,7 @@ export default function ForgotPasswordPage() {
 
       <div className="relative w-full max-w-md">
         {/* Main Card */}
-        <div className="bg-white rounded-3xl border border-gray-100 shadow-xl shadow-gray-200/50 p-6 sm:p-10 space-y-7 animate-fade-in-up">
+        <div className="bg-white rounded-3xl border border-gray-100 shadow-xl shadow-gray-200/50 p-6 sm:p-10 space-y-7">
           
           {/* Header */}
           <div className="text-center space-y-2.5">
@@ -560,8 +581,7 @@ export default function ForgotPasswordPage() {
               Forgot Password
             </h1>
             <p className="text-xs sm:text-sm text-gray-500">
-              {step === "email" &&
-                "Enter your registered email to receive a verification code"}
+              {step === "email" && "Enter your registered email to receive a verification code"}
               {step === "otp" && `We sent a 6-digit code to ${forgotForm.email}`}
               {step === "reset" && "Choose a strong new password for your account"}
             </p>
@@ -570,16 +590,24 @@ export default function ForgotPasswordPage() {
           {/* Step Indicator */}
           <StepIndicator step={step} />
 
+          {/* Feedback Messages */}
+          {serverError && (
+            <div className="flex items-center gap-2 p-3 rounded-xl bg-red-50 border border-red-200 text-xs sm:text-sm text-red-600 animate-slide-down">
+              <AlertCircle className="h-4 w-4 shrink-0" />
+              <span>{serverError}</span>
+            </div>
+          )}
+
+          {infoMessage && !serverError && (
+            <div className="flex items-center gap-2 p-3 rounded-xl bg-emerald-50 border border-emerald-200 text-xs sm:text-sm text-emerald-700 animate-slide-down">
+              <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-500" />
+              <span>{infoMessage}</span>
+            </div>
+          )}
+
           {/* Step 1: Enter Email */}
           {step === "email" && (
             <form onSubmit={handleSendOtp} className="space-y-4">
-              {serverError && (
-                <div className="flex items-center gap-2 p-3 rounded-xl bg-red-50 border border-red-200 text-xs sm:text-sm text-red-600 animate-slide-down">
-                  <AlertCircle className="h-4 w-4 shrink-0" />
-                  <span>{serverError}</span>
-                </div>
-              )}
-
               <InputField
                 id="email"
                 name="email"
@@ -597,6 +625,7 @@ export default function ForgotPasswordPage() {
                     setForgotErrors({ email: validateEmail(e.target.value) });
                   }
                   setServerError(null);
+                  setInfoMessage(null);
                 }}
                 onBlur={() => {
                   setForgotTouched(true);
@@ -621,51 +650,69 @@ export default function ForgotPasswordPage() {
                   </>
                 )}
               </button>
+
+              <div className="text-center pt-2">
+                <Link
+                  href="/auth/login"
+                  className="inline-flex items-center gap-1.5 text-xs sm:text-sm font-semibold text-gray-500 hover:text-orange-600 transition-colors"
+                >
+                  <ArrowLeft className="h-4 w-4" />
+                  Back to Sign In
+                </Link>
+              </div>
             </form>
           )}
 
           {/* Step 2: Enter OTP */}
           {step === "otp" && (
             <form onSubmit={handleVerifyOtp} className="space-y-4">
-              {serverError && (
-                <div className="flex items-center gap-2 p-3 rounded-xl bg-red-50 border border-red-200 text-xs sm:text-sm text-red-600 animate-slide-down">
-                  <AlertCircle className="h-4 w-4 shrink-0" />
-                  <span>{serverError}</span>
-                </div>
-              )}
-
-              <div className="rounded-2xl bg-amber-50 border border-amber-200 p-3.5 text-xs text-amber-700 dark:bg-amber-500/10 dark:border-amber-500/30 dark:text-amber-500">
-                Code sent to your email — check inbox (and spam folder)
+              <div className="rounded-2xl bg-orange-50 border border-orange-100 p-3.5 text-xs text-orange-800 space-y-1">
+                <p className="font-semibold">✉️ Check your inbox</p>
+                <p className="text-orange-700/90 leading-relaxed">
+                  We sent a 6-digit code to <strong className="text-orange-950">{forgotForm.email}</strong>. Please check your Inbox and Spam folder.
+                </p>
               </div>
 
-              <InputField
-                id="otp"
-                name="otp"
-                label="Verification Code"
-                type="text"
-                placeholder="6-digit code"
-                icon={Smartphone}
-                value={otpForm.otp}
-                error={otpErrors.otp}
-                touched={otpTouched}
-                disabled={isLoading}
-                maxLength={6}
-                inputMode="numeric"
-                onChange={(e) => {
-                  const digits = e.target.value.replace(/\D/g, "").slice(0, 6);
-                  setOtpForm({ otp: digits });
-                  if (otpTouched) setOtpErrors({ otp: validateOtp(digits) });
-                  setServerError(null);
-                }}
-                onBlur={() => {
-                  setOtpTouched(true);
-                  setOtpErrors({ otp: validateOtp(otpForm.otp) });
-                }}
-              />
+              <div className="space-y-1.5">
+                <label className="block text-xs sm:text-sm font-semibold text-gray-700">
+                  Enter 6-Digit Code
+                </label>
+                <div className="relative">
+                  <Smartphone className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+                  <input
+                    id="otp"
+                    name="otp"
+                    type="text"
+                    placeholder="• • • • • •"
+                    value={otpForm.otp}
+                    disabled={isLoading}
+                    maxLength={6}
+                    inputMode="numeric"
+                    autoFocus
+                    onChange={(e) => {
+                      const digits = e.target.value.replace(/\D/g, "").slice(0, 6);
+                      setOtpForm({ otp: digits });
+                      if (otpTouched) setOtpErrors({ otp: validateOtp(digits) });
+                      setServerError(null);
+                    }}
+                    onBlur={() => {
+                      setOtpTouched(true);
+                      setOtpErrors({ otp: validateOtp(otpForm.otp) });
+                    }}
+                    className="w-full pl-10 pr-4 py-3.5 rounded-xl border border-gray-200 text-center tracking-[8px] text-xl font-bold text-gray-900 bg-white placeholder:text-gray-300 placeholder:tracking-widest focus:ring-2 focus:ring-orange-500/20 focus:border-orange-500 outline-none transition-all duration-200"
+                  />
+                </div>
+                {otpTouched && otpErrors.otp && (
+                  <p className="flex items-center gap-1 text-xs text-red-500 mt-0.5">
+                    <AlertCircle className="h-3 w-3 shrink-0" />
+                    {otpErrors.otp}
+                  </p>
+                )}
+              </div>
 
               <button
                 type="submit"
-                disabled={isLoading}
+                disabled={isLoading || otpForm.otp.length !== 6}
                 className="w-full flex items-center justify-center gap-2 px-6 py-3.5 rounded-full bg-orange-500 text-white font-bold text-sm sm:text-base shadow-lg shadow-orange-500/25 hover:bg-orange-600 hover:shadow-xl hover:shadow-orange-500/30 hover:-translate-y-0.5 active:scale-[0.98] disabled:opacity-60 disabled:cursor-not-allowed disabled:hover:translate-y-0 transition-all duration-200 ease-out"
               >
                 {isLoading ? (
@@ -684,7 +731,11 @@ export default function ForgotPasswordPage() {
               <div className="flex items-center justify-between text-xs text-gray-500 pt-1">
                 <button
                   type="button"
-                  onClick={() => setStep("email")}
+                  onClick={() => {
+                    setStep("email");
+                    setServerError(null);
+                    setInfoMessage(null);
+                  }}
                   className="inline-flex items-center gap-1 text-gray-600 hover:text-orange-600 font-medium transition-colors"
                 >
                   <ArrowLeft className="h-3.5 w-3.5" />
@@ -693,7 +744,7 @@ export default function ForgotPasswordPage() {
 
                 <div>
                   {resendCountdown > 0 ? (
-                    <span>
+                    <span className="text-gray-500 font-medium">
                       Resend in{" "}
                       <span className="font-bold text-orange-500 tabular-nums">
                         {resendCountdown}s
@@ -702,10 +753,18 @@ export default function ForgotPasswordPage() {
                   ) : (
                     <button
                       type="button"
+                      disabled={isResending}
                       onClick={handleResendOtp}
-                      className="font-bold text-orange-600 hover:underline transition-colors"
+                      className="inline-flex items-center gap-1 font-bold text-orange-600 hover:text-orange-700 hover:underline transition-colors disabled:opacity-50"
                     >
-                      Resend code
+                      {isResending ? (
+                        <>
+                          <RefreshCw className="h-3.5 w-3.5 animate-spin" />
+                          <span>Sending...</span>
+                        </>
+                      ) : (
+                        <span>Resend code</span>
+                      )}
                     </button>
                   )}
                 </div>
@@ -716,19 +775,12 @@ export default function ForgotPasswordPage() {
           {/* Step 3: Set New Password */}
           {step === "reset" && (
             <form onSubmit={handleResetPassword} className="space-y-4">
-              {serverError && (
-                <div className="flex items-center gap-2 p-3 rounded-xl bg-red-50 border border-red-200 text-xs sm:text-sm text-red-600 animate-slide-down">
-                  <AlertCircle className="h-4 w-4 shrink-0" />
-                  <span>{serverError}</span>
-                </div>
-              )}
-
               <InputField
                 id="new-password"
                 name="password"
                 label="New Password"
                 type={showPassword ? "text" : "password"}
-                placeholder="Enter new password"
+                placeholder="Enter at least 6 characters"
                 icon={Lock}
                 value={resetForm.password}
                 error={resetErrors.password}
@@ -810,9 +862,9 @@ export default function ForgotPasswordPage() {
               <InputField
                 id="confirm-password"
                 name="confirmPassword"
-                label="Confirm New Password"
+                label="Confirm Password"
                 type={showConfirmPassword ? "text" : "password"}
-                placeholder="Re-enter new password"
+                placeholder="Re-enter your new password"
                 icon={Lock}
                 value={resetForm.confirmPassword}
                 error={resetErrors.confirmPassword}
@@ -870,30 +922,12 @@ export default function ForgotPasswordPage() {
                 ) : (
                   <>
                     <span>Reset Password</span>
-                    <ArrowRight className="h-4 w-4" />
+                    <ShieldCheck className="h-4 w-4" />
                   </>
                 )}
               </button>
             </form>
           )}
-
-          {/* Footer */}
-          <div className="pt-2 border-t border-gray-100 flex flex-col items-center gap-3">
-            <div className="flex items-center gap-1.5 text-[11px] text-gray-400">
-              <ShieldCheck className="h-3.5 w-3.5 text-emerald-500" />
-              <span>Protected by Food Flow security protocols</span>
-            </div>
-
-            <p className="text-center text-xs sm:text-sm text-gray-500">
-              Remember your password?{" "}
-              <Link
-                href="/auth/login"
-                className="font-bold text-orange-600 hover:text-orange-700 hover:underline transition-colors duration-150"
-              >
-                Sign In
-              </Link>
-            </p>
-          </div>
 
         </div>
       </div>

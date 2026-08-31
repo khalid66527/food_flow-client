@@ -1,5 +1,6 @@
 import DashboardSideBar from "@/components/dashboardComponents/riderDashboard/DashboardSideBar";
 import RoleGuard from "@/components/common/RoleGuard";
+import RiderAccessGuard from "@/components/dashboardComponents/riderDashboard/RiderAccessGuard";
 
 interface DashboardLayoutProps {
   children: React.ReactNode;
@@ -12,7 +13,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
         <DashboardSideBar />
         <div className="flex-1 flex flex-col min-w-0 h-screen overflow-y-auto">
           <main className="p-6 md:p-10 flex-grow">
-            {children}
+            <RiderAccessGuard>{children}</RiderAccessGuard>
           </main>
         </div>
       </div>

@@ -240,7 +240,7 @@ export default function CreateRestaurant({
         website: formData.website.trim(),
       },
       isOpen: initialData?.isOpen ?? true,
-      status: initialData?.status || "active",
+      status: initialData?.status || (isEditMode ? "active" : "pending"),
     };
 
     setLoading(true);
