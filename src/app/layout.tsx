@@ -9,6 +9,7 @@ import Footer from "@/components/common/Footer";
 import ScrollToHash from "@/components/common/ScrollToHash";
 import AOSInit from "@/components/common/AOSInit";
 import AIChatbot from "@/components/ai/AIChatbot";
+import CartSidebar from "@/components/cart/CartSidebar";
 import { CartProvider } from "@/contexts/CartContext";
 
 const inter = Inter({
@@ -38,13 +39,14 @@ export default function RootLayout({
       suppressHydrationWarning
       className={`${inter.variable} ${jakarta.variable} h-full antialiased`}
     >
-      <body suppressHydrationWarning className="min-h-full flex flex-col bg-gray-50 dark:bg-gray-950 text-gray-900 dark:text-gray-100">
+      <body suppressHydrationWarning className="min-h-full flex flex-col bg-gray-50 text-gray-900">
         <AOSInit />
         <ScrollToHash />
         <CartProvider>
           <Navbar session={null} cartItemCount={0} />
           <main className="flex-grow">{children}</main>
           <Footer></Footer>
+          <CartSidebar />
           <AIChatbot />
         </CartProvider>
       </body>
