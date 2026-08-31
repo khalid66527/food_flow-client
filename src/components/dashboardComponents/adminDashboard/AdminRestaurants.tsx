@@ -1,11 +1,8 @@
-import React from 'react';
+import React from "react";
+import AdminRestaurantAndRider from "./AdminRestaurantAndRider";
 
 const AdminRestaurants = () => {
-    return (
-        <div>
-            Admin Restaurants
-        </div>
-    );
+  return <AdminRestaurantAndRider />;
 };
 
 export default AdminRestaurants;

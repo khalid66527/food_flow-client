@@ -84,8 +84,8 @@ export default function DashboardSideBar() {
           icon: Users,
         },
         {
-          label: "Restaurant Approval & Control",
-          href: "/dashboard/admin/restaurants",
+          label: "Restaurant & Rider Management",
+          href: "/dashboard/admin/restaurant&rider",
           icon: Store,
         },
         {

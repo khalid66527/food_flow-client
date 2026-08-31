@@ -154,8 +154,8 @@ export default function CreateRiderProfile({
           phone: formData.emergencyPhone.trim(),
         },
         bio: formData.bio.trim(),
-        isAvailable: initialData?.isAvailable !== undefined ? initialData.isAvailable : true,
-        status: initialData?.status || "active",
+        isAvailable: initialData?.isAvailable !== undefined ? initialData.isAvailable : false,
+        status: initialData?.status || (isEditMode ? "active" : "pending"),
       };
 
       let res;
