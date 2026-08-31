@@ -1,6 +1,3 @@
-import dns from "node:dns";
-dns.setServers(["8.8.8.8", "8.8.4.4"]);
-
 import type { Metadata } from "next";
 import { Inter, Plus_Jakarta_Sans } from "next/font/google";
 import "./globals.css";
@@ -8,6 +5,7 @@ import Navbar from "@/components/common/Navbar";
 import Footer from "@/components/common/Footer";
 import ScrollToHash from "@/components/common/ScrollToHash";
 import AOSInit from "@/components/common/AOSInit";
+import { AuthProvider } from "@/lib/auth-context";
 
 const inter = Inter({
   variable: "--font-inter",
@@ -39,9 +37,11 @@ export default function RootLayout({
       <body suppressHydrationWarning className="min-h-full flex flex-col bg-gray-50 dark:bg-gray-950 text-gray-900 dark:text-gray-100">
         <AOSInit />
         <ScrollToHash />
-        <Navbar session={null} cartItemCount={0} />
-        <main className="flex-grow">{children}</main>
-        <Footer></Footer>
+        <AuthProvider>
+          <Navbar session={null} cartItemCount={0} />
+          <main className="flex-grow">{children}</main>
+          <Footer />
+        </AuthProvider>
       </body>
     </html>
   );
