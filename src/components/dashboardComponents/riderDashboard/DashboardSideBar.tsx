@@ -182,11 +182,11 @@ export default function DashboardSideBar() {
   return (
     <>
       {/* Mobile Top App Bar */}
-      <div className="md:hidden sticky top-0 z-40 flex items-center justify-between px-4 py-3 bg-white/95 dark:bg-[#0C0C14]/95 backdrop-blur-md border-b border-gray-100 dark:border-white/5 shadow-xs">
+      <div className="md:hidden sticky top-0 z-40 flex items-center justify-between px-4 py-3 bg-white/95 backdrop-blur-md border-b border-gray-100 shadow-xs">
         <div className="flex items-center gap-2.5">
           <button
             onClick={() => setIsMobileOpen(true)}
-            className="p-2 rounded-xl text-gray-700 dark:text-gray-200 hover:bg-orange-50 hover:text-[#FF6B35] transition-colors"
+            className="p-2 rounded-xl text-gray-700 hover:bg-orange-50 hover:text-[#FF6B35] transition-colors"
             aria-label="Open sidebar menu"
           >
             <MenuIcon className="w-5 h-5" />
@@ -240,8 +240,8 @@ export default function DashboardSideBar() {
       <aside
         className={`
           fixed md:sticky top-0 left-0 z-50 h-screen
-          bg-white dark:bg-[#0C0C14]
-          border-r border-gray-100 dark:border-white/5
+          bg-white
+          border-r border-gray-100
           flex flex-col justify-between
           transition-all duration-300 ease-in-out
           ${isMobileOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0"}
@@ -250,7 +250,7 @@ export default function DashboardSideBar() {
         `}
       >
         {/* Top Header & Logo */}
-        <div className="p-4 border-b border-gray-100 dark:border-white/5">
+        <div className="p-4 border-b border-gray-100">
           <div className="flex items-center justify-between">
             <Link
               href="/dashboard/rider"
@@ -264,7 +264,7 @@ export default function DashboardSideBar() {
               {!isCollapsed && (
                 <div className="flex flex-col min-w-0">
                   <div className="flex items-center gap-1.5">
-                    <span className="font-extrabold text-lg tracking-tight bg-gradient-to-r from-gray-900 via-gray-800 to-[#FF6B35] dark:from-white dark:via-gray-200 dark:to-[#FF6B35] bg-clip-text text-transparent">
+                    <span className="font-extrabold text-lg tracking-tight bg-gradient-to-r from-gray-900 via-gray-800 to-[#FF6B35] bg-clip-text text-transparent">
                       Food Flow
                     </span>
                     <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider bg-orange-100 text-[#FF6B35]">
@@ -299,9 +299,9 @@ export default function DashboardSideBar() {
 
           {/* Online / Duty Status Card */}
           {!isCollapsed && (
-            <div className="mt-3.5 pt-3 border-t border-gray-100 dark:border-white/5">
+            <div className="mt-3.5 pt-3 border-t border-gray-100">
               {isRiderApproved ? (
-                <div className="flex items-center justify-between px-3 py-2 bg-emerald-50/70 dark:bg-emerald-950/20 rounded-xl border border-emerald-100 dark:border-emerald-900/30">
+                <div className="flex items-center justify-between px-3 py-2 bg-emerald-50/70 rounded-xl border border-emerald-100">
                   <div className="flex items-center gap-2">
                     <span className="relative flex h-2.5 w-2.5">
                       {isOnline && (
@@ -309,7 +309,7 @@ export default function DashboardSideBar() {
                       )}
                       <span className={`relative inline-flex rounded-full h-2.5 w-2.5 ${isOnline ? "bg-emerald-500" : "bg-rose-500"}`} />
                     </span>
-                    <span className="text-xs font-semibold text-emerald-900 dark:text-emerald-300">
+                    <span className="text-xs font-semibold text-emerald-900">
                       {isOnline ? "Ready for Orders" : "Duty Offline"}
                     </span>
                   </div>
@@ -380,7 +380,7 @@ export default function DashboardSideBar() {
                             ? "bg-gradient-to-r from-[#FF6B35] to-[#FF8C42] text-white font-semibold shadow-md shadow-[#FF6B35]/25"
                             : isLocked
                             ? "text-gray-400 hover:text-gray-600 hover:bg-gray-50"
-                            : "text-gray-600 dark:text-gray-400 hover:text-[#FF6B35] hover:bg-orange-50/70"
+                            : "text-gray-600 hover:text-[#FF6B35] hover:bg-orange-50/70"
                         }
                       `}
                     >
