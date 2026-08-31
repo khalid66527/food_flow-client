@@ -24,7 +24,7 @@ const ITEMS_PER_PAGE = 6;
 export default function CustomerCart() {
   const {
     items,
-    updateQuantity,
+    changeQuantity,
     removeItem,
     clearCart,
     totalItems,
@@ -130,11 +130,11 @@ export default function CustomerCart() {
                           {item.foodItem.restaurantName || "Food Flow"}
                         </p>
                         <p className="text-sm text-gray-600 mt-1 font-medium">
-                          ৳{unitPrice.toFixed(2)}
+                          ${unitPrice.toFixed(2)}
                           {item.foodItem.discountPrice &&
                             item.foodItem.discountPrice < item.foodItem.price && (
                               <span className="ml-2 line-through text-gray-400 font-normal">
-                                ৳{item.foodItem.price.toFixed(2)}
+                                ${item.foodItem.price.toFixed(2)}
                               </span>
                             )}
                         </p>
@@ -154,7 +154,7 @@ export default function CustomerCart() {
                         <button
                           type="button"
                           onClick={() =>
-                            updateQuantity(item.foodItem._id, item.quantity - 1)
+                            changeQuantity(item.foodItem._id, -1)
                           }
                           className="p-1.5 rounded-full text-gray-600 hover:text-[#FF6B35] hover:bg-orange-50 transition-colors cursor-pointer"
                           aria-label="Decrease quantity"
@@ -167,7 +167,7 @@ export default function CustomerCart() {
                         <button
                           type="button"
                           onClick={() =>
-                            updateQuantity(item.foodItem._id, item.quantity + 1)
+                            changeQuantity(item.foodItem._id, 1)
                           }
                           className="p-1.5 rounded-full text-gray-600 hover:text-[#FF6B35] hover:bg-orange-50 transition-colors cursor-pointer"
                           aria-label="Increase quantity"
@@ -177,7 +177,7 @@ export default function CustomerCart() {
                       </div>
 
                       <p className="text-base font-bold text-gray-900">
-                        ৳{lineTotal.toFixed(2)}
+                        ${lineTotal.toFixed(2)}
                       </p>
                     </div>
                   </div>
@@ -233,7 +233,7 @@ export default function CustomerCart() {
                     Subtotal ({totalItems} item{totalItems > 1 ? "s" : ""})
                   </span>
                   <span className="font-semibold text-gray-900">
-                    ৳{totalPrice.toFixed(2)}
+                    ${totalPrice.toFixed(2)}
                   </span>
                 </div>
                 <div className="flex items-center justify-between">
@@ -242,7 +242,7 @@ export default function CustomerCart() {
                     {deliveryFee === 0 ? (
                       <span className="text-emerald-600">FREE</span>
                     ) : (
-                      `৳${deliveryFee.toFixed(2)}`
+                      `$${deliveryFee.toFixed(2)}`
                     )}
                   </span>
                 </div>
@@ -250,7 +250,7 @@ export default function CustomerCart() {
                 {deliveryFee > 0 && (
                   <div className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-orange-50 border border-orange-100 text-xs text-orange-600">
                     <Sparkles className="w-3.5 h-3.5 shrink-0" />
-                    Add ৳
+                    Add $
                     {(FREE_DELIVERY_THRESHOLD - totalPrice).toFixed(2)} more for free
                     delivery!
                   </div>
@@ -261,7 +261,7 @@ export default function CustomerCart() {
                     Estimated Total
                   </span>
                   <span className="text-xl font-extrabold text-gray-900">
-                    ৳{estimatedTotal.toFixed(2)}
+                    ${estimatedTotal.toFixed(2)}
                   </span>
                 </div>
               </div>
