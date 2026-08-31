@@ -441,7 +441,7 @@ export default function RestaurantProfile() {
                 Delivery Fee
               </span>
               <span className="text-base font-extrabold text-[#FF6B35]">
-                ৳{restaurant.pricing?.deliveryFee ?? 40}
+                ${restaurant.pricing?.deliveryFee ?? 40}
               </span>
             </div>
 
@@ -450,7 +450,7 @@ export default function RestaurantProfile() {
                 Min Order Amount
               </span>
               <span className="text-base font-extrabold text-gray-800">
-                ৳{restaurant.pricing?.minOrderAmount ?? 150}
+                ${restaurant.pricing?.minOrderAmount ?? 150}
               </span>
             </div>
 
@@ -459,7 +459,7 @@ export default function RestaurantProfile() {
                 Avg Cost for Two
               </span>
               <span className="text-base font-extrabold text-gray-800">
-                ৳{restaurant.pricing?.costForTwo ?? 450}
+                ${restaurant.pricing?.costForTwo ?? 450}
               </span>
             </div>
           </div>

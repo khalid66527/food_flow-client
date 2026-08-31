@@ -104,7 +104,7 @@ function useResponsiveLimit() {
 // PAGE COMPONENT
 // ---------------------------------------------------------------------------
 export default function ExploreFoodPage() {
-  const { addItem } = useCart();
+  const { addItem, canAddToCart } = useCart();
   const responsiveLimit = useResponsiveLimit();
 
   // Data
@@ -602,6 +602,7 @@ export default function ExploreFoodPage() {
                       viewMode="grid"
                       onAddToCart={handleAddToCart}
                       addedFeedbackId={addedItemId}
+                      canAddToCart={canAddToCart}
                     />
                   ))}
                 </AnimatePresence>

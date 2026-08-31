@@ -19,7 +19,7 @@ import { useSession } from "@/lib/auth-client";
 export default function CartSidebar() {
   const {
     items,
-    updateQuantity,
+    changeQuantity,
     removeItem,
     clearCart,
     totalItems,
@@ -153,10 +153,7 @@ export default function CartSidebar() {
                             <button
                               type="button"
                               onClick={() =>
-                                updateQuantity(
-                                  item.foodItem._id,
-                                  item.quantity - 1
-                                )
+                                changeQuantity(item.foodItem._id, -1)
                               }
                               className="p-1 rounded-full text-gray-600 hover:text-[#FF6B35] hover:bg-orange-50 transition-colors cursor-pointer"
                               aria-label="Decrease quantity"
@@ -169,10 +166,7 @@ export default function CartSidebar() {
                             <button
                               type="button"
                               onClick={() =>
-                                updateQuantity(
-                                  item.foodItem._id,
-                                  item.quantity + 1
-                                )
+                                changeQuantity(item.foodItem._id, 1)
                               }
                               className="p-1 rounded-full text-gray-600 hover:text-[#FF6B35] hover:bg-orange-50 transition-colors cursor-pointer"
                               aria-label="Increase quantity"
@@ -182,7 +176,7 @@ export default function CartSidebar() {
                           </div>
 
                           <p className="text-sm font-bold text-gray-900">
-                            ৳
+                            $
                             {(
                               (item.foodItem.discountPrice ||
                                 item.foodItem.price) * item.quantity
@@ -210,7 +204,7 @@ export default function CartSidebar() {
                 <div className="flex items-center justify-between">
                   <span className="text-sm text-gray-500">Subtotal</span>
                   <span className="text-lg font-extrabold text-gray-900">
-                    ৳{totalPrice.toFixed(2)}
+                    ${totalPrice.toFixed(2)}
                   </span>
                 </div>
                 <p className="text-xs text-gray-400">
