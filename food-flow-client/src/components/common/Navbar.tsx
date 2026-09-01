@@ -17,6 +17,7 @@ import {
   ChevronDown
 } from "lucide-react";
 import { useSession, signOut } from "@/lib/auth-client";
+import { useCart } from "@/contexts/CartContext";
 
 // Better Auth session ba user object-er type definition (Real implementation er jonno)
 type UserRole = "customer" | "restaurant" | "rider" | "admin" | string | null;
@@ -53,6 +54,9 @@ export default function Navbar({
   const pathname = usePathname();
   const router = useRouter();
   const { data: clientSession } = useSession();
+  const { totalItems } = useCart();
+
+  const cartCount = totalItems || cartItemCount;
 
   const session = sessionProp || clientSession;
   const user = (userProp || session?.user || null) as UserSession | null;
@@ -169,9 +173,9 @@ export default function Navbar({
             aria-label="Cart"
           >
             <ShoppingCart className="h-5 w-5" />
-            {cartItemCount > 0 && (
+            {cartCount > 0 && (
               <span className="absolute top-0.5 right-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-orange-500 text-[10px] font-bold text-white shadow-xs">
-                {cartItemCount}
+                {cartCount}
               </span>
             )}
           </Link>

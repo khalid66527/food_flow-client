@@ -5,7 +5,8 @@ import Navbar from "@/components/common/Navbar";
 import Footer from "@/components/common/Footer";
 import ScrollToHash from "@/components/common/ScrollToHash";
 import AOSInit from "@/components/common/AOSInit";
-import { AuthProvider } from "@/lib/auth-context";
+import AIChatbot from "@/components/ai/AIChatbot";
+import { CartProvider } from "@/contexts/CartContext";
 
 const inter = Inter({
   variable: "--font-inter",
@@ -37,11 +38,12 @@ export default function RootLayout({
       <body suppressHydrationWarning className="min-h-full flex flex-col bg-gray-50 dark:bg-gray-950 text-gray-900 dark:text-gray-100">
         <AOSInit />
         <ScrollToHash />
-        <AuthProvider>
+        <CartProvider>
           <Navbar session={null} cartItemCount={0} />
           <main className="flex-grow">{children}</main>
-          <Footer />
-        </AuthProvider>
+          <Footer></Footer>
+          <AIChatbot />
+        </CartProvider>
       </body>
     </html>
   );

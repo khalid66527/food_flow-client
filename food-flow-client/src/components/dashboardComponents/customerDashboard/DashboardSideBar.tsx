@@ -5,9 +5,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
   Home,
-  Utensils,
   Store,
-  FileText,
   BadgePercent,
   ShoppingCart,
   CreditCard,
@@ -73,16 +71,6 @@ export default function DashboardSideBar() {
           label: "Restaurants",
           href: "/dashboard/customer/restaurants",
           icon: Store,
-        },
-        {
-          label: "Restaurant Details",
-          href: "/dashboard/customer/restaurant-details",
-          icon: Utensils,
-        },
-        {
-          label: "Food Details",
-          href: "/dashboard/customer/food-details",
-          icon: FileText,
         },
         {
           label: "Offers",
