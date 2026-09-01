@@ -38,7 +38,10 @@ export default function RootLayout({
       suppressHydrationWarning
       className={`${inter.variable} ${jakarta.variable} h-full antialiased`}
     >
-      <body suppressHydrationWarning className="min-h-full flex flex-col bg-gray-50 dark:bg-gray-950 text-gray-900 dark:text-gray-100">
+      <body
+        suppressHydrationWarning
+        className="min-h-full flex flex-col bg-gray-50 dark:bg-gray-950 text-gray-900 dark:text-gray-100"
+      >
         <AOSInit />
         <ScrollToHash />
         <CartProvider>
