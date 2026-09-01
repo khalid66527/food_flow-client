@@ -362,7 +362,7 @@ export default function CustomerAddress() {
   return (
     <div className="max-w-6xl mx-auto pb-12">
       {/* Header Banner */}
-      <div className="mb-8 bg-gradient-to-r from-orange-600 via-[#FF6B35] to-amber-500 rounded-3xl p-6 sm:p-8 text-white shadow-lg shadow-orange-500/15 relative overflow-hidden">
+      <div className="mb-8 bg-gradient-to-r from-orange-500 via-amber-500 to-orange-600 rounded-3xl p-6 sm:p-8 text-white shadow-xl relative overflow-hidden">
         <div className="absolute right-0 top-0 translate-x-8 -translate-y-8 w-48 h-48 rounded-full bg-white/10 blur-2xl pointer-events-none" />
         <div className="relative z-10 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
