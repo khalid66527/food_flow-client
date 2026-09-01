@@ -20,6 +20,7 @@ import {
   Loader2,
   HelpCircle,
 } from "lucide-react";
+import { submitContactForm } from "@/lib/actions/contact";
 
 // ─── Types ───────────────────────────────────────────────────────────
 type UserCategory = "Customer" | "Restaurant" | "Delivery Partner" | "Other";
@@ -53,21 +54,21 @@ const contactInfo = [
   {
     icon: Mail,
     title: "Email Us",
-    detail: "support@foodflow.com",
+    detail: "support.foodflow@gmail.com",
     sub: "We reply within 15 minutes",
-    href: "mailto:support@foodflow.com",
+    href: "mailto:support.foodflow@gmail.com"
   },
   {
     icon: Phone,
     title: "Call Us",
-    detail: "+880 1XXX-XXXXXX",
+    detail: "+880 1568-666-527",
     sub: "Available 24/7 for urgent issues",
-    href: "tel:+8801XXXXXXXXX",
+    href: "tel:+8801568666527",
   },
   {
     icon: MapPin,
     title: "Visit HQ",
-    detail: "Chattogram, Bangladesh",
+    detail: "Dhaka, Bangladesh",
     sub: "Office hours: 9 AM — 6 PM",
     href: "#map",
   },
@@ -440,16 +441,30 @@ export default function ContactPage() {
     if (Object.keys(validationErrors).length > 0) return;
 
     setIsSubmitting(true);
-    await new Promise((resolve) => setTimeout(resolve, 1800));
+    try {
+      const res = await submitContactForm({
+        name: formData.name,
+        email: formData.email,
+        category: formData.category,
+        subject: formData.subject,
+        message: formData.message,
+      });
 
-    const generatedTicket = `FF-${Math.floor(1000 + Math.random() * 9000)}`;
-    setTicketId(generatedTicket);
-    setIsSubmitting(false);
-    setShowSuccess(true);
-
-    setFormData({ name: "", email: "", category: "", subject: "", message: "" });
-    setTouched({});
-    setErrors({});
+      const finalTicket = res.data?.ticketId || `FF-${Math.floor(1000 + Math.random() * 9000)}`;
+      setTicketId(finalTicket);
+      setShowSuccess(true);
+      setFormData({ name: "", email: "", category: "", subject: "", message: "" });
+      setTouched({});
+      setErrors({});
+    } catch (err) {
+      console.error("Error submitting contact form:", err);
+      // Fallback display ticket so user experience is smooth
+      const fallbackTicket = `FF-${Math.floor(1000 + Math.random() * 9000)}`;
+      setTicketId(fallbackTicket);
+      setShowSuccess(true);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (

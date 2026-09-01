@@ -25,6 +25,7 @@ import {
   X,
   ShieldCheck,
   Sparkles,
+  MessageSquare,
 } from "lucide-react";
 import { useSession, signOut } from "@/lib/auth-client";
 
@@ -97,6 +98,11 @@ export default function DashboardSideBar() {
           label: "Review & Rating Moderation",
           href: "/dashboard/admin/reviews",
           icon: Star,
+        },
+        {
+          label: "Support & Inquiries",
+          href: "/dashboard/admin/messages",
+          icon: MessageSquare,
         },
       ],
     },
