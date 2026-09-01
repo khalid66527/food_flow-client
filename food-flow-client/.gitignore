@@ -39,13 +39,3 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
-
-# server
-node_modules/
-dist/
-food-flow-server/node_modules/
-food-flow-server/dist/
-
-# client
-food-flow-client/node_modules/
-food-flow-client/.next/
