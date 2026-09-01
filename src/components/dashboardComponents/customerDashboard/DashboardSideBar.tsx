@@ -6,10 +6,8 @@ import { usePathname, useRouter } from "next/navigation";
 import {
   Home,
   Store,
-  BadgePercent,
   ShoppingCart,
   CreditCard,
-  CheckCircle2,
   MapPin,
   User,
   LogOut,
@@ -63,7 +61,7 @@ export default function DashboardSideBar() {
       title: "Discover & Food",
       items: [
         {
-          label: "Home",
+          label: "Overview",
           href: "/dashboard/customer",
           icon: Home,
         },
@@ -71,13 +69,6 @@ export default function DashboardSideBar() {
           label: "Restaurants",
           href: "/dashboard/customer/restaurants",
           icon: Store,
-        },
-        {
-          label: "Offers",
-          href: "/dashboard/customer/offers",
-          icon: BadgePercent,
-          badge: "Hot",
-          badgeType: "accent",
         },
       ],
     },
@@ -92,16 +83,11 @@ export default function DashboardSideBar() {
           badgeType: "brand",
         },
         {
-          label: "Checkout",
-          href: "/dashboard/customer/checkout",
-          icon: CreditCard,
-        },
-        {
-          label: "Order Success",
-          href: "/dashboard/customer/order-success",
-          icon: CheckCircle2,
-          badge: "New",
-          badgeType: "success",
+          label: "Orders",
+          href: "/dashboard/customer/orders",
+          icon: ShoppingBag,
+          badge: "History",
+          badgeType: "brand",
         },
         {
           label: "Order Tracking",

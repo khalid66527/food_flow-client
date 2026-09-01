@@ -152,18 +152,6 @@ export default function Navbar({
             Restaurants
           </Link>
           <Link 
-            href="/offers" 
-            className={`px-4 py-1.5 rounded-full transition-all ${pathname === "/offers" ? "bg-white text-orange-600 shadow-xs font-semibold" : "hover:bg-white hover:text-orange-600"}`}
-          >
-            Offers
-          </Link>
-          <Link 
-            href="/track/sample-id" 
-            className={`px-4 py-1.5 rounded-full transition-all ${pathname.startsWith("/track") ? "bg-white text-orange-600 shadow-xs font-semibold" : "hover:bg-white hover:text-orange-600"}`}
-          >
-            Track Order
-          </Link>
-          <Link 
             href="/about" 
             className={`px-4 py-1.5 rounded-full transition-all ${pathname.startsWith("/about") ? "bg-white text-orange-600 shadow-xs font-semibold" : "hover:bg-white hover:text-orange-600"}`}
           >
@@ -300,20 +288,6 @@ export default function Navbar({
             className={`block px-3 py-2 rounded-lg text-base font-medium transition-colors ${pathname === "/restaurants" ? "bg-orange-50 text-orange-600" : "text-gray-700 hover:bg-orange-50 hover:text-orange-600"}`}
           >
             Restaurants
-          </Link>
-          <Link 
-            href="/offers" 
-            onClick={() => setIsMobileMenuOpen(false)}
-            className={`block px-3 py-2 rounded-lg text-base font-medium transition-colors ${pathname === "/offers" ? "bg-orange-50 text-orange-600" : "text-gray-700 hover:bg-orange-50 hover:text-orange-600"}`}
-          >
-            Offers
-          </Link>
-          <Link 
-            href="/track/sample-id" 
-            onClick={() => setIsMobileMenuOpen(false)}
-            className={`block px-3 py-2 rounded-lg text-base font-medium transition-colors ${pathname.startsWith("/track") ? "bg-orange-50 text-orange-600" : "text-gray-700 hover:bg-orange-50 hover:text-orange-600"}`}
-          >
-            Track Order
           </Link>
           <Link 
             href="/contact" 

@@ -366,12 +366,18 @@ export default function FoodDetails({ foodId }: FoodDetailsProps) {
     setTimeout(() => setAddedToast(false), 2500);
   };
 
-  // Button 2: Instant Order Now / Direct Checkout Action
+  // Button 2: Instant Order Now / Direct Checkout Action (Single Item Buy Now)
   const handleOrderNow = () => {
     if (!canAddToCart) return;
     const item = getCartFoodItem();
-    addItem(item, quantity);
-    router.push("/dashboard/customer/checkout");
+    const buyNowPayload = {
+      foodItem: item,
+      quantity,
+    };
+    if (typeof window !== "undefined") {
+      sessionStorage.setItem("foodflow_buy_now_item", JSON.stringify(buyNowPayload));
+    }
+    router.push("/dashboard/customer/checkout?buyNow=true");
   };
 
   // Render Dynamic Category Specifications matching AddFoodForm.tsx
