@@ -3,6 +3,7 @@ import { getOrdersCollection, getCartCollection } from "@/lib/db";
 import { auth } from "@/lib/auth";
 import { ObjectId } from "mongodb";
 import Stripe from "stripe";
+import { sendOrderConfirmationEmail } from "@/lib/email";
 
 export async function GET(
   req: NextRequest,
@@ -110,6 +111,14 @@ export async function GET(
         order.paymentStatus = "Paid";
         order.orderStatus = "Confirmed";
       }
+    }
+
+    // Trigger instant Order Confirmation Email for Stripe paid orders if not already sent
+    if (order.paymentStatus === "Paid" && order.confirmationEmailSent !== true) {
+      sendOrderConfirmationEmail(order as any)
+        .then(() => ordersCol.updateOne({ _id: order._id }, { $set: { confirmationEmailSent: true } }))
+        .catch((e) => console.warn("Background confirmation email error:", e));
+      order.confirmationEmailSent = true;
     }
 
     return NextResponse.json({

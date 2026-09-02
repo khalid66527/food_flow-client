@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getOrdersCollection, getCartCollection } from "@/lib/db";
 import Stripe from "stripe";
+import { sendOrderConfirmationEmail } from "@/lib/email";
 
 const stripeSecretKey = process.env.STRIPE_SECRET_KEY || "";
 const stripeWebhookSecret = process.env.STRIPE_WEBHOOK_SECRET || "";
@@ -63,10 +64,17 @@ export async function POST(req: NextRequest) {
               $set: {
                 paymentStatus: "Paid",
                 orderStatus: "Confirmed",
+                confirmationEmailSent: true,
                 updatedAt: new Date().toISOString(),
               },
             }
           );
+
+          if (order.confirmationEmailSent !== true) {
+            sendOrderConfirmationEmail({ ...order, paymentStatus: "Paid", orderStatus: "Confirmed" } as any).catch(
+              (e) => console.warn("Webhook email send error:", e)
+            );
+          }
 
           // Clear cart in MongoDB
           const effectiveUserId = userId || order.userId;
