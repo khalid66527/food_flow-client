@@ -144,8 +144,8 @@ function OrderSuccessContent() {
 
   return (
     <div className="max-w-4xl mx-auto pb-16 space-y-8 animate-fadeIn">
-      {/* Top Banner Celebration Card (Explore Dishes Bright Orange Gradient Theme) */}
-      <div className="bg-gradient-to-r from-orange-500 via-amber-500 to-orange-600 rounded-3xl p-8 sm:p-10 text-white shadow-xl relative overflow-hidden text-center">
+      {/* Top Banner Celebration Card (Signature Bright Orange Gradient Theme) */}
+      <div className="bg-gradient-to-r from-[#FF6B35] via-[#FF7843] to-[#FF8C42] rounded-3xl p-8 sm:p-10 text-white shadow-xl relative overflow-hidden text-center">
         <div className="absolute right-0 top-0 translate-x-8 -translate-y-8 w-56 h-56 rounded-full bg-white/10 blur-3xl pointer-events-none" />
         
         <div className="w-20 h-20 rounded-full bg-white/20 backdrop-blur-md flex items-center justify-center mx-auto mb-4 border border-white/30 shadow-inner">

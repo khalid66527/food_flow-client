@@ -82,6 +82,27 @@ export async function updateUserDetails(
       return { success: false, message: "User ID is required." };
     }
 
+    // Try same-origin Next.js API route first to eliminate network CORS/fetch failures
+    try {
+      const localRes = await fetch("/api/user/profile", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          identifier: userId,
+          ...payload,
+        }),
+      });
+
+      if (localRes.ok) {
+        const localData = await localRes.json();
+        if (localData.success) {
+          return localData;
+        }
+      }
+    } catch {
+      // Fall through to express server if local fetch fails
+    }
+
     const res = await fetch(`${API_BASE_URL}/admin/users/${encodeURIComponent(userId)}`, {
       method: "PATCH",
       headers: {

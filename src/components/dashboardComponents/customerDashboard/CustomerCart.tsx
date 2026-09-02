@@ -59,14 +59,28 @@ export default function CustomerCart() {
 
   return (
     <div className="max-w-6xl mx-auto">
-      {/* Header */}
-      <div className="mb-6">
-        <h1 className="text-2xl sm:text-3xl font-extrabold text-gray-900 tracking-tight">
-          Your Cart
-        </h1>
-        <p className="text-sm text-gray-500 mt-1">
-          Review your selected items before proceeding to payment.
-        </p>
+      {/* Header Banner */}
+      <div className="mb-8 bg-gradient-to-r from-[#FF6B35] via-[#FF7843] to-[#FF8C42] rounded-3xl p-6 sm:p-8 text-white shadow-xl relative overflow-hidden">
+        <div className="absolute right-0 top-0 translate-x-8 -translate-y-8 w-48 h-48 rounded-full bg-white/10 blur-3xl pointer-events-none" />
+        <div className="relative z-10 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <div>
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/20 backdrop-blur-md border border-white/20 text-xs font-bold uppercase tracking-wider mb-2.5">
+              <ShoppingCart className="w-3.5 h-3.5 text-white" /> Food Flow Cart
+            </div>
+            <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-white">
+              Your Shopping Cart
+            </h1>
+            <p className="text-orange-100 text-sm mt-1">
+              Review your selected food items, adjust quantities, and proceed seamlessly to checkout.
+            </p>
+          </div>
+          {items.length > 0 && (
+            <div className="inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-full bg-white/20 text-white text-xs font-bold backdrop-blur-md border border-white/25 shrink-0">
+              <Sparkles className="w-4 h-4 text-amber-200" />
+              <span>{totalItems} {totalItems === 1 ? "Item" : "Items"} Selected</span>
+            </div>
+          )}
+        </div>
       </div>
 
       {cartError && (

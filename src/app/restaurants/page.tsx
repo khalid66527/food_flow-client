@@ -361,7 +361,7 @@ export default function ExploreFoodPage() {
   return (
     <div className="min-h-screen bg-[#FFFDF8] text-gray-900 font-sans pb-20">
       {/* HEADER */}
-      <section className="bg-gradient-to-r from-orange-500 via-amber-500 to-orange-600 text-white shadow-md">
+      <section className="bg-gradient-to-r from-[#FF6B35] via-[#FF7843] to-[#FF8C42] text-white shadow-md">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 md:py-8">
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
             <div>

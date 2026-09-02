@@ -162,6 +162,24 @@ export async function getUserById(
       return { success: false, message: "User identifier is required." };
     }
 
+    // Try same-origin Next.js API route first to prevent network CORS/fetch errors
+    try {
+      const localRes = await fetch(`/api/user/profile?identifier=${encodeURIComponent(userIdOrEmail)}`, {
+        method: "GET",
+        headers: { "Content-Type": "application/json" },
+        cache: "no-store",
+      });
+
+      if (localRes.ok) {
+        const localData = await localRes.json();
+        if (localData.success) {
+          return localData;
+        }
+      }
+    } catch {
+      // Fall through to server API if local fetch is unavailable
+    }
+
     const res = await fetch(`${API_BASE_URL}/admin/users/${encodeURIComponent(userIdOrEmail)}`, {
       method: "GET",
       headers: {

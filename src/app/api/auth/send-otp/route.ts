@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import nodemailer from "nodemailer";
 import { getDb } from "@/lib/mongodb";
+import { sendEmail } from "@/lib/email";
 
 // In-memory OTP store (persisted across module reloads in global)
 const globalForOtp = global as unknown as {
@@ -148,25 +149,26 @@ export async function POST(req: NextRequest) {
 </html>
         `;
 
-        await transporter.sendMail({
-          from: fromSender,
+        const otpText = `Food Flow Password Reset Code: ${otp}. This code expires in 10 minutes. Never share this code with anyone.`;
+
+        await sendEmail({
           to: normalizedEmail,
           subject: "🔐 Food Flow - Your Password Reset Code",
           html: emailHtml,
+          text: otpText,
         });
 
-        console.log(`✉️ [SMTP] Password reset email sent to ${normalizedEmail} with OTP: ${otp}`);
+        console.log(`✉️ Password reset email sent to ${normalizedEmail} with OTP: ${otp}`);
         return NextResponse.json({
           success: true,
           message: "Verification code sent to your email.",
         });
       } catch (smtpError) {
-        console.error("⚠️ SMTP sending error:", smtpError);
+        console.error("⚠️ Email sending error:", smtpError);
         console.log("==========================================");
         console.log(`🔑 [FALLBACK OTP for ${normalizedEmail}]: ${otp}`);
         console.log("==========================================");
 
-        // Fallback for development if SMTP fails (e.g. invalid credentials)
         return NextResponse.json({
           success: true,
           message: "Verification code generated! (Please check your email or server console in development).",
