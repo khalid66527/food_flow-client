@@ -1,0 +1,42 @@
+{
+  "name": "food_flow-client",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "eslint"
+  },
+  "dependencies": {
+    "@better-auth/mongo-adapter": "^1.7.1",
+    "aos": "^2.3.4",
+    "axios": "^1.20.0",
+    "better-auth": "^1.7.2",
+    "framer-motion": "^13.1.0",
+    "leaflet": "^1.9.4",
+    "lucide-react": "^1.31.0",
+    "mongodb": "^7.6.0",
+    "next": "16.3.1",
+    "nodemailer": "^9.0.5",
+    "react": "19.2.8",
+    "react-dom": "19.2.8",
+    "react-hot-toast": "^2.6.0",
+    "react-icons": "^5.7.0",
+    "recharts": "^3.10.1",
+    "socket.io-client": "^4.8.3"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4",
+    "@types/aos": "^3.0.8",
+    "@types/leaflet": "^1.9.22",
+    "@types/node": "^20",
+    "@types/nodemailer": "^8.0.1",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "eslint": "^9",
+    "eslint-config-next": "16.3.1",
+    "tailwindcss": "^4",
+    "typescript": "^5"
+  }
+}
