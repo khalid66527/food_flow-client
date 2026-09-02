@@ -1189,7 +1189,7 @@ export default function RestaurantMenu() {
       discountNum !== null &&
       (!Number.isFinite(discountNum) || discountNum >= price || discountNum <= 0)
     ) {
-      setErrorMsg(`Discount price must be greater than 0 and less than regular price ($${price}).`);
+      setErrorMsg(`Discount price must be greater than 0 and less than regular price (Tk ${price}).`);
       return;
     }
 
@@ -1202,7 +1202,7 @@ export default function RestaurantMenu() {
       if (res.success) {
         setSuccessMsg(
           discountNum
-            ? `🎉 Special offer set at $${discountNum.toFixed(2)} for "${offerItem.name}"!`
+            ? `🎉 Special offer set at Tk ${discountNum.toFixed(2)} for "${offerItem.name}"!`
             : `✓ Special discount removed for "${offerItem.name}".`
         );
         setOfferItem(null);
@@ -1689,10 +1689,10 @@ export default function RestaurantMenu() {
                             <>
                               <div className="flex items-center gap-1.5">
                                 <span className="text-base font-black text-[#FF6B35]">
-                                  ${Number(item.discountPrice).toFixed(2)}
+                                  Tk {Number(item.discountPrice).toFixed(2)}
                                 </span>
                                 <span className="text-xs font-bold text-gray-400 line-through">
-                                  ${Number(item.price).toFixed(2)}
+                                  Tk {Number(item.price).toFixed(2)}
                                 </span>
                               </div>
                               <span className="inline-block bg-rose-100 text-rose-700 text-[10px] font-black px-1.5 py-0.2 rounded">
@@ -1701,7 +1701,7 @@ export default function RestaurantMenu() {
                             </>
                           ) : (
                             <span className="text-base font-black text-gray-900">
-                              ${Number(item.price || 0).toFixed(2)}
+                              Tk {Number(item.price || 0).toFixed(2)}
                             </span>
                           )}
                         </div>
@@ -1876,15 +1876,15 @@ export default function RestaurantMenu() {
                   {viewItem.discountPrice ? (
                     <>
                       <span className="text-xl font-black text-[#FF6B35]">
-                        ${Number(viewItem.discountPrice).toFixed(2)}
+                        Tk {Number(viewItem.discountPrice).toFixed(2)}
                       </span>
                       <span className="block text-xs text-gray-400 line-through">
-                        ${Number(viewItem.price).toFixed(2)}
+                        Tk {Number(viewItem.price).toFixed(2)}
                       </span>
                     </>
                   ) : (
                     <span className="text-xl font-black text-gray-900">
-                      ${Number(viewItem.price || 0).toFixed(2)}
+                      Tk {Number(viewItem.price || 0).toFixed(2)}
                     </span>
                   )}
                 </div>
@@ -2026,10 +2026,12 @@ export default function RestaurantMenu() {
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
                       <div className="space-y-1">
                         <label className="text-xs font-bold text-gray-700 uppercase tracking-wider">
-                          Price ($ USD) <span className="text-rose-500">*</span>
+                          Price (Tk) <span className="text-rose-500">*</span>
                         </label>
                         <div className="relative">
-                          <DollarSign className="w-3.5 h-3.5 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                          <span className="text-xs font-bold text-gray-400 absolute left-3 top-1/2 -translate-y-1/2">
+                            Tk
+                          </span>
                           <input
                             type="number"
                             step="0.01"
@@ -2037,8 +2039,8 @@ export default function RestaurantMenu() {
                             required
                             value={editFormData.price}
                             onChange={(e) => setEditFormData((p) => ({ ...p, price: e.target.value }))}
-                            placeholder="12.99"
-                            className="w-full pl-8 pr-3 py-2.5 rounded-xl bg-gray-50/80 border border-gray-200 text-xs font-bold text-gray-900 focus:bg-white focus:border-[#FF6B35] outline-none"
+                            placeholder="150"
+                            className="w-full pl-9 pr-3 py-2.5 rounded-xl bg-gray-50/80 border border-gray-200 text-xs font-bold text-gray-900 focus:bg-white focus:border-[#FF6B35] outline-none"
                           />
                         </div>
                       </div>
@@ -2477,15 +2479,15 @@ export default function RestaurantMenu() {
                           {editFormData.discountPrice ? (
                             <>
                               <span className="text-sm font-black text-[#FF6B35]">
-                                ${Number(editFormData.discountPrice).toFixed(2)}
+                                Tk {Number(editFormData.discountPrice).toFixed(2)}
                               </span>
                               <span className="block text-[10px] text-gray-400 line-through">
-                                ${Number(editFormData.price || 0).toFixed(2)}
+                                Tk {Number(editFormData.price || 0).toFixed(2)}
                               </span>
                             </>
                           ) : (
                             <span className="text-sm font-black text-gray-900">
-                              ${Number(editFormData.price || 0).toFixed(2)}
+                              Tk {Number(editFormData.price || 0).toFixed(2)}
                             </span>
                           )}
                         </div>
@@ -2598,13 +2600,13 @@ export default function RestaurantMenu() {
                   <span className="text-[11px] text-gray-500">Regular Price:</span>
                 </div>
                 <span className="text-base font-black text-gray-900">
-                  ${Number(offerItem.price || 0).toFixed(2)}
+                  Tk {Number(offerItem.price || 0).toFixed(2)}
                 </span>
               </div>
 
               <div className="space-y-1">
                 <label className="text-xs font-bold text-gray-700 uppercase tracking-wider">
-                  Promotional Offer Price ($ USD)
+                  Promotional Offer Price (Tk)
                 </label>
                 <input
                   type="number"

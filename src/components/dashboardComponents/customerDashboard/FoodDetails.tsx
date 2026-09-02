@@ -757,18 +757,18 @@ export default function FoodDetails({ foodId }: FoodDetailsProps) {
               {discountPrice !== null && discountPrice < originalPrice ? (
                 <>
                   <span className="text-3xl sm:text-4xl font-black text-[#FF6B35]">
-                    ${discountPrice.toFixed(2)}
+                    Tk {discountPrice.toFixed(2)}
                   </span>
                   <span className="text-lg font-bold text-gray-400 line-through">
-                    ${originalPrice.toFixed(2)}
+                    Tk {originalPrice.toFixed(2)}
                   </span>
                   <span className="text-xs font-bold text-emerald-700 bg-emerald-100 border border-emerald-200/80 px-2.5 py-1 rounded-lg ml-auto">
-                    Save ${(originalPrice - discountPrice).toFixed(2)}
+                    Save Tk {(originalPrice - discountPrice).toFixed(2)}
                   </span>
                 </>
               ) : (
                 <span className="text-3xl sm:text-4xl font-black text-[#FF6B35]">
-                  ${originalPrice.toFixed(2)}
+                  Tk {originalPrice.toFixed(2)}
                 </span>
               )}
             </div>
@@ -841,7 +841,7 @@ export default function FoodDetails({ foodId }: FoodDetailsProps) {
                     Select Quantity
                   </span>
                   <span className="text-xs text-gray-500 font-medium">
-                    Subtotal: <strong className="text-gray-900 font-black text-sm">${totalPrice.toFixed(2)}</strong>
+                    Subtotal: <strong className="text-gray-900 font-black text-sm">Tk {totalPrice.toFixed(2)}</strong>
                   </span>
                 </div>
 
@@ -894,7 +894,7 @@ export default function FoodDetails({ foodId }: FoodDetailsProps) {
                   className="w-full py-3.5 px-5 rounded-2xl bg-gradient-to-r from-orange-500 via-amber-500 to-orange-600 hover:brightness-105 text-white text-xs sm:text-sm font-black transition flex items-center justify-center gap-2 shadow-lg shadow-orange-500/25 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed hover:scale-101 active:scale-99"
                 >
                   <ShoppingBag className="w-4 h-4 text-white" />
-                  <span>Add to Cart (${totalPrice.toFixed(2)})</span>
+                  <span>Add to Cart (Tk {totalPrice.toFixed(2)})</span>
                 </button>
 
                 {/* BUTTON 2: Instant Order Now */}
@@ -1030,10 +1030,10 @@ export default function FoodDetails({ foodId }: FoodDetailsProps) {
                   <span>Order Policy</span>
                 </div>
                 <p className="text-xs font-bold text-gray-900">
-                  Min Order: ${restaurant?.pricing?.minOrderAmount || 0}
+                  Min Order: Tk {restaurant?.pricing?.minOrderAmount || 0}
                 </p>
                 <span className="text-[10px] text-gray-400 block font-medium">
-                  Delivery Fee: ${restaurant?.pricing?.deliveryFee ?? 4}
+                  Delivery Fee: Tk {restaurant?.pricing?.deliveryFee ?? 4}
                 </span>
               </div>
 

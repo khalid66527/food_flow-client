@@ -289,7 +289,7 @@ function OrderSuccessContent() {
                     {item.quantity}x {item.name}
                   </span>
                   <span className="font-extrabold text-gray-900">
-                    ${(unitPrice * item.quantity).toFixed(2)}
+                    Tk {(unitPrice * item.quantity).toFixed(2)}
                   </span>
                 </div>
               );
@@ -298,7 +298,7 @@ function OrderSuccessContent() {
 
           <div className="pt-3 border-t border-gray-100 flex items-center justify-between text-sm font-extrabold text-gray-900">
             <span>Total Paid</span>
-            <span className="text-[#FF6B35] text-lg">${(order.totalAmount || 0).toFixed(2)}</span>
+            <span className="text-[#FF6B35] text-lg">Tk {(order.totalAmount || 0).toFixed(2)}</span>
           </div>
         </div>
       </div>
