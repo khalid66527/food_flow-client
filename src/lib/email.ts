@@ -460,3 +460,213 @@ Need help? Contact support.foodflow@gmail.com
     return false;
   }
 }
+
+/**
+ * Send an automated order cancellation email to the customer (for Cash on Delivery orders).
+ */
+export async function sendOrderCancellationEmail(
+  order: TOrderEmailPayload,
+  reason?: string
+): Promise<boolean> {
+  try {
+    if (!order || !order.userEmail) {
+      console.warn("⚠️ Cannot send cancellation email: Missing userEmail.");
+      return false;
+    }
+
+    const normalizedEmail = order.userEmail.trim().toLowerCase();
+
+    const paymentMethodLabel =
+      order.paymentMethod === "STRIPE"
+        ? "Online Payment"
+        : order.paymentMethod === "COD"
+        ? "Cash on Delivery (COD)"
+        : order.paymentMethod;
+
+    const formattedDate = order.createdAt
+      ? new Date(order.createdAt).toLocaleString("en-US", {
+          dateStyle: "medium",
+          timeStyle: "short",
+        })
+      : new Date().toLocaleString("en-US", {
+          dateStyle: "medium",
+          timeStyle: "short",
+        });
+
+    const itemsHtml = (order.items || [])
+      .map((item) => {
+        const unitPrice = item.discountPrice || item.price;
+        const itemTotal = unitPrice * item.quantity;
+        return `
+          <tr style="border-bottom: 1px solid #F1F5F9;">
+            <td style="padding: 12px 16px; font-size: 14px; font-weight: 600; color: #1E293B;">
+              ${item.name}
+            </td>
+            <td style="padding: 12px 16px; font-size: 14px; color: #475569; text-align: center;">
+              x${item.quantity}
+            </td>
+            <td style="padding: 12px 16px; font-size: 14px; font-weight: 600; color: #0F172A; text-align: right;">
+              $${itemTotal.toFixed(2)}
+            </td>
+          </tr>
+        `;
+      })
+      .join("");
+
+    const emailHtml = `
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>FoodFlow - Order Cancellation #${order.orderId}</title>
+</head>
+<body style="margin: 0; padding: 0; background-color: #F8FAFC; font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; color: #1E293B;">
+  <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%" style="background-color: #F8FAFC; padding: 32px 16px;">
+    <tr>
+      <td align="center">
+        <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%" style="max-width: 600px; background-color: #FFFFFF; border-radius: 24px; overflow: hidden; box-shadow: 0 10px 30px rgba(0,0,0,0.06); border: 1px solid #E2E8F0;">
+          
+          <!-- Header with Red/Dark Accent for Cancellation -->
+          <tr>
+            <td style="background: linear-gradient(135deg, #DC2626 0%, #EF4444 50%, #F87171 100%); padding: 36px 32px 30px 32px; text-align: center;">
+              <div style="margin-bottom: 12px;">
+                <span style="font-size: 28px; font-weight: 900; color: #FFFFFF; letter-spacing: -0.5px; text-transform: uppercase; font-family: 'Segoe UI', Arial, sans-serif;">
+                  FOOD<span style="color: #FEE2E2; font-weight: 400;">FLOW</span>
+                </span>
+              </div>
+              <div style="display: inline-block; background-color: rgba(255,255,255,0.22); padding: 4px 16px; border-radius: 9999px; margin-bottom: 12px; border: 1px solid rgba(255,255,255,0.3);">
+                <span style="font-size: 11px; font-weight: 800; color: #FFFFFF; letter-spacing: 1px; text-transform: uppercase;">🚫 Order Cancelled</span>
+              </div>
+              <h1 style="margin: 0; color: #FFFFFF; font-size: 24px; font-weight: 800; letter-spacing: -0.5px;">Your Order Has Been Cancelled</h1>
+              <p style="margin: 6px 0 0 0; color: #FEE2E2; font-size: 13px; font-weight: 500;">
+                We're sorry to inform you that your order #${order.orderId} was cancelled.
+              </p>
+            </td>
+          </tr>
+
+          <!-- Body Content -->
+          <tr>
+            <td style="padding: 32px;">
+
+              <!-- Order Reference Card -->
+              <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%" style="background-color: #FEF2F2; border-radius: 16px; border: 1px solid #FECACA; margin-bottom: 24px;">
+                <tr>
+                  <td style="padding: 20px;">
+                    <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%">
+                      <tr>
+                        <td style="font-size: 12px; color: #991B1B; font-weight: 800; text-transform: uppercase; letter-spacing: 0.5px;">
+                          Order Reference
+                        </td>
+                        <td align="right" style="font-size: 12px; color: #991B1B; font-weight: 800; text-transform: uppercase; letter-spacing: 0.5px;">
+                          Date & Time
+                        </td>
+                      </tr>
+                      <tr>
+                        <td style="font-size: 18px; font-weight: 900; color: #DC2626; padding-top: 4px;">
+                          #${order.orderId}
+                        </td>
+                        <td align="right" style="font-size: 13px; font-weight: 600; color: #475569; padding-top: 4px;">
+                          ${formattedDate}
+                        </td>
+                      </tr>
+                    </table>
+
+                    <div style="margin-top: 16px; padding-top: 14px; border-top: 1px dashed #FCA5A5; display: flex; align-items: center; justify-content: space-between;">
+                      <div style="font-size: 13px; color: #475569;">
+                        <strong>Payment Method:</strong> ${paymentMethodLabel}
+                      </div>
+                      <div style="margin-top: 4px;">
+                        <span style="display: inline-block; padding: 4px 12px; border-radius: 9999px; font-size: 12px; font-weight: 800; background-color: #FEF2F2; color: #DC2626; border: 1px solid #FCA5A5;">
+                          Status: Cancelled
+                        </span>
+                      </div>
+                    </div>
+                  </td>
+                </tr>
+              </table>
+
+              <!-- Cancellation Notice Box -->
+              <div style="background-color: #FFF1F2; border: 1px solid #FECDD3; border-radius: 14px; padding: 16px; font-size: 13px; color: #9F1239; line-height: 1.6; margin-bottom: 24px;">
+                <strong>ℹ️ Cancellation Information:</strong><br/>
+                ${
+                  reason
+                    ? `Reason: <em>${reason}</em><br/>`
+                    : "This Cash on Delivery (COD) order was cancelled. No charges were incurred.<br/>"
+                }
+                If you did not request this cancellation or have any questions, please feel free to reach out to our support team.
+              </div>
+
+              <!-- Ordered Items Summary Table -->
+              <div style="margin-bottom: 24px;">
+                <h3 style="margin: 0 0 10px 0; font-size: 13px; font-weight: 800; color: #0F172A; text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 2px solid #F1F5F9; padding-bottom: 8px;">
+                  🍔 Cancelled Items Summary
+                </h3>
+                <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%" style="border-collapse: collapse; background-color: #FFFFFF; border: 1px solid #E2E8F0; border-radius: 14px; overflow: hidden;">
+                  <thead>
+                    <tr style="background-color: #F8FAFC; border-bottom: 1px solid #E2E8F0; font-size: 12px; font-weight: 800; color: #64748B; text-transform: uppercase;">
+                      <th align="left" style="padding: 10px 16px;">Item</th>
+                      <th align="center" style="padding: 10px 16px;">Qty</th>
+                      <th align="right" style="padding: 10px 16px;">Price</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    ${itemsHtml}
+                  </tbody>
+                </table>
+              </div>
+
+            </td>
+          </tr>
+
+          <!-- Footer -->
+          <tr>
+            <td style="background-color: #F8FAFC; border-top: 1px solid #F1F5F9; padding: 24px 32px; text-align: center;">
+              <p style="margin: 0 0 6px 0; font-size: 13px; color: #0F172A; font-weight: 700;">
+                Food Flow &bull; Fast, Fresh & Reliable Food Delivery
+              </p>
+              <p style="margin: 0; font-size: 11px; color: #64748B;">
+                Questions? Contact customer support at <a href="mailto:support.foodflow@gmail.com" style="color: #FF6B35; text-decoration: none; font-weight: 700;">support.foodflow@gmail.com</a>
+              </p>
+            </td>
+          </tr>
+
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>
+    `;
+
+    const emailText = `
+Food Flow - Order Cancellation Notification
+
+Order Reference: #${order.orderId}
+Date & Time: ${formattedDate}
+Payment Method: ${paymentMethodLabel}
+Order Status: Cancelled
+
+${reason ? `Cancellation Reason: ${reason}\n` : "This Cash on Delivery order was cancelled. No charges were incurred.\n"}
+Cancelled Items:
+${(order.items || [])
+  .map(
+    (item) =>
+      `- ${item.quantity}x ${item.name} ($${((item.discountPrice || item.price) * item.quantity).toFixed(2)})`
+  )
+  .join("\n")}
+
+If you have questions, please contact support.foodflow@gmail.com
+    `.trim();
+
+    return await sendEmail({
+      to: normalizedEmail,
+      subject: `🚫 Food Flow Order Cancelled #${order.orderId}`,
+      html: emailHtml,
+      text: emailText,
+    });
+  } catch (err) {
+    console.error("⚠️ Error sending order cancellation email:", err);
+    return false;
+  }
+}
