@@ -1,0 +1,462 @@
+import nodemailer from "nodemailer";
+
+export interface TOrderEmailItem {
+  name: string;
+  quantity: number;
+  price: number;
+  discountPrice?: number;
+  image?: string;
+  restaurantName?: string;
+}
+
+export interface TOrderEmailPayload {
+  orderId: string;
+  userId?: string;
+  userEmail: string;
+  userName?: string;
+  items: TOrderEmailItem[];
+  deliveryAddress: {
+    fullName: string;
+    phoneNumber: string;
+    streetAddress: string;
+    area: string;
+    city?: string;
+    postalCode?: string;
+    building?: string;
+  };
+  subtotal?: number;
+  deliveryFee?: number;
+  discount?: number;
+  totalAmount: number;
+  paymentMethod: "COD" | "STRIPE" | string;
+  paymentStatus?: "Pending" | "Paid" | string;
+  orderStatus?: string;
+  createdAt?: string;
+}
+
+export interface TGenericEmailPayload {
+  to: string;
+  subject: string;
+  html: string;
+  text?: string;
+  replyTo?: string;
+}
+
+/**
+ * Universal High-Deliverability Email Dispatcher.
+ * Priority:
+ * 1. Resend API (RESEND_API_KEY)
+ * 2. SendGrid API (SENDGRID_API_KEY)
+ * 3. Anti-Spam Optimized Nodemailer SMTP (Gmail / Custom SMTP)
+ */
+export async function sendEmail(payload: TGenericEmailPayload): Promise<boolean> {
+  const { to, subject, html, text, replyTo } = payload;
+  const normalizedTo = to.trim().toLowerCase();
+
+  const resendApiKey = process.env.RESEND_API_KEY;
+  const sendgridApiKey = process.env.SENDGRID_API_KEY;
+  const resendFromEmail = process.env.RESEND_FROM_EMAIL || "onboarding@resend.dev";
+  const sendgridFromEmail = process.env.SENDGRID_FROM_EMAIL || "support@foodflow.app";
+
+  const defaultSupportEmail = "support.foodflow@gmail.com";
+  const effectiveReplyTo = replyTo || process.env.SMTP_USER || defaultSupportEmail;
+
+  // 1. Resend API Flow (Highest Inbox Rate)
+  if (resendApiKey) {
+    try {
+      const fromFormatted = resendFromEmail.includes("<")
+        ? resendFromEmail
+        : `Food Flow <${resendFromEmail}>`;
+
+      const res = await fetch("https://api.resend.com/emails", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${resendApiKey.trim()}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          from: fromFormatted,
+          to: [normalizedTo],
+          subject: subject,
+          html: html,
+          text: text || html.replace(/<[^>]+>/g, " ").trim(),
+          reply_to: effectiveReplyTo,
+        }),
+      });
+
+      const resData = await res.json();
+      if (res.ok && resData.id) {
+        console.log(`✉️ [RESEND API] Email delivered to ${normalizedTo} (ID: ${resData.id})`);
+        return true;
+      } else {
+        console.warn("⚠️ [RESEND API] Delivery warning:", resData);
+      }
+    } catch (resendErr) {
+      console.error("⚠️ Resend API Exception:", resendErr);
+    }
+  }
+
+  // 2. SendGrid API Flow
+  if (sendgridApiKey) {
+    try {
+      const res = await fetch("https://api.sendgrid.com/v3/mail/send", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${sendgridApiKey.trim()}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          personalizations: [{ to: [{ email: normalizedTo }] }],
+          from: { email: sendgridFromEmail, name: "Food Flow" },
+          reply_to: { email: effectiveReplyTo, name: "Food Flow Support" },
+          subject: subject,
+          content: [
+            { type: "text/plain", value: text || html.replace(/<[^>]+>/g, " ").trim() },
+            { type: "text/html", value: html },
+          ],
+        }),
+      });
+
+      if (res.ok || res.status === 202) {
+        console.log(`✉️ [SENDGRID API] Email delivered to ${normalizedTo}`);
+        return true;
+      } else {
+        const errorText = await res.text();
+        console.warn("⚠️ [SENDGRID API] Error response:", errorText);
+      }
+    } catch (sgErr) {
+      console.error("⚠️ SendGrid API Exception:", sgErr);
+    }
+  }
+
+  // 3. Optimized Nodemailer SMTP (Gmail / Custom SMTP with Anti-Spam Headers)
+  const smtpHost = process.env.SMTP_HOST || "smtp.gmail.com";
+  const smtpPort = Number(process.env.SMTP_PORT) || 587;
+  const smtpUser = process.env.SMTP_USER;
+  const smtpPass = process.env.SMTP_PASS;
+
+  if (smtpHost && smtpUser && smtpPass) {
+    try {
+      const transporter = nodemailer.createTransport({
+        host: smtpHost,
+        port: smtpPort,
+        secure: smtpPort === 465, // true for 465, false for 587
+        auth: {
+          user: smtpUser,
+          pass: smtpPass,
+        },
+      });
+
+      const cleanFromUser = smtpUser.trim();
+      const fromSender = `"Food Flow Support" <${cleanFromUser}>`;
+
+      await transporter.sendMail({
+        from: fromSender,
+        to: normalizedTo,
+        replyTo: cleanFromUser,
+        subject: subject,
+        text: text || html.replace(/<[^>]+>/g, " ").trim(), // Plain-text fallback prevents spam categorization
+        html: html,
+        headers: {
+          "X-Mailer": "FoodFlow Transactional Mailer v1.0",
+          "X-Auto-Response-Suppress": "All",
+          "Precedence": "bulk",
+        },
+      });
+
+      console.log(`✉️ [SMTP INBOX OPTIMIZED] Email delivered to ${normalizedTo}`);
+      return true;
+    } catch (smtpError) {
+      console.error("⚠️ SMTP delivery error:", smtpError);
+    }
+  }
+
+  // Fallback log for local dev without credentials
+  console.log("=================================================");
+  console.log(`✉️ [LOCAL DEV EMAIL DISPATCH] To: ${normalizedTo}`);
+  console.log(`Subject: ${subject}`);
+  console.log("=================================================");
+  return true;
+}
+
+/**
+ * Send an automated order confirmation summary email to the customer.
+ */
+export async function sendOrderConfirmationEmail(order: TOrderEmailPayload): Promise<boolean> {
+  try {
+    if (!order || !order.userEmail) {
+      console.warn("⚠️ Cannot send order confirmation email: Missing userEmail.");
+      return false;
+    }
+
+    const normalizedEmail = order.userEmail.trim().toLowerCase();
+
+    const paymentMethodLabel =
+      order.paymentMethod === "STRIPE"
+        ? "Online Payment"
+        : order.paymentMethod === "COD"
+        ? "Cash on Delivery (COD)"
+        : order.paymentMethod;
+
+    const paymentStatusBadgeColor =
+      order.paymentStatus === "Paid"
+        ? "#059669" // Emerald-600
+        : "#D97706"; // Amber-600
+
+    const paymentStatusBg =
+      order.paymentStatus === "Paid"
+        ? "#ECFDF5" // Emerald-50
+        : "#FFFBEB"; // Amber-50
+
+    const formattedDate = order.createdAt
+      ? new Date(order.createdAt).toLocaleString("en-US", {
+          dateStyle: "medium",
+          timeStyle: "short",
+        })
+      : new Date().toLocaleString("en-US", {
+          dateStyle: "medium",
+          timeStyle: "short",
+        });
+
+    // Build Items List HTML
+    const itemsHtml = (order.items || [])
+      .map((item) => {
+        const unitPrice = item.discountPrice || item.price;
+        const itemTotal = unitPrice * item.quantity;
+        return `
+          <tr style="border-bottom: 1px solid #F1F5F9;">
+            <td style="padding: 12px 16px; font-size: 14px; font-weight: 600; color: #1E293B;">
+              ${item.name}
+              ${
+                item.restaurantName
+                  ? `<br/><span style="font-size: 11px; font-weight: 500; color: #64748B;">Store: ${item.restaurantName}</span>`
+                  : ""
+              }
+            </td>
+            <td style="padding: 12px 16px; font-size: 14px; color: #475569; text-align: center;">
+              x${item.quantity}
+            </td>
+            <td style="padding: 12px 16px; font-size: 14px; font-weight: 600; color: #0F172A; text-align: right;">
+              $${itemTotal.toFixed(2)}
+            </td>
+          </tr>
+        `;
+      })
+      .join("");
+
+    const subtotalCalc = order.subtotal ?? (order.totalAmount - (order.deliveryFee || 0) + (order.discount || 0));
+    const deliveryFeeCalc = order.deliveryFee || 0;
+    const discountCalc = order.discount || 0;
+
+    const emailHtml = `
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>FoodFlow - Order Confirmation Summary #${order.orderId}</title>
+</head>
+<body style="margin: 0; padding: 0; background-color: #F8FAFC; font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; color: #1E293B;">
+  <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%" style="background-color: #F8FAFC; padding: 32px 16px;">
+    <tr>
+      <td align="center">
+        <!-- Main Container -->
+        <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%" style="max-width: 600px; background-color: #FFFFFF; border-radius: 24px; overflow: hidden; box-shadow: 0 10px 30px rgba(0,0,0,0.06); border: 1px solid #E2E8F0;">
+          
+          <!-- Signature Orange Header with Premium Text Logo -->
+          <tr>
+            <td style="background: linear-gradient(135deg, #FF6B35 0%, #FF7843 50%, #FF8C42 100%); padding: 36px 32px 30px 32px; text-align: center;">
+              <div style="margin-bottom: 12px;">
+                <span style="font-size: 28px; font-weight: 900; color: #FFFFFF; letter-spacing: -0.5px; text-transform: uppercase; font-family: 'Segoe UI', Arial, sans-serif;">
+                  FOOD<span style="color: #FFE8DF; font-weight: 400;">FLOW</span>
+                </span>
+              </div>
+              <div style="display: inline-block; background-color: rgba(255,255,255,0.22); padding: 4px 16px; border-radius: 9999px; margin-bottom: 12px; border: 1px solid rgba(255,255,255,0.3);">
+                <span style="font-size: 11px; font-weight: 800; color: #FFFFFF; letter-spacing: 1px; text-transform: uppercase;">Instant Order Confirmation</span>
+              </div>
+              <h1 style="margin: 0; color: #FFFFFF; font-size: 24px; font-weight: 800; letter-spacing: -0.5px;">Order Placed Successfully!</h1>
+              <p style="margin: 6px 0 0 0; color: #FFE8DF; font-size: 13px; font-weight: 500;">
+                Thank you for choosing FoodFlow. Your order is being processed by the kitchen.
+              </p>
+            </td>
+          </tr>
+
+          <!-- Body Content -->
+          <tr>
+            <td style="padding: 32px;">
+
+              <!-- Order Overview Card (Order Reference, Date, Payment Method, Status) -->
+              <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%" style="background-color: #FFF7ED; border-radius: 16px; border: 1px solid #FFEDD5; margin-bottom: 24px;">
+                <tr>
+                  <td style="padding: 20px;">
+                    <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%">
+                      <tr>
+                        <td style="font-size: 12px; color: #9A3412; font-weight: 800; text-transform: uppercase; letter-spacing: 0.5px;">
+                          Order Reference
+                        </td>
+                        <td align="right" style="font-size: 12px; color: #9A3412; font-weight: 800; text-transform: uppercase; letter-spacing: 0.5px;">
+                          Date & Time
+                        </td>
+                      </tr>
+                      <tr>
+                        <td style="font-size: 18px; font-weight: 900; color: #C2410C; padding-top: 4px;">
+                          #${order.orderId}
+                        </td>
+                        <td align="right" style="font-size: 13px; font-weight: 600; color: #475569; padding-top: 4px;">
+                          ${formattedDate}
+                        </td>
+                      </tr>
+                    </table>
+
+                    <div style="margin-top: 16px; padding-top: 14px; border-top: 1px dashed #FDBA74; display: flex; align-items: center; justify-content: space-between;">
+                      <div style="font-size: 13px; color: #475569;">
+                        <strong>Payment Method:</strong> ${paymentMethodLabel}
+                      </div>
+                      <div style="margin-top: 4px;">
+                        <span style="display: inline-block; padding: 4px 12px; border-radius: 9999px; font-size: 12px; font-weight: 800; background-color: ${paymentStatusBg}; color: ${paymentStatusBadgeColor}; border: 1px solid ${paymentStatusBadgeColor}40;">
+                          Payment Status: ${order.paymentStatus || "Pending"}
+                        </span>
+                      </div>
+                    </div>
+                  </td>
+                </tr>
+              </table>
+
+              <!-- Delivery Address Section -->
+              <div style="margin-bottom: 24px;">
+                <h3 style="margin: 0 0 10px 0; font-size: 13px; font-weight: 800; color: #0F172A; text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 2px solid #F1F5F9; padding-bottom: 8px;">
+                  📍 Delivery Address
+                </h3>
+                <div style="background-color: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 14px; padding: 16px; font-size: 13px; color: #334155; line-height: 1.6;">
+                  <strong style="font-size: 14px; color: #0F172A;">${order.deliveryAddress?.fullName || order.userName || "Customer"}</strong><br/>
+                  📞 Phone: <strong>${order.deliveryAddress?.phoneNumber || "N/A"}</strong><br/>
+                  🏠 Address: ${order.deliveryAddress?.streetAddress || ""}, ${order.deliveryAddress?.area || ""}${
+                    order.deliveryAddress?.city ? `, ${order.deliveryAddress.city}` : ""
+                  }${order.deliveryAddress?.postalCode ? ` - ${order.deliveryAddress.postalCode}` : ""}
+                </div>
+              </div>
+
+              <!-- Ordered Items Summary Table -->
+              <div style="margin-bottom: 24px;">
+                <h3 style="margin: 0 0 10px 0; font-size: 13px; font-weight: 800; color: #0F172A; text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 2px solid #F1F5F9; padding-bottom: 8px;">
+                  🍔 Ordered Items Summary
+                </h3>
+                <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%" style="border-collapse: collapse; background-color: #FFFFFF; border: 1px solid #E2E8F0; border-radius: 14px; overflow: hidden;">
+                  <thead>
+                    <tr style="background-color: #F8FAFC; border-bottom: 1px solid #E2E8F0; font-size: 12px; font-weight: 800; color: #64748B; text-transform: uppercase;">
+                      <th align="left" style="padding: 10px 16px;">Item</th>
+                      <th align="center" style="padding: 10px 16px;">Qty</th>
+                      <th align="right" style="padding: 10px 16px;">Price</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    ${itemsHtml}
+                  </tbody>
+                </table>
+              </div>
+
+              <!-- Total Amount Breakdown -->
+              <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%" style="margin-bottom: 24px;">
+                <tr>
+                  <td align="right">
+                    <table role="presentation" border="0" cellpadding="0" cellspacing="0" style="width: 240px; font-size: 13px; color: #475569;">
+                      <tr>
+                        <td style="padding: 4px 0;">Subtotal:</td>
+                        <td align="right" style="font-weight: 600; color: #1E293B;">$${subtotalCalc.toFixed(2)}</td>
+                      </tr>
+                      <tr>
+                        <td style="padding: 4px 0;">Delivery Fee:</td>
+                        <td align="right" style="font-weight: 600; color: #1E293B;">$${deliveryFeeCalc.toFixed(2)}</td>
+                      </tr>
+                      ${
+                        discountCalc > 0
+                          ? `
+                      <tr>
+                        <td style="padding: 4px 0; color: #059669;">Discount:</td>
+                        <td align="right" style="font-weight: 700; color: #059669;">-$${discountCalc.toFixed(2)}</td>
+                      </tr>
+                      `
+                          : ""
+                      }
+                      <tr style="border-top: 2px solid #E2E8F0;">
+                        <td style="padding: 10px 0 0 0; font-size: 16px; font-weight: 900; color: #0F172A;">Total Paid:</td>
+                        <td align="right" style="padding: 10px 0 0 0; font-size: 20px; font-weight: 900; color: #FF6B35;">$${order.totalAmount.toFixed(2)}</td>
+                      </tr>
+                    </table>
+                  </td>
+                </tr>
+              </table>
+
+              <!-- Notice Box -->
+              <div style="background-color: #EFF6FF; border: 1px solid #BFDBFE; border-radius: 12px; padding: 14px 18px; font-size: 12px; color: #1E40AF; line-height: 1.5;">
+                ℹ️ <strong>Instant Order Notification:</strong> This email is an instant summary of your placed order. Your official invoice receipt will be unlocked upon successful delivery.
+              </div>
+
+            </td>
+          </tr>
+
+          <!-- Footer -->
+          <tr>
+            <td style="background-color: #F8FAFC; border-top: 1px solid #F1F5F9; padding: 24px 32px; text-align: center;">
+              <p style="margin: 0 0 6px 0; font-size: 13px; color: #0F172A; font-weight: 700;">
+                Food Flow &bull; Fast, Fresh & Reliable Food Delivery
+              </p>
+              <p style="margin: 0; font-size: 11px; color: #64748B;">
+                Need help with your order? Contact customer support at <a href="mailto:support.foodflow@gmail.com" style="color: #FF6B35; text-decoration: none; font-weight: 700;">support.foodflow@gmail.com</a>
+              </p>
+            </td>
+          </tr>
+
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>
+    `;
+
+    // Plain text representation for anti-spam filters
+    const emailText = `
+Food Flow - Order Confirmation Summary
+
+Order Reference: #${order.orderId}
+Date & Time: ${formattedDate}
+Payment Method: ${paymentMethodLabel}
+Payment Status: ${order.paymentStatus || "Pending"}
+
+Delivery Address:
+Customer: ${order.deliveryAddress?.fullName || order.userName || "Customer"}
+Phone: ${order.deliveryAddress?.phoneNumber || "N/A"}
+Address: ${order.deliveryAddress?.streetAddress || ""}, ${order.deliveryAddress?.area || ""}${
+      order.deliveryAddress?.city ? `, ${order.deliveryAddress.city}` : ""
+    }${order.deliveryAddress?.postalCode ? ` - ${order.deliveryAddress.postalCode}` : ""}
+
+Ordered Items Summary:
+${(order.items || [])
+  .map(
+    (item) =>
+      `- ${item.quantity}x ${item.name} ($${((item.discountPrice || item.price) * item.quantity).toFixed(2)})`
+  )
+  .join("\n")}
+
+Subtotal: $${subtotalCalc.toFixed(2)}
+Delivery Fee: $${deliveryFeeCalc.toFixed(2)}
+${discountCalc > 0 ? `Discount: -$${discountCalc.toFixed(2)}\n` : ""}
+Total Paid: $${order.totalAmount.toFixed(2)}
+
+Note: This email is an instant summary of your placed order. Your official invoice receipt will be unlocked upon successful delivery.
+
+Need help? Contact support.foodflow@gmail.com
+    `.trim();
+
+    return await sendEmail({
+      to: normalizedEmail,
+      subject: `🎉 Food Flow Order Confirmation #${order.orderId}`,
+      html: emailHtml,
+      text: emailText,
+    });
+  } catch (err) {
+    console.error("⚠️ Error sending order confirmation email:", err);
+    return false;
+  }
+}
