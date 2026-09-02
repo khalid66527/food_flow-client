@@ -3,7 +3,7 @@ import { getOrdersCollection, getCartCollection } from "@/lib/db";
 import { auth } from "@/lib/auth";
 import { ObjectId } from "mongodb";
 import Stripe from "stripe";
-import { sendOrderConfirmationEmail } from "@/lib/email";
+import { sendOrderConfirmationEmail, sendOrderCancellationEmail } from "@/lib/email";
 
 export async function GET(
   req: NextRequest,
@@ -215,6 +215,16 @@ export async function PATCH(
 
       const updatedOrder = await ordersCol.findOne({ _id: order._id });
 
+      // 📧 Trigger Order Cancellation Email Notification (COD Orders)
+      if (updatedOrder && updatedOrder.paymentMethod === "COD") {
+        sendOrderCancellationEmail(
+          updatedOrder as any,
+          body.reason || "Order cancelled by user prior to kitchen preparation"
+        ).catch((e) =>
+          console.warn("Background order cancellation email trigger error:", e)
+        );
+      }
+
       return NextResponse.json({
         success: true,
         message: "Order cancelled successfully.",
@@ -249,6 +259,21 @@ export async function PATCH(
 
     await ordersCol.updateOne({ _id: order._id }, { $set: updateFields });
     const updatedOrder = await ordersCol.findOne({ _id: order._id });
+
+    // 📧 Trigger Order Cancellation Email for generic updates (e.g. restaurant/admin setting status to Cancelled)
+    if (
+      orderStatus === "Cancelled" &&
+      order.orderStatus !== "Cancelled" &&
+      order.paymentMethod === "COD" &&
+      updatedOrder
+    ) {
+      sendOrderCancellationEmail(
+        updatedOrder as any,
+        body.reason || "Order cancelled by kitchen or restaurant administrator"
+      ).catch((e) =>
+        console.warn("Background order cancellation email trigger error:", e)
+      );
+    }
 
     return NextResponse.json({
       success: true,
