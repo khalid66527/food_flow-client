@@ -266,16 +266,6 @@ function LoginForm() {
     [form]
   );
 
-  const mockLogin = useCallback(async () => {
-    await new Promise((r) => setTimeout(r, 800));
-    return {
-      id: "mock_" + Date.now(),
-      email: form.email,
-      name: form.email.split("@")[0] || "User",
-      role: "Customer" as const,
-    };
-  }, [form.email]);
-
   const handleSubmit = useCallback(
     async (e: React.FormEvent) => {
       e.preventDefault();
@@ -316,23 +306,12 @@ function LoginForm() {
           setRedirectCountdown(REDIRECT_COUNTDOWN_SECONDS);
           return;
         }
-        const mockUser = await mockLogin();
-        setLoggedInUser({
-          name: mockUser.name,
-          email: mockUser.email,
-          role: mockUser.role,
-        });
-        setIsSuccess(true);
-        setRedirectCountdown(REDIRECT_COUNTDOWN_SECONDS);
-      } catch {
-        const mockUser = await mockLogin();
-        setLoggedInUser({
-          name: mockUser.name,
-          email: mockUser.email,
-          role: mockUser.role,
-        });
-        setIsSuccess(true);
-        setRedirectCountdown(REDIRECT_COUNTDOWN_SECONDS);
+
+        setServerError(error?.message || "Invalid email or password. Please try again.");
+      } catch (err: unknown) {
+        const message =
+          err instanceof Error ? err.message : "Something went wrong. Please try again.";
+        setServerError(message);
       } finally {
         setIsLoading(false);
       }

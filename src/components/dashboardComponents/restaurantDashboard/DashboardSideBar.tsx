@@ -26,6 +26,8 @@ import {
   Truck,
   Store,
   Plus,
+  Clock,
+  Lock,
 } from "lucide-react";
 import { useSession, signOut } from "@/lib/auth-client";
 
@@ -50,37 +52,37 @@ export default function DashboardSideBar() {
   const [isMobileOpen, setIsMobileOpen] = useState(false);
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [isOnline, setIsOnline] = useState(true);
-  const [hasRestaurant, setHasRestaurant] = useState<boolean>(true);
+  const [restaurantData, setRestaurantData] = useState<any>(null);
 
   // Sync restaurant creation status from localStorage and API
   useEffect(() => {
     const checkRestaurant = async () => {
       if (typeof window === "undefined") return;
-      const savedStatus = localStorage.getItem("foodflow_has_restaurant");
       const savedData = localStorage.getItem("foodflow_restaurant_data");
       const savedEmail = localStorage.getItem("restaurant_owner_email");
 
-      if (savedStatus === "true" || savedData || savedEmail) {
-        setHasRestaurant(true);
-        return;
+      if (savedData) {
+        try {
+          setRestaurantData(JSON.parse(savedData));
+        } catch {}
       }
 
-      // Fetch from API to check if profile exists
+      // Fetch from API to check if profile exists and get latest status
       try {
         const { getMyRestaurantProfile } = await import("@/lib/api/restaurant");
         const res = await getMyRestaurantProfile(session?.user?.email || savedEmail || "");
         if (res.success && res.data) {
-          setHasRestaurant(true);
+          setRestaurantData(res.data);
           localStorage.setItem("foodflow_has_restaurant", "true");
           localStorage.setItem("foodflow_restaurant_data", JSON.stringify(res.data));
           if (res.data.ownerEmail) {
             localStorage.setItem("restaurant_owner_email", res.data.ownerEmail);
           }
-        } else {
-          setHasRestaurant(false);
+        } else if (!savedData) {
+          setRestaurantData(null);
         }
       } catch {
-        setHasRestaurant(false);
+        // keep cached
       }
     };
 
@@ -110,6 +112,10 @@ export default function DashboardSideBar() {
       router.push("/auth/login");
     }
   };
+
+  const restStatus = (restaurantData?.status || "").toLowerCase();
+  const isStoreApproved = restStatus === "active" || restStatus === "approved";
+  const hasStore = Boolean(restaurantData);
 
   const navSections: NavSection[] = [
     {
@@ -195,13 +201,13 @@ export default function DashboardSideBar() {
     {
       title: "Account & System",
       items: [
-        hasRestaurant
+        restaurantData
           ? {
               label: "Restaurant Profile",
               href: "/dashboard/restaurant/profile",
               icon: User,
-              badge: "Verified",
-              badgeType: "success",
+              badge: isStoreApproved ? "Active" : "Pending",
+              badgeType: isStoreApproved ? "success" : "brand",
             }
           : {
               label: "Open Restaurant",
@@ -266,18 +272,25 @@ export default function DashboardSideBar() {
           </div>
         </div>
 
-        {/* Quick Online Status Toggle */}
-        <button
-          onClick={() => setIsOnline(!isOnline)}
-          className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold transition-all ${
-            isOnline
-              ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
-              : "bg-rose-50 text-rose-700 border border-rose-200"
-          }`}
-        >
-          <span className={`w-2 h-2 rounded-full ${isOnline ? "bg-emerald-500 animate-pulse" : "bg-rose-500"}`} />
-          {isOnline ? "Accepting" : "Paused"}
-        </button>
+        {/* Quick Online / Approval Status Indicator */}
+        {isStoreApproved ? (
+          <button
+            onClick={() => setIsOnline(!isOnline)}
+            className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold transition-all ${
+              isOnline
+                ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
+                : "bg-rose-50 text-rose-700 border border-rose-200"
+            }`}
+          >
+            <span className={`w-2 h-2 rounded-full ${isOnline ? "bg-emerald-500 animate-pulse" : "bg-rose-500"}`} />
+            {isOnline ? "Accepting" : "Paused"}
+          </button>
+        ) : (
+          <div className="flex items-center gap-1 px-2.5 py-1 rounded-full bg-amber-50 border border-amber-200 text-amber-700 text-[10px] font-bold">
+            <Clock className="w-3 h-3 text-amber-600 animate-pulse" />
+            <span>Pending Review</span>
+          </div>
+        )}
       </div>
 
       {/* Mobile Backdrop Overlay */}
@@ -324,7 +337,7 @@ export default function DashboardSideBar() {
                     </span>
                   </div>
                   <span className="text-[11px] text-gray-400 font-medium truncate">
-                    Restaurant Hub
+                    {restaurantData?.restaurantName || "Restaurant Hub"}
                   </span>
                 </div>
               )}
@@ -349,31 +362,54 @@ export default function DashboardSideBar() {
             </button>
           </div>
 
-          {/* Kitchen / Online Status Card */}
+          {/* Store Status / Approval Alert Card */}
           {!isCollapsed && (
-            <div className="mt-3.5 pt-3 border-t border-gray-100 flex items-center justify-between px-3 py-2 bg-gray-50/70 rounded-xl border border-gray-100">
-              <div className="flex items-center gap-2">
-                <span className="relative flex h-2.5 w-2.5">
-                  {isOnline && (
-                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
-                  )}
-                  <span className={`relative inline-flex rounded-full h-2.5 w-2.5 ${isOnline ? "bg-emerald-500" : "bg-rose-500"}`} />
-                </span>
-                <span className="text-xs font-semibold text-gray-700">
-                  {isOnline ? "Accepting Orders" : "Kitchen Paused"}
-                </span>
-              </div>
+            <div className="mt-3.5 pt-3 border-t border-gray-100">
+              {isStoreApproved ? (
+                <div className="flex items-center justify-between px-3 py-2 bg-emerald-50/70 rounded-xl border border-emerald-100">
+                  <div className="flex items-center gap-2">
+                    <span className="relative flex h-2.5 w-2.5">
+                      {isOnline && (
+                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+                      )}
+                      <span className={`relative inline-flex rounded-full h-2.5 w-2.5 ${isOnline ? "bg-emerald-500" : "bg-rose-500"}`} />
+                    </span>
+                    <span className="text-xs font-semibold text-emerald-900">
+                      {isOnline ? "Accepting Orders" : "Kitchen Paused"}
+                    </span>
+                  </div>
 
-              <button
-                onClick={() => setIsOnline(!isOnline)}
-                className={`text-[11px] font-bold px-2 py-0.5 rounded-md transition-colors ${
-                  isOnline
-                    ? "text-emerald-700 hover:bg-emerald-100/60"
-                    : "text-rose-700 hover:bg-rose-100/60"
-                }`}
-              >
-                {isOnline ? "Pause" : "Resume"}
-              </button>
+                  <button
+                    onClick={() => setIsOnline(!isOnline)}
+                    className={`text-[11px] font-bold px-2 py-0.5 rounded-md transition-colors ${
+                      isOnline
+                        ? "text-emerald-700 hover:bg-emerald-100/60"
+                        : "text-rose-700 hover:bg-rose-100/60"
+                    }`}
+                  >
+                    {isOnline ? "Pause" : "Resume"}
+                  </button>
+                </div>
+              ) : hasStore ? (
+                <div className="flex items-center gap-2 px-3 py-2 bg-amber-50 rounded-xl border border-amber-200 text-amber-900">
+                  <Clock className="w-4 h-4 text-amber-600 animate-pulse shrink-0" />
+                  <div className="min-w-0">
+                    <p className="text-[11px] font-extrabold leading-tight">Pending Admin Review</p>
+                    <p className="text-[10px] text-amber-700 truncate">Operations locked until approved</p>
+                  </div>
+                </div>
+              ) : (
+                <Link
+                  href="/dashboard/restaurant/create-restaurant"
+                  className="flex items-center gap-2 px-3 py-2 bg-orange-50 rounded-xl border border-orange-200 text-[#FF6B35] hover:bg-orange-100 transition-colors"
+                >
+                  <Plus className="w-4 h-4 shrink-0" />
+                  <div className="min-w-0">
+                    <p className="text-[11px] font-extrabold leading-tight">Setup Required</p>
+                    <p className="text-[10px] text-orange-600 truncate">Create store profile</p>
+                  </div>
+                </Link>
+              )}
             </div>
           )}
         </div>
@@ -392,13 +428,14 @@ export default function DashboardSideBar() {
                 {section.items.map((item) => {
                   const Icon = item.icon;
                   const isActive = pathname === item.href;
+                  const isLocked = !isStoreApproved && item.href !== "/dashboard/restaurant/profile" && item.href !== "/dashboard/restaurant/settings";
 
                   return (
                     <Link
                       key={item.href}
                       href={item.href}
                       onClick={() => setIsMobileOpen(false)}
-                      title={isCollapsed ? item.label : undefined}
+                      title={isCollapsed ? (isLocked ? `${item.label} (Locked - Approval Needed)` : item.label) : undefined}
                       className={`
                         relative group flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium
                         transition-all duration-200
@@ -406,6 +443,8 @@ export default function DashboardSideBar() {
                         ${
                           isActive
                             ? "bg-gradient-to-r from-[#FF6B35] to-[#FF8C42] text-white font-semibold shadow-md shadow-[#FF6B35]/25"
+                            : isLocked
+                            ? "text-gray-400 hover:text-gray-600 hover:bg-gray-50"
                             : "text-gray-600 hover:text-[#FF6B35] hover:bg-orange-50/70"
                         }
                       `}
@@ -414,22 +453,33 @@ export default function DashboardSideBar() {
                         className={`w-5 h-5 flex-shrink-0 transition-transform duration-200 ${
                           isActive
                             ? "text-white"
+                            : isLocked
+                            ? "text-gray-300"
                             : "text-gray-400 group-hover:text-[#FF6B35] group-hover:scale-110"
                         }`}
                       />
 
                       {!isCollapsed && (
                         <div className="flex-1 flex items-center justify-between min-w-0">
-                          <span className="truncate">{item.label}</span>
-                          {item.badge && (
-                            <span
-                              className={`text-[10px] font-bold px-2 py-0.5 rounded-full flex-shrink-0 ${getBadgeClass(
-                                item.badgeType,
-                                isActive
-                              )}`}
-                            >
-                              {item.badge}
+                          <span className={`truncate ${isLocked ? "text-gray-400 font-normal" : ""}`}>
+                            {item.label}
+                          </span>
+                          {isLocked ? (
+                            <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-md bg-gray-100 text-gray-400 flex items-center gap-0.5">
+                              <Lock className="w-2.5 h-2.5" />
+                              <span>Locked</span>
                             </span>
+                          ) : (
+                            item.badge && (
+                              <span
+                                className={`text-[10px] font-bold px-2 py-0.5 rounded-full flex-shrink-0 ${getBadgeClass(
+                                  item.badgeType,
+                                  isActive
+                                )}`}
+                              >
+                                {item.badge}
+                              </span>
+                            )
                           )}
                         </div>
                       )}
@@ -437,10 +487,7 @@ export default function DashboardSideBar() {
                       {/* Tooltip on Collapsed Mode */}
                       {isCollapsed && (
                         <div className="absolute left-full ml-3 px-2.5 py-1.5 bg-gray-900 text-white text-xs font-semibold rounded-lg shadow-xl opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto transition-opacity z-50 whitespace-nowrap">
-                          {item.label}
-                          {item.badge && (
-                            <span className="ml-1.5 text-[9px] opacity-85">({item.badge})</span>
-                          )}
+                          {item.label} {isLocked ? "(Locked - Needs Approval)" : ""}
                         </div>
                       )}
                     </Link>

@@ -44,6 +44,7 @@ import {
   BadgePercent,
   Play,
   Pause,
+  Lock,
 } from "lucide-react";
 import { useCart } from "@/contexts/CartContext";
 import { IGlobalFoodItem } from "@/types/restaurant";
@@ -152,7 +153,7 @@ export default function FoodDetails({ foodId }: FoodDetailsProps) {
   const router = useRouter();
   const params = useParams();
   const searchParams = useSearchParams();
-  const { addItem } = useCart();
+  const { addItem, canAddToCart } = useCart();
 
   const targetId =
     foodId ||
@@ -184,6 +185,13 @@ export default function FoodDetails({ foodId }: FoodDetailsProps) {
   // Fetch food item and restaurant info
   useEffect(() => {
     let isMounted = true;
+    const SERVER_BASE_URL = (
+      process.env.NEXT_PUBLIC_SERVER_API_URL ||
+      process.env.NEXT_PUBLIC_SERVER_URL ||
+      "http://localhost:5000"
+    ).replace(/\/api\/?$/, "").replace(/\/$/, "");
+
+    const API_BASE_URL = `${SERVER_BASE_URL}/api`;
 
     async function loadDetails() {
       if (!targetId) {
@@ -194,7 +202,7 @@ export default function FoodDetails({ foodId }: FoodDetailsProps) {
       try {
         setLoading(true);
         // 1. Try single food details endpoint with restaurant populated
-        const res = await fetch(`http://localhost:5000/api/restaurants/food/item/${targetId}`);
+        const res = await fetch(`${API_BASE_URL}/restaurants/food/item/${targetId}`);
         if (res.ok) {
           const json = await res.json();
           if (json.success && json.data) {
@@ -213,7 +221,7 @@ export default function FoodDetails({ foodId }: FoodDetailsProps) {
         }
 
         // 2. If targetId is restaurant ID, check restaurant endpoint
-        const restRes = await fetch(`http://localhost:5000/api/restaurants/${targetId}`);
+        const restRes = await fetch(`${API_BASE_URL}/restaurants/${targetId}`);
         if (restRes.ok) {
           const restJson = await restRes.json();
           if (restJson.success && restJson.data) {
@@ -240,7 +248,7 @@ export default function FoodDetails({ foodId }: FoodDetailsProps) {
 
     async function fetchRestaurant(restId: string) {
       try {
-        const res = await fetch(`http://localhost:5000/api/restaurants/${restId}`);
+        const res = await fetch(`${API_BASE_URL}/restaurants/${restId}`);
         if (res.ok) {
           const json = await res.json();
           if (json.success && json.data && isMounted) {
@@ -351,17 +359,25 @@ export default function FoodDetails({ foodId }: FoodDetailsProps) {
 
   // Button 1: Add to Cart Action
   const handleAddToCart = () => {
+    if (!canAddToCart) return;
     const item = getCartFoodItem();
     addItem(item, quantity);
     setAddedToast(true);
     setTimeout(() => setAddedToast(false), 2500);
   };
 
-  // Button 2: Instant Order Now / Direct Checkout Action
+  // Button 2: Instant Order Now / Direct Checkout Action (Single Item Buy Now)
   const handleOrderNow = () => {
+    if (!canAddToCart) return;
     const item = getCartFoodItem();
-    addItem(item, quantity);
-    router.push("/dashboard/customer/checkout");
+    const buyNowPayload = {
+      foodItem: item,
+      quantity,
+    };
+    if (typeof window !== "undefined") {
+      sessionStorage.setItem("foodflow_buy_now_item", JSON.stringify(buyNowPayload));
+    }
+    router.push("/dashboard/customer/checkout?buyNow=true");
   };
 
   // Render Dynamic Category Specifications matching AddFoodForm.tsx
@@ -874,7 +890,7 @@ export default function FoodDetails({ foodId }: FoodDetailsProps) {
                 <button
                   type="button"
                   onClick={handleAddToCart}
-                  disabled={food.status === "unavailable" || food.isAvailable === false}
+                  disabled={food.status === "unavailable" || food.isAvailable === false || !canAddToCart}
                   className="w-full py-3.5 px-5 rounded-2xl bg-gradient-to-r from-orange-500 via-amber-500 to-orange-600 hover:brightness-105 text-white text-xs sm:text-sm font-black transition flex items-center justify-center gap-2 shadow-lg shadow-orange-500/25 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed hover:scale-101 active:scale-99"
                 >
                   <ShoppingBag className="w-4 h-4 text-white" />
@@ -885,7 +901,7 @@ export default function FoodDetails({ foodId }: FoodDetailsProps) {
                 <button
                   type="button"
                   onClick={handleOrderNow}
-                  disabled={food.status === "unavailable" || food.isAvailable === false}
+                  disabled={food.status === "unavailable" || food.isAvailable === false || !canAddToCart}
                   className="w-full py-3.5 px-5 rounded-2xl bg-gray-900 hover:bg-black text-white text-xs sm:text-sm font-black transition flex items-center justify-center gap-2 shadow-lg shadow-gray-900/15 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed hover:scale-101 active:scale-99"
                 >
                   <Zap className="w-4 h-4 text-amber-400 fill-amber-400" />
@@ -893,6 +909,13 @@ export default function FoodDetails({ foodId }: FoodDetailsProps) {
                 </button>
 
               </div>
+
+              {!canAddToCart && (
+                <p className="mt-3 text-xs font-medium text-gray-500 flex items-center gap-1.5">
+                  <Lock className="w-3.5 h-3.5 text-orange-500" />
+                  Only customer accounts can add items to the cart.
+                </p>
+              )}
 
             </div>
 

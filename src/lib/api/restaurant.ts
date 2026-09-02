@@ -58,6 +58,7 @@ export interface IRestaurant {
   ownerName?: string;
   ownerPhone?: string;
   restaurantName: string;
+  name?: string;
   slug?: string;
   tagline?: string;
   description: string;
@@ -135,8 +136,13 @@ export interface ApiResponse<T> {
   error?: any;
 }
 
-const API_BASE_URL =
-  process.env.NEXT_PUBLIC_SERVER_API_URL || "http://localhost:5000/api";
+const SERVER_BASE_URL = (
+  process.env.NEXT_PUBLIC_SERVER_API_URL ||
+  process.env.NEXT_PUBLIC_SERVER_URL ||
+  "http://localhost:5000"
+).replace(/\/api\/?$/, "").replace(/\/$/, "");
+
+const API_BASE_URL = `${SERVER_BASE_URL}/api`;
 
 // -------------------------------------------------------------
 // GET Requests / Queries for Restaurant

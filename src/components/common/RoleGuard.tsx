@@ -38,13 +38,13 @@ function isRoleAllowed(userRole: string | undefined | null, allowedRoles: string
     return allowedRoles.some((ar) => ar.toLowerCase() === "customer");
   }
 
-  const normalizedUserRole = userRole.toLowerCase();
+  const normalizedUserRole = userRole.toLowerCase().trim();
 
   return allowedRoles.some((allowed) => {
-    const normAllowed = allowed.toLowerCase();
-    if (normAllowed === "admin" && normalizedUserRole.includes("admin")) return true;
-    if (normAllowed === "restaurant" && (normalizedUserRole.includes("restaurant") || normalizedUserRole.includes("partner"))) return true;
-    if (normAllowed === "rider" && (normalizedUserRole.includes("rider") || normalizedUserRole.includes("delivery"))) return true;
+    const normAllowed = allowed.toLowerCase().trim();
+    if (normAllowed === "admin" && (normalizedUserRole.includes("admin") || normalizedUserRole === "super-admin")) return true;
+    if (normAllowed === "restaurant" && (normalizedUserRole.includes("restaurant") || normalizedUserRole === "restaurant partner")) return true;
+    if (normAllowed === "rider" && (normalizedUserRole.includes("rider") || normalizedUserRole.includes("delivery") || normalizedUserRole === "delivery partner")) return true;
     if (normAllowed === "customer" && normalizedUserRole.includes("customer")) return true;
     return normalizedUserRole === normAllowed;
   });

@@ -12,6 +12,7 @@ import {
   Star,
   CheckCircle2,
   AlertCircle,
+  XCircle,
   Loader2,
   Edit3,
   ExternalLink,
@@ -26,6 +27,7 @@ import {
   Sparkles,
   ShoppingBag,
   TrendingUp,
+  RefreshCw,
 } from "lucide-react";
 import { FaFacebookF, FaInstagram, FaTwitter } from "react-icons/fa6";
 import AOS from "aos";
@@ -162,9 +164,12 @@ export default function RestaurantProfile() {
     );
   }
 
-  // 3. Show Full Restaurant Profile Dashboard
+  const status = (restaurant.status || "pending").toLowerCase();
+  const isActive = status === "active" || status === "approved";
+
+  // 3. Show Full Restaurant Profile Dashboard with Pending Modal Guard if not active
   return (
-    <div className="w-full max-w-6xl mx-auto space-y-8 pb-12">
+    <div className="relative w-full max-w-6xl mx-auto space-y-8 pb-12">
       {/* Toast feedback */}
       {statusMessage && (
         <div
@@ -183,6 +188,93 @@ export default function RestaurantProfile() {
           <span>{statusMessage.text}</span>
         </div>
       )}
+
+      {/* PENDING APPROVAL MODAL OVERLAY (Shown when store is pending / rejected / not active) */}
+      {!isActive && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-md flex items-center justify-center p-4 overflow-y-auto">
+          <div
+            data-aos="zoom-in"
+            data-aos-duration="400"
+            className="bg-white rounded-3xl max-w-lg w-full border border-gray-100 shadow-2xl p-6 sm:p-8 text-center space-y-6"
+          >
+            {/* Header Icon */}
+            <div className="relative mx-auto w-20 h-20 rounded-3xl bg-gradient-to-br from-amber-400 to-orange-500 flex items-center justify-center text-white shadow-lg shadow-orange-500/25">
+              <Clock className="w-10 h-10 animate-pulse" />
+              <div className="absolute -top-1 -right-1 w-6 h-6 rounded-full bg-white flex items-center justify-center shadow">
+                <Sparkles className="w-3.5 h-3.5 text-[#FF6B35]" />
+              </div>
+            </div>
+
+            {/* Title & Status */}
+            <div className="space-y-2">
+              <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-50 border border-amber-200 text-amber-800 text-[11px] font-extrabold uppercase tracking-wider">
+                <span className="w-2 h-2 rounded-full bg-amber-500 animate-ping" />
+                <span>Status: {status === "rejected" ? "Application Rejected" : "Awaiting Admin Approval"}</span>
+              </div>
+              <h2 className="text-2xl font-black text-gray-900 tracking-tight">
+                {status === "rejected" ? "Application Needs Revision" : "Restaurant Under Review"}
+              </h2>
+              <p className="text-xs sm:text-sm text-gray-600 leading-relaxed max-w-md mx-auto">
+                {status === "rejected"
+                  ? "Your restaurant registration was not approved by the admin. Please edit your application information or contact support."
+                  : "Your restaurant profile has been submitted and is currently in the verification queue. Admin will review your store credentials shortly."}
+              </p>
+            </div>
+
+            {/* Application Summary Box */}
+            <div className="p-4 rounded-2xl bg-gray-50 border border-gray-100 text-left text-xs space-y-2.5">
+              <div className="flex items-center justify-between">
+                <span className="text-gray-400 font-bold">Restaurant Name:</span>
+                <span className="font-extrabold text-gray-900">{restaurant.restaurantName}</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-gray-400 font-bold">Contact Phone:</span>
+                <span className="font-bold text-gray-800">{restaurant.contactNumber || "N/A"}</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-gray-400 font-bold">Location:</span>
+                <span className="font-bold text-gray-800">
+                  {restaurant.address?.street ? `${restaurant.address.street}, ` : ""}
+                  {restaurant.address?.city || "Dhaka"}
+                </span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-gray-400 font-bold">Cuisines:</span>
+                <span className="font-bold text-[#FF6B35] truncate max-w-[200px]">
+                  {restaurant.cuisineTypes?.join(", ") || "General"}
+                </span>
+              </div>
+            </div>
+
+            <p className="text-[11px] text-gray-400 leading-normal">
+              🔒 Once approved by admin, your profile, dashboard, menu publishing, and online food ordering will become active automatically.
+            </p>
+
+            {/* Action Buttons */}
+            <div className="pt-2 flex flex-col sm:flex-row items-center gap-3">
+              <button
+                onClick={() => setIsEditMode(true)}
+                className="w-full flex-1 flex items-center justify-center gap-2 px-5 py-3 rounded-2xl bg-gradient-to-r from-[#FF6B35] to-[#FF8C42] text-white font-bold text-xs shadow-md shadow-[#FF6B35]/25 hover:opacity-95 transition-all cursor-pointer active:scale-95"
+              >
+                <Edit3 className="w-4 h-4" />
+                <span>Edit Application Info</span>
+              </button>
+
+              <button
+                onClick={fetchProfile}
+                disabled={loading}
+                className="w-full sm:w-auto flex items-center justify-center gap-2 px-5 py-3 rounded-2xl border border-gray-200 text-gray-700 hover:bg-gray-50 text-xs font-bold transition-all cursor-pointer active:scale-95"
+              >
+                <RefreshCw className={`w-3.5 h-3.5 ${loading ? "animate-spin" : ""}`} />
+                <span>Check Approval Status</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Main Profile View Container (Disabled / Locked when not active) */}
+      <div className={`${!isActive ? "pointer-events-none opacity-20 filter blur-xs select-none grayscale-[40%]" : ""} space-y-8 transition-all duration-300`}>
 
       {/* Hero Banner & Identity Header */}
       <div
@@ -210,22 +302,29 @@ export default function RestaurantProfile() {
 
           {/* Top floating badges */}
           <div className="absolute top-4 right-4 flex items-center gap-2">
-            <button
-              onClick={handleToggleOpenStatus}
-              disabled={toggleLoading}
-              className={`px-4 py-2 rounded-full text-xs font-bold flex items-center gap-2 backdrop-blur-md shadow-lg transition cursor-pointer ${
-                restaurant.isOpen
-                  ? "bg-emerald-500/90 text-white hover:bg-emerald-600"
-                  : "bg-rose-500/90 text-white hover:bg-rose-600"
-              }`}
-            >
-              {toggleLoading ? (
-                <Loader2 className="w-3.5 h-3.5 animate-spin" />
-              ) : (
-                <Power className="w-3.5 h-3.5" />
-              )}
-              <span>{restaurant.isOpen ? "Status: OPEN" : "Status: CLOSED"}</span>
-            </button>
+            {(restaurant.status || "").toLowerCase() === "active" ? (
+              <button
+                onClick={handleToggleOpenStatus}
+                disabled={toggleLoading}
+                className={`px-4 py-2 rounded-full text-xs font-bold flex items-center gap-2 backdrop-blur-md shadow-lg transition cursor-pointer ${
+                  restaurant.isOpen
+                    ? "bg-emerald-500/90 text-white hover:bg-emerald-600"
+                    : "bg-rose-500/90 text-white hover:bg-rose-600"
+                }`}
+              >
+                {toggleLoading ? (
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                ) : (
+                  <Power className="w-3.5 h-3.5" />
+                )}
+                <span>{restaurant.isOpen ? "Status: OPEN" : "Status: CLOSED"}</span>
+              </button>
+            ) : (
+              <div className="px-4 py-2 rounded-full text-xs font-bold flex items-center gap-1.5 backdrop-blur-md shadow-lg bg-amber-500/90 text-white">
+                <Clock className="w-3.5 h-3.5" />
+                <span>Awaiting Admin Approval</span>
+              </div>
+            )}
           </div>
         </div>
 
@@ -342,7 +441,7 @@ export default function RestaurantProfile() {
                 Delivery Fee
               </span>
               <span className="text-base font-extrabold text-[#FF6B35]">
-                ৳{restaurant.pricing?.deliveryFee ?? 40}
+                ${restaurant.pricing?.deliveryFee ?? 40}
               </span>
             </div>
 
@@ -351,7 +450,7 @@ export default function RestaurantProfile() {
                 Min Order Amount
               </span>
               <span className="text-base font-extrabold text-gray-800">
-                ৳{restaurant.pricing?.minOrderAmount ?? 150}
+                ${restaurant.pricing?.minOrderAmount ?? 150}
               </span>
             </div>
 
@@ -360,7 +459,7 @@ export default function RestaurantProfile() {
                 Avg Cost for Two
               </span>
               <span className="text-base font-extrabold text-gray-800">
-                ৳{restaurant.pricing?.costForTwo ?? 450}
+                ${restaurant.pricing?.costForTwo ?? 450}
               </span>
             </div>
           </div>
@@ -631,6 +730,7 @@ export default function RestaurantProfile() {
             </div>
           </div>
         </div>
+      </div>
       </div>
     </div>
   );

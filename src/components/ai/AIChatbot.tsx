@@ -41,8 +41,13 @@ type NormalizedRole = "customer" | "restaurant" | "rider" | "guest";
 /*  Constants                                                          */
 /* ------------------------------------------------------------------ */
 
-const API_BASE_URL =
-  process.env.NEXT_PUBLIC_SERVER_API_URL || "http://localhost:5000/api";
+const SERVER_BASE_URL = (
+  process.env.NEXT_PUBLIC_SERVER_API_URL ||
+  process.env.NEXT_PUBLIC_SERVER_URL ||
+  "http://localhost:5000"
+).replace(/\/api\/?$/, "").replace(/\/$/, "");
+
+const API_BASE_URL = `${SERVER_BASE_URL}/api`;
 
 const ROLE_QUICK_ACTIONS: Record<NormalizedRole, QuickAction[]> = {
   customer: [

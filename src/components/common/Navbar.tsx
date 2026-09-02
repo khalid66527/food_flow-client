@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useRef, useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { 
@@ -50,11 +50,26 @@ export default function Navbar({
 }: NavbarProps) {
   const [isDropdownOpen, setIsDropdownOpen] = useState<boolean>(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState<boolean>(false);
-  
+
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!isDropdownOpen) return;
+
+    const handleClickOutside = (event: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setIsDropdownOpen(false);
+      }
+    };
+
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [isDropdownOpen]);
+
   const pathname = usePathname();
   const router = useRouter();
   const { data: clientSession } = useSession();
-  const { totalItems } = useCart();
+  const { totalItems, openCartDrawer } = useCart();
 
   const cartCount = totalItems || cartItemCount;
 
@@ -137,18 +152,6 @@ export default function Navbar({
             Restaurants
           </Link>
           <Link 
-            href="/offers" 
-            className={`px-4 py-1.5 rounded-full transition-all ${pathname === "/offers" ? "bg-white text-orange-600 shadow-xs font-semibold" : "hover:bg-white hover:text-orange-600"}`}
-          >
-            Offers
-          </Link>
-          <Link 
-            href="/track/sample-id" 
-            className={`px-4 py-1.5 rounded-full transition-all ${pathname.startsWith("/track") ? "bg-white text-orange-600 shadow-xs font-semibold" : "hover:bg-white hover:text-orange-600"}`}
-          >
-            Track Order
-          </Link>
-          <Link 
             href="/about" 
             className={`px-4 py-1.5 rounded-full transition-all ${pathname.startsWith("/about") ? "bg-white text-orange-600 shadow-xs font-semibold" : "hover:bg-white hover:text-orange-600"}`}
           >
@@ -166,11 +169,12 @@ export default function Navbar({
         
         <div className="flex items-center gap-2 sm:gap-3">
           
-          {/* Cart Link */}
-          <Link 
-            href="/cart" 
-            className={`relative p-2 sm:p-2.5 rounded-full transition-all ${pathname === "/cart" ? "bg-orange-50 text-orange-600" : "text-gray-600 hover:text-orange-600 hover:bg-gray-50"}`}
-            aria-label="Cart"
+          {/* Cart Button (opens sliding drawer) */}
+          <button
+            type="button"
+            onClick={openCartDrawer}
+            className="relative p-2 sm:p-2.5 rounded-full transition-all text-gray-600 hover:text-orange-600 hover:bg-gray-50 cursor-pointer"
+            aria-label="Open cart"
           >
             <ShoppingCart className="h-5 w-5" />
             {cartCount > 0 && (
@@ -178,11 +182,11 @@ export default function Navbar({
                 {cartCount}
               </span>
             )}
-          </Link>
+          </button>
 
           {/* Better Auth User Authentication State */}
           {user ? (
-            <div className="relative">
+            <div className="relative" ref={dropdownRef}>
               <button 
                 onClick={() => setIsDropdownOpen(!isDropdownOpen)}
                 className="group flex items-center gap-1.5 rounded-full focus:outline-none focus:ring-2 focus:ring-orange-500 focus:ring-offset-2 transition-all"
@@ -284,20 +288,6 @@ export default function Navbar({
             className={`block px-3 py-2 rounded-lg text-base font-medium transition-colors ${pathname === "/restaurants" ? "bg-orange-50 text-orange-600" : "text-gray-700 hover:bg-orange-50 hover:text-orange-600"}`}
           >
             Restaurants
-          </Link>
-          <Link 
-            href="/offers" 
-            onClick={() => setIsMobileMenuOpen(false)}
-            className={`block px-3 py-2 rounded-lg text-base font-medium transition-colors ${pathname === "/offers" ? "bg-orange-50 text-orange-600" : "text-gray-700 hover:bg-orange-50 hover:text-orange-600"}`}
-          >
-            Offers
-          </Link>
-          <Link 
-            href="/track/sample-id" 
-            onClick={() => setIsMobileMenuOpen(false)}
-            className={`block px-3 py-2 rounded-lg text-base font-medium transition-colors ${pathname.startsWith("/track") ? "bg-orange-50 text-orange-600" : "text-gray-700 hover:bg-orange-50 hover:text-orange-600"}`}
-          >
-            Track Order
           </Link>
           <Link 
             href="/contact" 

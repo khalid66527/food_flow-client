@@ -16,6 +16,7 @@ interface FoodCardProps {
   viewMode?: 'grid' | 'list';
   onAddToCart?: (item: IGlobalFoodItem, e: React.MouseEvent) => void;
   addedFeedbackId?: string | null;
+  canAddToCart?: boolean;
 }
 
 export default function FoodCard({
@@ -24,6 +25,7 @@ export default function FoodCard({
   viewMode = 'grid',
   onAddToCart,
   addedFeedbackId,
+  canAddToCart = true,
 }: FoodCardProps) {
   const isAdded = addedFeedbackId === item._id;
   const hasDiscount = !!item.discountPrice && item.discountPrice < item.price;
@@ -109,16 +111,23 @@ export default function FoodCard({
             <button
               type="button"
               onClick={handleAddToCart}
-              disabled={!item.isAvailable}
-              className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
-                isAdded
-                  ? 'bg-emerald-500 text-white shadow-sm shadow-emerald-500/20'
+              disabled={!item.isAvailable || !canAddToCart}
+              className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-xs font-semibold transition-all ${
+                !canAddToCart
+                  ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                  : isAdded
+                  ? 'bg-emerald-500 text-white shadow-sm shadow-emerald-500/20 cursor-pointer'
                   : item.isAvailable
-                  ? 'bg-[#FF6B35] text-white hover:bg-[#e85b27] shadow-sm shadow-[#FF6B35]/25'
+                  ? 'bg-[#FF6B35] text-white hover:bg-[#e85b27] shadow-sm shadow-[#FF6B35]/25 cursor-pointer'
                   : 'bg-gray-200 text-gray-400 cursor-not-allowed'
               }`}
             >
-              {isAdded ? (
+              {!canAddToCart ? (
+                <>
+                  <ShoppingCart className="w-3.5 h-3.5" />
+                  Customers Only
+                </>
+              ) : isAdded ? (
                 <>
                   <Check className="w-3.5 h-3.5" />
                   Added
@@ -218,16 +227,23 @@ export default function FoodCard({
           <button
             type="button"
             onClick={handleAddToCart}
-            disabled={!item.isAvailable}
-            className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
-              isAdded
-                ? 'bg-emerald-500 text-white shadow-sm shadow-emerald-500/20'
+            disabled={!item.isAvailable || !canAddToCart}
+            className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-xs font-semibold transition-all ${
+              !canAddToCart
+                ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                : isAdded
+                ? 'bg-emerald-500 text-white shadow-sm shadow-emerald-500/20 cursor-pointer'
                 : item.isAvailable
-                ? 'bg-[#FF6B35] text-white hover:bg-[#e85b27] shadow-sm shadow-[#FF6B35]/25'
+                ? 'bg-[#FF6B35] text-white hover:bg-[#e85b27] shadow-sm shadow-[#FF6B35]/25 cursor-pointer'
                 : 'bg-gray-200 text-gray-400 cursor-not-allowed'
             }`}
           >
-            {isAdded ? (
+            {!canAddToCart ? (
+              <>
+                <ShoppingCart className="w-3.5 h-3.5" />
+                Customers Only
+              </>
+            ) : isAdded ? (
               <>
                 <Check className="w-3.5 h-3.5" />
                 Added
