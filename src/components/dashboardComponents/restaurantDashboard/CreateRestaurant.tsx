@@ -760,7 +760,7 @@ export default function CreateRestaurant({
 
                   <div>
                     <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1.5">
-                      Min Order Amount ($)
+                      Min Order Amount (Tk)
                     </label>
                     <input
                       type="number"
@@ -775,7 +775,7 @@ export default function CreateRestaurant({
 
                   <div>
                     <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1.5">
-                      Delivery Fee ($)
+                      Delivery Fee (Tk)
                     </label>
                     <input
                       type="number"
@@ -804,7 +804,7 @@ export default function CreateRestaurant({
 
                   <div>
                     <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1.5">
-                      Average Cost for Two ($)
+                      Average Cost for Two (Tk)
                     </label>
                     <input
                       type="number"
@@ -1090,11 +1090,11 @@ export default function CreateRestaurant({
                   </div>
                   <div className="bg-gray-50 p-2 rounded-xl">
                     <span className="text-[10px] text-gray-400 block font-medium">Min Order</span>
-                    <span className="font-bold text-gray-800">${formData.minOrderAmount || 0}</span>
+                    <span className="font-bold text-gray-800">Tk {formData.minOrderAmount || 0}</span>
                   </div>
                   <div className="bg-gray-50 p-2 rounded-xl">
                     <span className="text-[10px] text-gray-400 block font-medium">Fee</span>
-                    <span className="font-bold text-[#FF6B35]">${formData.deliveryFee || 0}</span>
+                    <span className="font-bold text-[#FF6B35]">Tk {formData.deliveryFee || 0}</span>
                   </div>
                 </div>
 

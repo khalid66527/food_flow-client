@@ -70,6 +70,7 @@ export async function POST(req: NextRequest) {
       {
         $set: {
           password: hashedPassword,
+          issuer: "local:credential",
           updatedAt: now,
         },
       }
@@ -78,6 +79,7 @@ export async function POST(req: NextRequest) {
     // If no credential account was found (e.g. user was created without password), insert one
     if (updateResult.matchedCount === 0) {
       await db.collection("account").insertOne({
+        issuer: "local:credential",
         userId: userIdObj,
         accountId: userIdStr,
         providerId: "credential",

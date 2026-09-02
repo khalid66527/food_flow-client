@@ -381,7 +381,7 @@ export default function CustomerOrders() {
             Total Spent
           </span>
           <p className="text-xl sm:text-2xl font-black text-gray-900">
-            ${stats.totalSpent.toFixed(2)}
+            Tk {stats.totalSpent.toFixed(2)}
           </p>
         </div>
       </div>
@@ -481,7 +481,7 @@ export default function CustomerOrders() {
             const isVoucherEnabled = isDelivered;
             const isStripe =
               order.paymentMethod === "STRIPE" ||
-              order.paymentMethod === "STRIPE_CARD";
+              (order.paymentMethod as string) === "STRIPE_CARD";
             const currentStatusLower = (order.orderStatus || "Placed").toLowerCase();
             const isCancelled = currentStatusLower === "cancelled";
             const isTrackEnabled = !isCancelled;
@@ -590,13 +590,13 @@ export default function CustomerOrders() {
                                       {item.name}
                                     </h4>
                                     <p className="text-[11px] text-gray-400 font-medium mt-0.5">
-                                      Qty: {item.quantity} × ${unitPrice.toFixed(2)}
+                                      Qty: {item.quantity} × Tk {unitPrice.toFixed(2)}
                                     </p>
                                   </div>
                                 </div>
 
                                 <span className="text-xs sm:text-sm font-black text-gray-900 shrink-0">
-                                  ${lineTotal.toFixed(2)}
+                                  Tk {lineTotal.toFixed(2)}
                                 </span>
                               </div>
                             );
@@ -610,8 +610,8 @@ export default function CustomerOrders() {
                   <div className="pt-4 border-t border-gray-100 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                     <div className="text-xs text-gray-500 space-y-0.5">
                       <p>
-                        Subtotal: <strong className="text-gray-800">${(order.subtotal || order.totalAmount).toFixed(2)}</strong>
-                        {order.deliveryFee ? ` | Delivery: $${order.deliveryFee.toFixed(2)}` : " | Free Delivery"}
+                        Subtotal: <strong className="text-gray-800">Tk {(order.subtotal || order.totalAmount).toFixed(2)}</strong>
+                        {order.deliveryFee ? ` | Delivery: Tk ${order.deliveryFee.toFixed(2)}` : " | Free Delivery"}
                       </p>
                       <p className="text-[11px] text-gray-400">
                         Delivery Address: {order.deliveryAddress?.streetAddress || "Registered Address"}
@@ -621,7 +621,7 @@ export default function CustomerOrders() {
                     <div className="flex items-center justify-between sm:justify-end gap-3">
                       <span className="text-xs font-bold text-gray-500 sm:hidden">Total Amount:</span>
                       <span className="text-lg sm:text-xl font-black text-[#FF6B35]">
-                        ${(order.totalAmount || 0).toFixed(2)}
+                        Tk {(order.totalAmount || 0).toFixed(2)}
                       </span>
                     </div>
                   </div>

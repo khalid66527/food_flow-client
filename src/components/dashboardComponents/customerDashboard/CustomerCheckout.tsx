@@ -516,11 +516,11 @@ export default function CustomerCheckout() {
                         {item.foodItem.name}
                       </p>
                       <p className="text-[11px] text-gray-400">
-                        Qty: {item.quantity} x ${unitPrice.toFixed(2)}
+                        Qty: {item.quantity} x Tk {unitPrice.toFixed(2)}
                       </p>
                     </div>
                     <span className="text-xs font-extrabold text-gray-900 shrink-0">
-                      ${lineTotal.toFixed(2)}
+                      Tk {lineTotal.toFixed(2)}
                     </span>
                   </div>
                 );
@@ -531,7 +531,7 @@ export default function CustomerCheckout() {
             <div className="pt-3 border-t border-gray-100 space-y-2.5 text-xs">
               <div className="flex items-center justify-between text-gray-600">
                 <span>Subtotal</span>
-                <span className="font-bold text-gray-900">${activeSubtotal.toFixed(2)}</span>
+                <span className="font-bold text-gray-900">Tk {activeSubtotal.toFixed(2)}</span>
               </div>
 
               <div className="flex items-center justify-between text-gray-600">
@@ -540,7 +540,7 @@ export default function CustomerCheckout() {
                   {deliveryFee === 0 ? (
                     <span className="text-emerald-600 font-extrabold">FREE</span>
                   ) : (
-                    `$${deliveryFee.toFixed(2)}`
+                    `Tk ${deliveryFee.toFixed(2)}`
                   )}
                 </span>
               </div>
@@ -548,14 +548,14 @@ export default function CustomerCheckout() {
               {deliveryFee > 0 && (
                 <div className="p-2.5 rounded-xl bg-orange-50 text-[11px] text-orange-700 flex items-center gap-1.5 font-medium border border-orange-100">
                   <Sparkles className="w-3.5 h-3.5 shrink-0 text-[#FF6B35]" />
-                  Add ${(FREE_DELIVERY_THRESHOLD - activeSubtotal).toFixed(2)} more for free delivery!
+                  Add Tk {(FREE_DELIVERY_THRESHOLD - activeSubtotal).toFixed(2)} more for free delivery!
                 </div>
               )}
 
               <div className="pt-3 border-t border-gray-200 flex items-center justify-between text-sm">
                 <span className="font-extrabold text-gray-900">Grand Total</span>
                 <span className="text-xl font-black text-[#FF6B35]">
-                  ${grandTotal.toFixed(2)}
+                  Tk {grandTotal.toFixed(2)}
                 </span>
               </div>
             </div>

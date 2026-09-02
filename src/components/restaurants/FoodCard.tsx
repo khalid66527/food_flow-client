@@ -7,7 +7,7 @@ import { Star, ShoppingCart, Check, Utensils, Eye } from 'lucide-react';
 import { IGlobalFoodItem } from '@/types/restaurant';
 
 function formatPrice(price: number): string {
-  return `$${price.toFixed(2)}`;
+  return `Tk ${price.toFixed(2)}`;
 }
 
 interface FoodCardProps {

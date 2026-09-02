@@ -1132,10 +1132,12 @@ export default function AddFoodForm() {
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-1">
                 <label className="text-xs font-bold text-gray-700 uppercase tracking-wider">
-                  Price ($ USD) <span className="text-rose-500">*</span>
+                  Price (Tk) <span className="text-rose-500">*</span>
                 </label>
                 <div className="relative">
-                  <DollarSign className="w-4 h-4 text-gray-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                  <span className="text-xs font-bold text-gray-400 absolute left-3.5 top-1/2 -translate-y-1/2">
+                    Tk
+                  </span>
                   <input
                     type="number"
                     name="price"
@@ -1144,7 +1146,7 @@ export default function AddFoodForm() {
                     step="0.01"
                     value={commonData.price}
                     onChange={handleCommonChange}
-                    placeholder="12.99"
+                    placeholder="150"
                     className="w-full pl-10 pr-4 py-3 rounded-2xl bg-gray-50/80 border border-gray-200 focus:bg-white focus:border-[#FF6B35] outline-none text-sm font-semibold"
                   />
                 </div>
