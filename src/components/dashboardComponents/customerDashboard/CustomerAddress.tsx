@@ -91,7 +91,7 @@ const parseAddressToForm = (addr: TAddress): AddressFormValues => {
   let instructionsStr = addr.deliveryInstructions || "";
 
   const landmarkMatch = instructionsStr.match(
-    /^Landmark:\s*([^.\n]+)(?:\.\s*Note:\s*(.*))?$/s
+    /^Landmark:\s*([^.\n]+)(?:\.\s*Note:\s*([\s\S]*))?$/
   );
   if (landmarkMatch) {
     landmarkStr = landmarkMatch[1].trim();
@@ -160,7 +160,7 @@ const getAddressCardDetails = (addr: TAddress) => {
   let landmark = "";
   let instructions = addr.deliveryInstructions || "";
   const landmarkMatch = instructions.match(
-    /^Landmark:\s*([^.\n]+)(?:\.\s*Note:\s*(.*))?$/s
+    /^Landmark:\s*([^.\n]+)(?:\.\s*Note:\s*([\s\S]*))?$/
   );
   if (landmarkMatch) {
     landmark = landmarkMatch[1].trim();

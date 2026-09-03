@@ -200,7 +200,7 @@ export default function CustomerCheckout() {
     }
 
     // Stripe Flow: Redirect browser directly to Stripe Checkout URL
-    const stripeTargetUrl = res.url || res.checkoutUrl;
+    const stripeTargetUrl = (res as any).url || res.checkoutUrl;
     if (paymentMethod === "STRIPE" && stripeTargetUrl) {
       window.location.href = stripeTargetUrl;
       return;

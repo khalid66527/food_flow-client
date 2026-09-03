@@ -2,9 +2,10 @@
 
 import React, { useEffect, useMemo, useState } from "react";
 import dynamic from "next/dynamic";
-import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { Loader2, User, Bike } from "lucide-react";
+
+const L = typeof window !== "undefined" ? require("leaflet") : null;
 
 const MapContainer = dynamic(
   () => import("react-leaflet").then((m) => m.MapContainer),

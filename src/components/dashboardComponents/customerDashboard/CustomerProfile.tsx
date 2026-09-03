@@ -134,7 +134,7 @@ export default function CustomerProfile() {
           image: uploadedUrl,
           photo: uploadedUrl,
           avatar: uploadedUrl,
-        });
+        } as any);
 
         if (saveRes.success) {
           showToast("success", "Image uploaded successfully!");

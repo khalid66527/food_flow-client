@@ -167,6 +167,7 @@ export async function POST(req: NextRequest) {
                 currency: "usd",
                 product_data: {
                   name: "Delivery Fee",
+                  images: [],
                   description: "Standard Delivery Charge",
                 },
                 unit_amount: Math.round(deliveryFee * 100),

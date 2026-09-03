@@ -143,6 +143,7 @@ export async function downloadInvoicePdf(order: TOrder) {
     const deliveryFee = order.deliveryFee || 0;
     const discount = order.discount || 0;
     const grandTotal = order.totalAmount || subtotal + deliveryFee - discount;
+    const isPaid = (order.paymentStatus || "").toLowerCase() === "paid" || order.paymentMethod === "STRIPE";
 
     doc.setFillColor(248, 250, 252);
     doc.roundedRect(120, finalY + 8, 76, 38, 2, 2, "F");
