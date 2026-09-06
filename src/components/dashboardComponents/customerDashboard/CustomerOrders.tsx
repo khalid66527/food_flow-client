@@ -60,7 +60,7 @@ export default function CustomerOrders() {
 
   // Pagination State
   const [currentPage, setCurrentPage] = useState<number>(1);
-  const ORDERS_PER_PAGE = 5;
+  const ORDERS_PER_PAGE = 10;
 
   // Reset pagination when search or filter changes
   useEffect(() => {
@@ -197,8 +197,29 @@ export default function CustomerOrders() {
 
       // 2. Status filter
       const currentStatus = (order.orderStatus || "Placed").toUpperCase();
-      const matchesStatus =
-        statusFilter === "ALL" || currentStatus === statusFilter.toUpperCase();
+      let matchesStatus = statusFilter === "ALL";
+
+      if (statusFilter === "PLACED") {
+        matchesStatus = currentStatus === "PLACED" || currentStatus === "PENDING";
+      } else if (statusFilter === "CONFIRMED") {
+        matchesStatus =
+          currentStatus === "CONFIRMED" ||
+          currentStatus === "PREPARING" ||
+          currentStatus === "ACCEPTED" ||
+          currentStatus === "COOKING" ||
+          currentStatus === "PROCESSING" ||
+          currentStatus === "ON-THE-WAY" ||
+          currentStatus === "ON_THE_WAY" ||
+          currentStatus === "OUT FOR DELIVERY" ||
+          currentStatus === "OUT_FOR_DELIVERY";
+      } else if (statusFilter === "DELIVERED") {
+        matchesStatus = currentStatus === "DELIVERED" || currentStatus === "COMPLETED";
+      } else if (statusFilter === "CANCELLED") {
+        matchesStatus =
+          currentStatus === "CANCELLED" ||
+          currentStatus === "CANCELED" ||
+          currentStatus === "REJECTED";
+      }
 
       return matchesSearch && matchesStatus;
     });

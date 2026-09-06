@@ -69,17 +69,23 @@ interface RiderLocationState {
   vehicleNumber?: string;
 }
 
-// Strict list of active/pending order statuses (excludes 'delivered' and 'cancelled')
-const ACTIVE_STATUSES = [
-  "pending",
-  "preparing",
-  "accepted",
-  "confirmed",
-  "on-the-way",
-  "out for delivery",
-  "cooking",
-  "on_the_way"
-];
+// Robust check for active (in-progress) order statuses.
+// Excludes orders that are completed, delivered, or cancelled.
+export function isOrderActive(orderStatus?: string): boolean {
+  if (!orderStatus) return true; // Default/newly placed orders are active
+  const s = orderStatus.toLowerCase().trim();
+  if (
+    s === "delivered" ||
+    s === "completed" ||
+    s === "cancelled" ||
+    s === "canceled" ||
+    s === "rejected" ||
+    s === "failed"
+  ) {
+    return false;
+  }
+  return true;
+}
 
 function toNumber(value: unknown): number | undefined {
   const n = Number(value);
@@ -155,10 +161,7 @@ export default function OrderTracking() {
         const userOrdersRes = await getUserOrdersApi(userId, userEmail);
         if (userOrdersRes.success && Array.isArray(userOrdersRes.data)) {
           const allOrders = userOrdersRes.data as TOrder[];
-          const liveOrders = allOrders.filter((o) => {
-            const status = (o.orderStatus || "").toLowerCase().trim();
-            return ACTIVE_STATUSES.includes(status);
-          });
+          const liveOrders = allOrders.filter((o) => isOrderActive(o.orderStatus));
           setActiveOrders(liveOrders);
         }
       }
@@ -235,6 +238,15 @@ export default function OrderTracking() {
         setLiveStatus(newStatus);
         const location = readLocationPayload(payload as unknown as RiderLocationEvent);
         if (location) setRiderLocation(location);
+
+        if (!isOrderActive(newStatus)) {
+          const updatedId = payload.orderId || payload.order?._id || payload.order?.orderId;
+          if (updatedId) {
+            setActiveOrders((prev) =>
+              prev.filter((o) => (o._id || o.orderId || o.id) !== updatedId)
+            );
+          }
+        }
       }
     };
 
@@ -368,7 +380,7 @@ export default function OrderTracking() {
 
                       <p className="text-xs font-bold text-gray-800 line-clamp-1">{rNames}</p>
                       <p className="text-xs font-medium text-gray-500">
-                        {itemCount} item{itemCount === 1 ? "" : "s"} • ${o.totalAmount?.toFixed(2)}
+                        {itemCount} item{itemCount === 1 ? "" : "s"} • Tk {o.totalAmount?.toFixed(2)}
                       </p>
                     </div>
 
