@@ -38,16 +38,9 @@ import {
 import { useSession } from "@/lib/auth-client";
 import { getMyRestaurantProfile, IRestaurant } from "@/lib/api/restaurant";
 import { createFoodItem } from "@/lib/actions/restaurant";
+import { getGlobalCategories, IGlobalCategory } from "@/lib/api/category";
 
-type CategoryType =
-  | "Pizza"
-  | "Burger"
-  | "Biryani"
-  | "Pasta"
-  | "BBQ & Grill"
-  | "Desserts"
-  | "Drinks"
-  | "";
+type CategoryType = string;
 
 type FoodStatus = "available" | "unavailable";
 
@@ -109,9 +102,26 @@ export default function AddFoodForm() {
 
   // Category State
   const [category, setCategory] = useState<CategoryType>("Pizza");
+  const [customCategory, setCustomCategory] = useState("");
+  const [globalCategories, setGlobalCategories] = useState<IGlobalCategory[]>([]);
   const [loading, setLoading] = useState(false);
   const [successMsg, setSuccessMsg] = useState("");
   const [errorMsg, setErrorMsg] = useState("");
+
+  // Fetch admin approved global categories
+  useEffect(() => {
+    const loadCategories = async () => {
+      try {
+        const res = await getGlobalCategories();
+        if (res.success && Array.isArray(res.data) && res.data.length > 0) {
+          setGlobalCategories(res.data);
+        }
+      } catch {
+        // fallback
+      }
+    };
+    loadCategories();
+  }, []);
 
   // Common General Food Fields
   const [commonData, setCommonData] = useState({
@@ -867,11 +877,43 @@ export default function AddFoodForm() {
 
       default:
         return (
-          <div className="col-span-2 flex flex-col items-center justify-center p-6 border-2 border-dashed border-gray-200 rounded-2xl bg-gray-50 text-center">
-            <Sliders className="w-8 h-8 text-gray-400 mb-2" />
-            <p className="text-xs font-bold text-gray-600">Select a Category from the Left</p>
-            <p className="text-[11px] text-gray-400 mt-0.5">Dynamic fields will appear automatically</p>
-          </div>
+          <>
+            <div className="space-y-1">
+              <label className="text-xs font-bold text-gray-700">Portion / Serving Size</label>
+              <input
+                type="text"
+                name="portionSize"
+                placeholder="e.g. Single Portion / 6 Pieces / 500ml Bowl"
+                value={dynamicData.portionSize || ""}
+                onChange={handleDynamicChange}
+                className="w-full px-3.5 py-2.5 rounded-xl bg-gray-50 border border-gray-200 text-xs font-semibold focus:bg-white focus:border-[#FF6B35] outline-none"
+              />
+            </div>
+
+            <div className="space-y-1">
+              <label className="text-xs font-bold text-gray-700">Preparation / Flavor Notes</label>
+              <input
+                type="text"
+                name="prepStyle"
+                placeholder="e.g. House Specialty, Authentic Herbs & Spices"
+                value={dynamicData.prepStyle || ""}
+                onChange={handleDynamicChange}
+                className="w-full px-3.5 py-2.5 rounded-xl bg-gray-50 border border-gray-200 text-xs font-semibold focus:bg-white focus:border-[#FF6B35] outline-none"
+              />
+            </div>
+
+            <div className="space-y-1 sm:col-span-2">
+              <label className="text-xs font-bold text-gray-700">Special Serving Options</label>
+              <input
+                type="text"
+                name="specialNotes"
+                placeholder="e.g. Served fresh with dipping sauce and side garnish"
+                value={dynamicData.specialNotes || ""}
+                onChange={handleDynamicChange}
+                className="w-full px-3.5 py-2.5 rounded-xl bg-gray-50 border border-gray-200 text-xs font-semibold focus:bg-white focus:border-[#FF6B35] outline-none"
+              />
+            </div>
+          </>
         );
     }
   };
@@ -897,6 +939,7 @@ export default function AddFoodForm() {
       sliceCount: "6 Slices",
     });
     setCategory("Pizza");
+    setCustomCategory("");
     setImages([]);
     setActivePreviewIndex(0);
     setImageUrlInput("");
@@ -910,8 +953,12 @@ export default function AddFoodForm() {
     setErrorMsg("");
     setSuccessMsg("");
 
-    if (!category) {
-      setErrorMsg("Please select a Food Category!");
+    const effectiveCategory = (
+      category === "Custom" ? customCategory.trim() : category.trim()
+    );
+
+    if (!effectiveCategory) {
+      setErrorMsg("Please select or enter a Food Category!");
       return;
     }
 
@@ -954,7 +1001,7 @@ export default function AddFoodForm() {
 
       const tagsArray = commonData.tags
         ? commonData.tags.split(",").map((t) => t.trim()).filter(Boolean)
-        : [category];
+        : [effectiveCategory];
 
       const ingredientsArray = commonData.ingredients
         ? commonData.ingredients.split(",").map((i) => i.trim()).filter(Boolean)
@@ -963,7 +1010,7 @@ export default function AddFoodForm() {
       const payload = {
         restaurantId,
         name: commonData.name.trim(),
-        category,
+        category: effectiveCategory,
         price: priceNum,
         discountPrice: discountPriceNum,
         description: commonData.description.trim(),
@@ -974,7 +1021,7 @@ export default function AddFoodForm() {
         isVegetarian: commonData.isVegetarian,
         isSpicy: commonData.isSpicy,
         tags: [
-          category,
+          effectiveCategory,
           commonData.isVegetarian ? "Vegetarian" : "",
           commonData.isSpicy ? "Spicy" : "",
           ...tagsArray,
@@ -1106,7 +1153,7 @@ export default function AddFoodForm() {
             </div>
 
             {/* Category Selector */}
-            <div className="space-y-1">
+            <div className="space-y-2">
               <label className="text-xs font-bold text-gray-700 uppercase tracking-wider flex items-center justify-between">
                 <span>Food Category <span className="text-rose-500">*</span></span>
                 <span className="text-[10px] text-[#FF6B35] font-bold">Adapts specifications dynamically</span>
@@ -1116,16 +1163,50 @@ export default function AddFoodForm() {
                 required
                 value={category}
                 onChange={handleCategoryChange}
-                className="w-full px-4 py-3 rounded-2xl bg-gray-50/80 border border-gray-200 focus:bg-white focus:border-[#FF6B35] outline-none text-sm font-bold text-gray-900 transition"
+                className="w-full px-4 py-3 rounded-2xl bg-gray-50/80 border border-gray-200 focus:bg-white focus:border-[#FF6B35] outline-none text-sm font-bold text-gray-900 transition cursor-pointer"
               >
-                <option value="Pizza">🍕 Pizza & Calzones</option>
-                <option value="Burger">🍔 Burgers & Sandwiches</option>
-                <option value="Biryani">🍛 Biryani & Rice Platters</option>
-                <option value="Pasta">🍝 Pasta & Noodles</option>
-                <option value="BBQ & Grill">🍖 BBQ & Grilled Platters</option>
-                <option value="Desserts">🍰 Desserts & Bakery</option>
-                <option value="Drinks">🥤 Drinks & Beverages</option>
+                {globalCategories.length > 0
+                  ? globalCategories.map((cat) => (
+                      <option key={cat._id} value={cat.name}>
+                        {cat.emoji || "🏷️"} {cat.name}
+                      </option>
+                    ))
+                  : [
+                      { name: "Pizza", emoji: "🍕" },
+                      { name: "Burgers", emoji: "🍔" },
+                      { name: "Biryani", emoji: "🍛" },
+                      { name: "Pasta", emoji: "🍝" },
+                      { name: "BBQ & Grill", emoji: "🍖" },
+                      { name: "Desserts", emoji: "🍰" },
+                      { name: "Drinks", emoji: "🥤" },
+                      { name: "Sushi", emoji: "🍣" },
+                      { name: "Chinese", emoji: "🍲" },
+                      { name: "Thai", emoji: "🌿" },
+                      { name: "Healthy", emoji: "🥗" },
+                    ].map((cat) => (
+                      <option key={cat.name} value={cat.name}>
+                        {cat.emoji} {cat.name}
+                      </option>
+                    ))}
+                <option value="Custom">✨ Add Custom / New Category...</option>
               </select>
+
+              {/* Custom Category Input Field */}
+              {category === "Custom" && (
+                <div className="mt-2.5 space-y-1">
+                  <label className="text-xs font-bold text-[#FF6B35] uppercase tracking-wider">
+                    Enter New Category Name <span className="text-rose-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={customCategory}
+                    onChange={(e) => setCustomCategory(e.target.value)}
+                    placeholder="e.g. Mexican Tacos, Waffles, Indian Thali, Ramen..."
+                    className="w-full px-4 py-3 rounded-2xl bg-orange-50/60 border border-orange-300 focus:bg-white focus:border-[#FF6B35] outline-none text-sm font-bold text-gray-900 transition placeholder:text-gray-400 shadow-xs"
+                  />
+                </div>
+              )}
             </div>
 
             {/* Pricing Grid */}
