@@ -23,6 +23,7 @@ import { getGlobalCategories } from '@/lib/api/category';
 import FoodCard from '@/components/restaurants/FoodCard';
 import { useCart } from '@/contexts/CartContext';
 import LoadingSpinner from '@/components/LoadingSpinner';
+import { getRealTimeLocation, subscribeLocation, detectRealTimeLocation, ILocationInfo } from '@/lib/location';
 
 // ---------------------------------------------------------------------------
 // SIDEBAR CATEGORY DEFINITIONS
@@ -164,6 +165,18 @@ function ExploreFoodContent() {
   // Mobile sidebar overlay
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
+  // Dynamic Real-Time Location State
+  const [locationInfo, setLocationInfo] = useState<ILocationInfo>(() => getRealTimeLocation());
+
+  useEffect(() => {
+    const unsubscribe = subscribeLocation(() => {
+      setLocationInfo(getRealTimeLocation());
+      setCurrentPage(1);
+    });
+    detectRealTimeLocation();
+    return unsubscribe;
+  }, []);
+
   // Dynamic categories list (starts with predefined home categories)
   const [categories, setCategories] = useState<SidebarCategory[]>(PREDEFINED_CATEGORIES);
 
@@ -213,11 +226,16 @@ function ExploreFoodContent() {
     fetchCategories();
   }, []);
 
-  // Fetch all active restaurants for the top-bar dropdown
+  // Fetch all active restaurants for the top-bar dropdown (filtered by real-time city & sorted by distance)
   useEffect(() => {
     const fetchRestaurants = async () => {
       try {
-        const res = await getAllRestaurants();
+        const params: Record<string, any> = { city: locationInfo.city };
+        if (locationInfo.lat !== undefined && locationInfo.lng !== undefined) {
+          params.lat = locationInfo.lat;
+          params.lng = locationInfo.lng;
+        }
+        const res = await getAllRestaurants(params);
         if (res.success && Array.isArray(res.data) && res.data.length > 0) {
           const list = res.data
             .map((r) => ({
@@ -231,13 +249,15 @@ function ExploreFoodContent() {
             list.forEach((item) => merged.set(item.id, item.name));
             return Array.from(merged.entries()).map(([id, name]) => ({ id, name }));
           });
+        } else {
+          setAvailableRestaurants([]);
         }
       } catch {
         // Fallback to food items mapping
       }
     };
     fetchRestaurants();
-  }, []);
+  }, [locationInfo.city, locationInfo.lat, locationInfo.lng]);
 
   // Reset to page 1 when responsive limit changes (viewport resize)
   useEffect(() => {
@@ -257,6 +277,11 @@ function ExploreFoodContent() {
       sortBy,
     };
 
+    if (locationInfo.city) query.city = locationInfo.city;
+    if (locationInfo.lat !== undefined && locationInfo.lng !== undefined) {
+      query.lat = String(locationInfo.lat);
+      query.lng = String(locationInfo.lng);
+    }
     if (debouncedSearch.trim()) query.search = debouncedSearch.trim();
     if (selectedRestaurant !== 'all') query.restaurantId = selectedRestaurant;
     if (selectedCategory !== 'all') query.category = selectedCategory;
@@ -293,7 +318,7 @@ function ExploreFoodContent() {
     } finally {
       setLoading(false);
     }
-  }, [currentPage, debouncedSearch, selectedRestaurant, sortBy, selectedCategory, isVegetarian, isSpicy, responsiveLimit]);
+  }, [currentPage, debouncedSearch, selectedRestaurant, sortBy, selectedCategory, isVegetarian, isSpicy, responsiveLimit, locationInfo.city]);
 
   useEffect(() => {
     fetchFoodItems();
@@ -490,9 +515,11 @@ function ExploreFoodContent() {
 
             <div className="flex items-center gap-3">
               {/* Location display */}
-              <div className="hidden sm:flex items-center gap-2 bg-white/10 backdrop-blur-md border border-white/20 rounded-xl px-3 py-2 text-white text-xs font-medium">
-                <MapPin className="w-3.5 h-3.5 text-amber-200" />
-                <span className="truncate max-w-[140px]">Downtown, Manhattan, NY</span>
+              <div className="hidden sm:flex items-center gap-2 bg-white/10 backdrop-blur-md border border-white/20 rounded-xl px-3.5 py-2 text-white text-xs font-medium">
+                <MapPin className="w-3.5 h-3.5 text-amber-200 shrink-0" />
+                <span className="truncate max-w-[190px] font-bold text-amber-100">
+                  {locationInfo.area || `${locationInfo.city} Central`}
+                </span>
               </div>
 
               {/* Restaurant dropdown */}
@@ -560,6 +587,7 @@ function ExploreFoodContent() {
               onChange={(e) => { setSortBy(e.target.value as FoodSortOption); setCurrentPage(1); }}
               className="appearance-none bg-white text-gray-700 text-sm font-medium py-2.5 pl-3.5 pr-8 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-orange-300 cursor-pointer"
             >
+              <option value="distance">Nearest First (Proximity)</option>
               <option value="newest">Newest First</option>
               <option value="price_asc">Price: Low to High</option>
               <option value="price_desc">Price: High to Low</option>
