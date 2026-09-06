@@ -184,9 +184,17 @@ export async function getMyRestaurantProfile(
 /**
  * Fetch all active restaurants for top-bar filter dropdown
  */
-export async function getAllRestaurants(): Promise<ApiResponse<IRestaurant[]>> {
+export async function getAllRestaurants(
+  query: Record<string, string> = {}
+): Promise<ApiResponse<IRestaurant[]>> {
   try {
-    const res = await fetch(`${API_BASE_URL}/restaurants?limit=100`, {
+    const url = new URL(`${API_BASE_URL}/restaurants`);
+    url.searchParams.append("limit", "100");
+    Object.entries(query).forEach(([key, val]) => {
+      if (val) url.searchParams.append(key, val);
+    });
+
+    const res = await fetch(url.toString(), {
       method: "GET",
       headers: {
         "Content-Type": "application/json",

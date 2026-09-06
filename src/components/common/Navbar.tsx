@@ -18,6 +18,14 @@ import {
 } from "lucide-react";
 import { useSession, signOut } from "@/lib/auth-client";
 import { useCart } from "@/contexts/CartContext";
+import { 
+  getRealTimeLocation, 
+  detectRealTimeLocation, 
+  subscribeLocation, 
+  updateRealTimeLocation,
+  ILocationInfo 
+} from "@/lib/location";
+import { getAddresses } from "@/lib/api/address";
 
 // Better Auth session ba user object-er type definition (Real implementation er jonno)
 type UserRole = "customer" | "restaurant" | "rider" | "admin" | string | null;
@@ -31,14 +39,13 @@ interface UserSession {
 }
 
 interface NavbarProps {
-  // Better Auth er useSession() ba auth client theke pawa real session data ekhane pass hobe
   session?: {
     user: UserSession;
   } | null;
   user?: UserSession | null;
   onLogout?: () => Promise<void> | void;
   cartItemCount?: number;
-  userLocation?: string; // Real location tracking er jonno prop
+  userLocation?: string;
 }
 
 export default function Navbar({ 
@@ -51,8 +58,65 @@ export default function Navbar({
   const [isDropdownOpen, setIsDropdownOpen] = useState<boolean>(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState<boolean>(false);
 
+  const [locationInfo, setLocationInfo] = useState<ILocationInfo>(() => getRealTimeLocation());
+
   const dropdownRef = useRef<HTMLDivElement>(null);
 
+  // Sync real-time location and trigger browser geolocation
+  useEffect(() => {
+    const unsubscribe = subscribeLocation(() => {
+      setLocationInfo(getRealTimeLocation());
+    });
+
+    detectRealTimeLocation();
+
+    return unsubscribe;
+  }, []);
+
+  const pathname = usePathname();
+  const router = useRouter();
+  const { data: clientSession } = useSession();
+  const { totalItems, openCartDrawer } = useCart();
+
+  const cartCount = totalItems || cartItemCount;
+
+  const session = sessionProp || clientSession;
+  const user = (userProp || session?.user || null) as UserSession | null;
+
+  // Auto detect user default delivery address city if logged in
+  useEffect(() => {
+    if (!user?.id || !user?.email) return;
+    let isCancelled = false;
+
+    const syncUserAddressCity = async () => {
+      try {
+        const res = await getAddresses(user.id, user.email);
+        if (isCancelled) return;
+        if (res.success && Array.isArray(res.data) && res.data.length > 0) {
+          const defaultAddr = res.data.find((a) => a.isDefault) || res.data[0];
+          if (defaultAddr) {
+            const addrObj = defaultAddr as any;
+            const detectedCity = addrObj.city || defaultAddr.area;
+            if (detectedCity) {
+              updateRealTimeLocation(
+                detectedCity,
+                defaultAddr.area || defaultAddr.streetAddress || `${detectedCity} Central`
+              );
+            }
+          }
+        }
+      } catch (e) {
+        console.warn("Failed to auto-detect user address city:", e);
+      }
+    };
+
+    syncUserAddressCity();
+    return () => {
+      isCancelled = true;
+    };
+  }, [user?.id, user?.email]);
+
+  // Click outside listener for profile dropdown
   useEffect(() => {
     if (!isDropdownOpen) return;
 
@@ -66,15 +130,6 @@ export default function Navbar({
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, [isDropdownOpen]);
 
-  const pathname = usePathname();
-  const router = useRouter();
-  const { data: clientSession } = useSession();
-  const { totalItems, openCartDrawer } = useCart();
-
-  const cartCount = totalItems || cartItemCount;
-
-  const session = sessionProp || clientSession;
-  const user = (userProp || session?.user || null) as UserSession | null;
 
   const handleLogout = async () => {
     setIsDropdownOpen(false);
@@ -121,6 +176,8 @@ export default function Navbar({
       { label: "Profile", href: "/dashboard/customer/profile", icon: User },
     ];
   };
+
+
 
   return (
     <header className="sticky top-0 z-50 w-full border-b border-gray-100 bg-white/95 backdrop-blur-md shadow-xs">
@@ -169,6 +226,14 @@ export default function Navbar({
         
         <div className="flex items-center gap-2 sm:gap-3">
           
+          {/* Real-Time Auto-Detected Location Badge (Beside Cart Button) */}
+          <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-orange-50/90 text-orange-700 border border-orange-200/80 text-xs font-bold shadow-2xs">
+            <MapPin className="h-3.5 w-3.5 text-orange-500 shrink-0 animate-pulse" />
+            <span className="truncate max-w-[90px] sm:max-w-[125px]">
+              {locationInfo.city || "Chattogram"}
+            </span>
+          </div>
+
           {/* Cart Button (opens sliding drawer) */}
           <button
             type="button"
