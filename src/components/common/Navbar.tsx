@@ -55,15 +55,16 @@ export default function Navbar({
   cartItemCount = 0,
   userLocation = "Chattogram" 
 }: NavbarProps) {
+  const [isMounted, setIsMounted] = useState<boolean>(false);
   const [isDropdownOpen, setIsDropdownOpen] = useState<boolean>(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState<boolean>(false);
-
   const [locationInfo, setLocationInfo] = useState<ILocationInfo>(() => getRealTimeLocation());
 
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   // Sync real-time location and trigger browser geolocation
   useEffect(() => {
+    setIsMounted(true);
     const unsubscribe = subscribeLocation(() => {
       setLocationInfo(getRealTimeLocation());
     });
@@ -230,7 +231,7 @@ export default function Navbar({
           <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-orange-50/90 text-orange-700 border border-orange-200/80 text-xs font-bold shadow-2xs">
             <MapPin className="h-3.5 w-3.5 text-orange-500 shrink-0 animate-pulse" />
             <span className="truncate max-w-[90px] sm:max-w-[125px]">
-              {locationInfo.city || "Chattogram"}
+              {isMounted ? (locationInfo.city || "Chattogram") : "Chattogram"}
             </span>
           </div>
 
