@@ -45,6 +45,7 @@ import {
   updateRiderStatusAdmin,
   deleteRiderAdmin,
 } from "@/lib/actions/admin";
+import LoadingSpinner from "@/components/LoadingSpinner";
 
 type TActiveTab = "all" | "restaurants" | "riders" | "pending";
 
@@ -498,9 +499,8 @@ export default function AdminRestaurantAndRider() {
 
       {/* Main Content Area */}
       {loading ? (
-        <div className="min-h-[40vh] flex flex-col items-center justify-center space-y-3 bg-white rounded-3xl border border-gray-100 p-12">
-          <Loader2 className="w-8 h-8 text-[#FF6B35] animate-spin" />
-          <p className="text-xs font-bold text-gray-400">Loading partner applications...</p>
+        <div className="min-h-[400px] flex items-center justify-center bg-white rounded-3xl border border-gray-100 p-12">
+          <LoadingSpinner size={50} color="#f97316" message="Loading partner applications..." />
         </div>
       ) : (
         <div className="space-y-8">

@@ -18,10 +18,11 @@ import {
   Flame,
 } from 'lucide-react';
 import { IGlobalFoodItem, FoodSortOption, IPaginationMeta } from '@/types/restaurant';
-import { getAllGlobalFoodItems, getFoodCategories } from '@/lib/api/restaurant';
+import { getAllGlobalFoodItems, getFoodCategories, getAllRestaurants } from '@/lib/api/restaurant';
 import { getGlobalCategories } from '@/lib/api/category';
 import FoodCard from '@/components/restaurants/FoodCard';
 import { useCart } from '@/contexts/CartContext';
+import LoadingSpinner from '@/components/LoadingSpinner';
 
 // ---------------------------------------------------------------------------
 // SIDEBAR CATEGORY DEFINITIONS
@@ -94,16 +95,22 @@ function getCategoryEmoji(categoryName: string): string {
 // RESPONSIVE ITEMS-PER-PAGE HOOK
 // ---------------------------------------------------------------------------
 function useResponsiveLimit() {
-  const [limit, setLimit] = useState(12);
+  const [limit, setLimit] = useState(() => {
+    if (typeof window !== 'undefined') {
+      const w = window.innerWidth;
+      if (w < 768) return 3;
+      if (w < 1024) return 6;
+      return 9;
+    }
+    return 9;
+  });
 
   useEffect(() => {
     const update = () => {
       const w = window.innerWidth;
-      if (w < 768) setLimit(3); // mobile: 1 column, 3 rows
-      else if (w < 1024) setLimit(6); // tablet: 2 columns, 3 rows
-      else setLimit(9); // desktop/laptop: 3 columns, 3 rows
+      const nextLimit = w < 768 ? 3 : w < 1024 ? 6 : 9;
+      setLimit((prev) => (prev !== nextLimit ? nextLimit : prev));
     };
-    update();
     window.addEventListener('resize', update);
     return () => window.removeEventListener('resize', update);
   }, []);
@@ -146,7 +153,7 @@ function ExploreFoodContent() {
   const [currentPage, setCurrentPage] = useState(1);
   const [debouncedSearch, setDebouncedSearch] = useState('');
 
-  // Restaurant dropdown (extracted from food items)
+  // Restaurant dropdown (extracted from food items + DB)
   const [availableRestaurants, setAvailableRestaurants] = useState<
     Array<{ id: string; name: string }>
   >([]);
@@ -204,6 +211,32 @@ function ExploreFoodContent() {
       }
     };
     fetchCategories();
+  }, []);
+
+  // Fetch all active restaurants for the top-bar dropdown
+  useEffect(() => {
+    const fetchRestaurants = async () => {
+      try {
+        const res = await getAllRestaurants();
+        if (res.success && Array.isArray(res.data) && res.data.length > 0) {
+          const list = res.data
+            .map((r) => ({
+              id: r._id || r.id || '',
+              name: r.restaurantName || r.name || 'Restaurant',
+            }))
+            .filter((r) => r.id);
+
+          setAvailableRestaurants((prev) => {
+            const merged = new Map<string, string>(prev.map((item) => [item.id, item.name]));
+            list.forEach((item) => merged.set(item.id, item.name));
+            return Array.from(merged.entries()).map(([id, name]) => ({ id, name }));
+          });
+        }
+      } catch {
+        // Fallback to food items mapping
+      }
+    };
+    fetchRestaurants();
   }, []);
 
   // Reset to page 1 when responsive limit changes (viewport resize)
@@ -378,7 +411,14 @@ function ExploreFoodContent() {
           {/* Vegetarian */}
           <button
             type="button"
-            onClick={() => { setIsVegetarian((v) => !v); setCurrentPage(1); }}
+            onClick={() => {
+              setIsVegetarian((prev) => {
+                const next = !prev;
+                if (next) setIsSpicy(false);
+                return next;
+              });
+              setCurrentPage(1);
+            }}
             className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all cursor-pointer ${
               isVegetarian
                 ? 'bg-emerald-50 text-emerald-600 border border-emerald-200 shadow-xs'
@@ -394,7 +434,14 @@ function ExploreFoodContent() {
           {/* Spicy */}
           <button
             type="button"
-            onClick={() => { setIsSpicy((s) => !s); setCurrentPage(1); }}
+            onClick={() => {
+              setIsSpicy((prev) => {
+                const next = !prev;
+                if (next) setIsVegetarian(false);
+                return next;
+              });
+              setCurrentPage(1);
+            }}
             className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all cursor-pointer ${
               isSpicy
                 ? 'bg-rose-50 text-rose-600 border border-rose-200 shadow-xs'
@@ -624,10 +671,10 @@ function ExploreFoodContent() {
 
           {/* RIGHT CONTENT */}
           <main className="flex-1 min-w-0">
-            {/* LOADING */}
+            {/* LOADING WITH HASHLOADER */}
             {loading && (
-              <div className="flex items-center justify-center py-32">
-                <Loader2 className="w-8 h-8 text-orange-500 animate-spin" />
+              <div className="flex items-center justify-center min-h-[450px] w-full">
+                <LoadingSpinner size={50} color="#f97316" />
               </div>
             )}
 
@@ -718,7 +765,7 @@ export default function ExploreFoodPage() {
     <Suspense
       fallback={
         <div className="min-h-screen flex items-center justify-center bg-[#FFFDF8]">
-          <Loader2 className="w-8 h-8 text-orange-500 animate-spin" />
+          <LoadingSpinner size={50} color="#f97316" />
         </div>
       }
     >

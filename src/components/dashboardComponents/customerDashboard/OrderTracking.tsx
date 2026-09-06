@@ -23,6 +23,7 @@ import { getOrderByIdApi } from "@/lib/api/order";
 import { getOrderSocket, joinOrderRoom, disconnectOrderSocket } from "@/lib/socket";
 import OrderStatusStepper, { resolveStepIndex } from "@/components/tracking/OrderStatusStepper";
 import OrderTrackingMap from "@/components/tracking/OrderTrackingMap";
+import LoadingSpinner from "@/components/LoadingSpinner";
 import { TOrder } from "@/types/order";
 
 interface OrderStatusUpdateEvent {
@@ -178,9 +179,8 @@ export default function OrderTracking() {
 
   if (loading && !order) {
     return (
-      <div className="max-w-4xl mx-auto min-h-[60vh] flex flex-col items-center justify-center gap-3">
-        <Loader2 className="w-10 h-10 text-[#FF6B35] animate-spin" />
-        <p className="text-sm font-bold text-gray-600">Loading live tracking...</p>
+      <div className="max-w-4xl mx-auto min-h-[400px] flex items-center justify-center">
+        <LoadingSpinner size={50} color="#f97316" message="Loading live tracking..." />
       </div>
     );
   }

@@ -2,12 +2,12 @@
 
 import React, { useState, useMemo } from "react";
 import Link from "next/link";
+import LoadingSpinner from "@/components/LoadingSpinner";
 import {
   Minus,
   Plus,
   Trash2,
   ShoppingCart,
-  Loader2,
   ArrowRight,
   ChevronLeft,
   ChevronRight,
@@ -91,9 +91,7 @@ export default function CustomerCart() {
 
       {/* Loading */}
       {isLoading ? (
-        <div className="flex items-center justify-center py-32">
-          <Loader2 className="w-8 h-8 text-orange-500 animate-spin" />
-        </div>
+        <LoadingSpinner size={50} minHeight="300px" />
       ) : items.length === 0 ? (
         /* Empty state */
         <div className="flex flex-col items-center justify-center py-24 text-center bg-white rounded-3xl border border-gray-100 shadow-sm">

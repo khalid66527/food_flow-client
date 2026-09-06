@@ -19,6 +19,7 @@ import { useSession } from "@/lib/auth-client";
 import { getRiderOrdersApi, updateOrderStatusApi } from "@/lib/api/order";
 import { getOrderSocket, joinOrderRoom, disconnectOrderSocket } from "@/lib/socket";
 import OrderTrackingMap from "@/components/tracking/OrderTrackingMap";
+import LoadingSpinner from "@/components/LoadingSpinner";
 import { TOrder } from "@/types/order";
 
 function getRiderProfile() {
@@ -191,9 +192,8 @@ export default function ActiveDelivery() {
 
   if (sessionPending || loading) {
     return (
-      <div className="min-h-[60vh] flex flex-col items-center justify-center gap-3">
-        <Loader2 className="w-10 h-10 text-[#FF6B35] animate-spin" />
-        <p className="text-sm font-bold text-gray-600">Loading active delivery...</p>
+      <div className="min-h-[400px] flex items-center justify-center">
+        <LoadingSpinner size={50} color="#f97316" message="Loading active delivery..." />
       </div>
     );
   }

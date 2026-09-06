@@ -33,6 +33,7 @@ import { FaFacebookF, FaInstagram, FaTwitter } from "react-icons/fa6";
 import AOS from "aos";
 import { useSession } from "@/lib/auth-client";
 import { IRestaurant, getMyRestaurantProfile } from "@/lib/api/restaurant";
+import LoadingSpinner from "@/components/LoadingSpinner";
 import { toggleRestaurantStatus } from "@/lib/actions/restaurant";
 import CreateRestaurant from "./CreateRestaurant";
 
@@ -138,13 +139,8 @@ export default function RestaurantProfile() {
   // 1. Loading State
   if (sessionLoading || loading) {
     return (
-      <div className="min-h-[50vh] flex flex-col items-center justify-center p-8 space-y-4">
-        <div className="w-12 h-12 rounded-2xl bg-orange-100 flex items-center justify-center text-[#FF6B35]">
-          <Loader2 className="w-6 h-6 animate-spin" />
-        </div>
-        <p className="text-sm font-semibold text-gray-500 animate-pulse">
-          Loading your restaurant profile...
-        </p>
+      <div className="min-h-[400px] flex items-center justify-center p-8">
+        <LoadingSpinner size={50} color="#f97316" message="Loading your restaurant profile..." />
       </div>
     );
   }
