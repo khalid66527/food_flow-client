@@ -651,7 +651,7 @@ export default function CustomerOrders() {
                     {/* Action 1: Track Order */}
                     {isTrackEnabled ? (
                       <Link
-                        href={`/dashboard/customer/order-tracking?orderId=${order.orderId}`}
+                        href={`/dashboard/customer/order-tracking?orderId=${order.orderId || order._id || order.id}`}
                         className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-gradient-to-r from-[#FF6B35] to-amber-500 text-white text-xs font-extrabold transition shadow-xs cursor-pointer hover:brightness-110 hover:scale-102 active:scale-98"
                       >
                         <MapPin className="w-3.5 h-3.5 text-white" />

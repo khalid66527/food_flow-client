@@ -94,8 +94,9 @@ function OrderSuccessContent() {
   };
 
   const handleTrackOrder = () => {
-    if (order?.orderId) {
-      router.push(`/dashboard/customer/order-tracking?orderId=${order.orderId}`);
+    const targetId = order?.orderId || order?._id || order?.id;
+    if (targetId) {
+      router.push(`/dashboard/customer/order-tracking?orderId=${targetId}`);
     } else {
       router.push("/dashboard/customer/order-tracking");
     }
