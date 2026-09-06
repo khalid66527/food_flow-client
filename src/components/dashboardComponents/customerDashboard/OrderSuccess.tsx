@@ -3,6 +3,7 @@
 import React, { useEffect, useState, Suspense } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import Link from "next/link";
+import LoadingSpinner from "@/components/LoadingSpinner";
 import {
   CheckCircle2,
   FileText,
@@ -101,14 +102,7 @@ function OrderSuccessContent() {
   };
 
   if (isLoading) {
-    return (
-      <div className="flex flex-col items-center justify-center py-32 space-y-4">
-        <Loader2 className="w-10 h-10 text-[#FF6B35] animate-spin" />
-        <p className="text-sm font-semibold text-gray-600">
-          Retrieving real-time order status from database...
-        </p>
-      </div>
-    );
+    return <LoadingSpinner size={50} minHeight="60vh" />;
   }
 
   if (errorMsg || !order) {
@@ -308,13 +302,7 @@ function OrderSuccessContent() {
 
 export default function OrderSuccess() {
   return (
-    <Suspense
-      fallback={
-        <div className="flex items-center justify-center py-32">
-          <Loader2 className="w-8 h-8 text-[#FF6B35] animate-spin" />
-        </div>
-      }
-    >
+    <Suspense fallback={<LoadingSpinner size={50} minHeight="60vh" />}>
       <OrderSuccessContent />
     </Suspense>
   );

@@ -52,6 +52,7 @@ import {
 } from "@/lib/actions/restaurant";
 import { getGlobalCategories, IGlobalCategory } from "@/lib/api/category";
 import { IMenuItem } from "@/types/restaurant";
+import LoadingSpinner from "@/components/LoadingSpinner";
 
 type CategoryType =
   | "Pizza"
@@ -1372,12 +1373,7 @@ export default function RestaurantMenu() {
   /* Loading state                                              */
   /* ---------------------------------------------------------- */
   if (profileLoading) {
-    return (
-      <div className="w-full max-w-7xl mx-auto flex flex-col items-center justify-center py-28 gap-4">
-        <Loader2 className="w-10 h-10 text-[#FF6B35] animate-spin" />
-        <p className="text-sm font-semibold text-gray-500">Loading your menu table...</p>
-      </div>
-    );
+    return <LoadingSpinner size={50} minHeight="60vh" />;
   }
 
   /* ---------------------------------------------------------- */
@@ -1596,9 +1592,8 @@ export default function RestaurantMenu() {
       <div className="bg-white rounded-3xl border border-gray-200/90 shadow-sm overflow-hidden">
         
         {itemsLoading ? (
-          <div className="py-24 flex flex-col items-center justify-center gap-3">
-            <Loader2 className="w-8 h-8 text-[#FF6B35] animate-spin" />
-            <p className="text-xs font-bold text-gray-400">Loading menu table...</p>
+          <div className="py-24 flex flex-col items-center justify-center">
+            <LoadingSpinner size={50} color="#f97316" message="Loading restaurant menu table..." />
           </div>
         ) : filteredItems.length === 0 ? (
           <div className="py-20 px-6 flex flex-col items-center justify-center text-center gap-4">

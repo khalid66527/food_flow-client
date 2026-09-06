@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
+import LoadingSpinner from "@/components/LoadingSpinner";
 import {
   Loader2,
   RefreshCw,
@@ -151,12 +152,7 @@ export default function DeliveryDetails() {
   const deliveredOrders = orders.filter((o) => o.orderStatus === "Delivered" && o.riderInfo?.riderId === user?.id);
 
   if (sessionPending || loading) {
-    return (
-      <div className="min-h-[60vh] flex flex-col items-center justify-center gap-3">
-        <Loader2 className="w-10 h-10 text-[#FF6B35] animate-spin" />
-        <p className="text-sm font-bold text-gray-600">Loading available deliveries...</p>
-      </div>
-    );
+    return <LoadingSpinner size={50} minHeight="60vh" />;
   }
 
   const renderOrderCard = (order: TOrder, view: "available" | "mine") => {

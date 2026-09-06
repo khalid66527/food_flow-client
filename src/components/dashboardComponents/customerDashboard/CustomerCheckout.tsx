@@ -3,6 +3,7 @@
 import React, { useEffect, useState, useCallback } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
+import LoadingSpinner from "@/components/LoadingSpinner";
 import {
   MapPin,
   CreditCard,
@@ -223,14 +224,7 @@ export default function CustomerCheckout() {
   };
 
   if (isCheckingAddress || sessionPending) {
-    return (
-      <div className="flex flex-col items-center justify-center py-32 space-y-4">
-        <Loader2 className="w-10 h-10 text-[#FF6B35] animate-spin" />
-        <p className="text-sm font-semibold text-gray-600">
-          Verifying default delivery address...
-        </p>
-      </div>
-    );
+    return <LoadingSpinner size={50} minHeight="60vh" />;
   }
 
   if (items.length === 0) {

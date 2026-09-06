@@ -20,6 +20,7 @@ import {
 import { useSession } from "@/lib/auth-client";
 import { getUserById, IUser } from "@/lib/api/user";
 import { updateUserDetails } from "@/lib/actions/user";
+import LoadingSpinner from "@/components/LoadingSpinner";
 
 export default function CustomerProfile() {
   const { data: session, isPending: sessionLoading } = useSession();
@@ -198,13 +199,8 @@ export default function CustomerProfile() {
   // Loading State
   if (sessionLoading || loading) {
     return (
-      <div className="min-h-[60vh] flex flex-col items-center justify-center p-8 space-y-4">
-        <div className="w-14 h-14 rounded-2xl bg-[#FF6B35]/10 flex items-center justify-center text-[#FF6B35]">
-          <Loader2 className="w-7 h-7 animate-spin" />
-        </div>
-        <p className="text-sm font-semibold text-gray-500 animate-pulse">
-          Loading customer profile...
-        </p>
+      <div className="min-h-[400px] flex items-center justify-center p-8">
+        <LoadingSpinner size={50} color="#f97316" message="Loading customer profile..." />
       </div>
     );
   }

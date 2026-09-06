@@ -17,6 +17,8 @@ import {
 import { useSession } from "@/lib/auth-client";
 import { getMyRiderProfile, IRiderProfile } from "@/lib/api/rider";
 
+import LoadingSpinner from "@/components/LoadingSpinner";
+
 interface RiderAccessGuardProps {
   children: React.ReactNode;
 }
@@ -85,13 +87,8 @@ export default function RiderAccessGuard({ children }: RiderAccessGuardProps) {
   // 1. Loading State
   if (sessionLoading || loading) {
     return (
-      <div className="min-h-[50vh] flex flex-col items-center justify-center p-8 space-y-4">
-        <div className="w-12 h-12 rounded-2xl bg-orange-100 flex items-center justify-center text-[#FF6B35]">
-          <Loader2 className="w-6 h-6 animate-spin" />
-        </div>
-        <p className="text-xs font-bold text-gray-500 animate-pulse">
-          Verifying delivery partner credentials...
-        </p>
+      <div className="min-h-[70vh] flex flex-col items-center justify-center p-8">
+        <LoadingSpinner size={50} color="#f97316" message="Verifying delivery partner credentials..." />
       </div>
     );
   }

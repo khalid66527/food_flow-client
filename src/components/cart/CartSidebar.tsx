@@ -3,13 +3,13 @@
 import React from "react";
 import Link from "next/link";
 import { AnimatePresence, motion } from "framer-motion";
+import LoadingSpinner from "@/components/LoadingSpinner";
 import {
   X,
   Minus,
   Plus,
   Trash2,
   ShoppingCart,
-  Loader2,
   ArrowRight,
   Lock,
 } from "lucide-react";
@@ -88,10 +88,7 @@ export default function CartSidebar() {
             {/* Body */}
             <div className="flex-1 overflow-y-auto px-5 py-4">
               {isLoading ? (
-                <div className="flex flex-col items-center justify-center py-20 text-gray-400">
-                  <Loader2 className="w-8 h-8 text-orange-500 animate-spin mb-3" />
-                  <p className="text-sm">Loading your cart...</p>
-                </div>
+                <LoadingSpinner size={50} minHeight="200px" />
               ) : items.length === 0 ? (
                 <div className="flex flex-col items-center justify-center py-20 text-center">
                   <div className="w-16 h-16 rounded-full bg-orange-50 flex items-center justify-center mb-4">

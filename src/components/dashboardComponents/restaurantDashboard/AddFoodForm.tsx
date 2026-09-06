@@ -39,6 +39,7 @@ import { useSession } from "@/lib/auth-client";
 import { getMyRestaurantProfile, IRestaurant } from "@/lib/api/restaurant";
 import { createFoodItem } from "@/lib/actions/restaurant";
 import { getGlobalCategories, IGlobalCategory } from "@/lib/api/category";
+import LoadingSpinner from "@/components/LoadingSpinner";
 
 type CategoryType = string;
 
@@ -1052,12 +1053,7 @@ export default function AddFoodForm() {
 
   /* Loading state */
   if (profileLoading) {
-    return (
-      <div className="w-full max-w-6xl mx-auto flex flex-col items-center justify-center py-28 gap-4">
-        <Loader2 className="w-10 h-10 text-[#FF6B35] animate-spin" />
-        <p className="text-sm font-semibold text-gray-500">Loading food studio...</p>
-      </div>
-    );
+    return <LoadingSpinner size={50} minHeight="60vh" />;
   }
 
   /* No restaurant profile */

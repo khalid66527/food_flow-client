@@ -31,6 +31,7 @@ import {
   Layers,
 } from "lucide-react";
 import { useSession } from "@/lib/auth-client";
+import LoadingSpinner from "@/components/LoadingSpinner";
 import { TOrder, TOrderItem } from "@/types/order";
 import { downloadInvoicePdf } from "@/lib/pdf/generateInvoice";
 
@@ -310,9 +311,8 @@ export default function CustomerOrders() {
 
   if (sessionPending || loading) {
     return (
-      <div className="w-full min-h-[60vh] flex flex-col items-center justify-center gap-3">
-        <Loader2 className="w-10 h-10 text-[#FF6B35] animate-spin" />
-        <p className="text-sm font-bold text-gray-600">Loading your orders history...</p>
+      <div className="w-full min-h-[60vh] flex flex-col items-center justify-center">
+        <LoadingSpinner size={50} color="#f97316" message="Loading your orders history..." />
       </div>
     );
   }

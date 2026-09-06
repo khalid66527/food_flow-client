@@ -27,6 +27,7 @@ import {
   updateGlobalCategory,
   deleteGlobalCategory,
 } from "@/lib/api/category";
+import LoadingSpinner from "@/components/LoadingSpinner";
 
 const POPULAR_EMOJIS = [
   "🍕", "🍔", "🍛", "🍝", "🍖", "🍰", "🥤", "🍣", "🍲", "🌿", "🥗", "🥣", "🍿", "🐟", "🌮", "☕", "🍦", "🥞", "🍗", "🥩", "📦"
@@ -398,7 +399,7 @@ export default function AdminCategories() {
       {/* CATEGORY GRID */}
       {loading ? (
         <div className="flex items-center justify-center py-28 bg-white rounded-3xl border border-gray-100">
-          <Loader2 className="w-8 h-8 text-[#FF6B35] animate-spin" />
+          <LoadingSpinner size={50} color="#f97316" message="Loading global categories..." />
         </div>
       ) : filteredCategories.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-20 bg-white rounded-3xl border border-gray-100 text-center p-6">

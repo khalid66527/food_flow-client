@@ -3,7 +3,8 @@
 import React, { useEffect, useMemo, useState } from "react";
 import dynamic from "next/dynamic";
 import "leaflet/dist/leaflet.css";
-import { Loader2, User, Bike } from "lucide-react";
+import { User, Bike } from "lucide-react";
+import LoadingSpinner from "@/components/LoadingSpinner";
 
 const L = typeof window !== "undefined" ? require("leaflet") : null;
 
@@ -171,9 +172,8 @@ export default function OrderTrackingMap({
     <div className="relative w-full h-full rounded-3xl overflow-hidden bg-gray-50">
       {/* Loading veil while the Leaflet map module loads on the client */}
       {(!mapReady || !hasPoints) && (
-        <div className="absolute inset-0 z-[5] flex flex-col items-center justify-center gap-2 bg-gray-50">
-          <Loader2 className="w-8 h-8 text-[#FF6B35] animate-spin" />
-          <p className="text-xs font-bold text-gray-500">Loading live map...</p>
+        <div className="absolute inset-0 z-[5] flex items-center justify-center bg-gray-50">
+          <LoadingSpinner size={50} color="#f97316" message="Loading live map..." />
         </div>
       )}
 
