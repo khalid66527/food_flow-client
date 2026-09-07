@@ -40,6 +40,7 @@ import {
   updateUserStatus,
   deleteUser,
 } from "@/lib/actions/user";
+import LoadingSpinner from "@/components/LoadingSpinner";
 
 type TCategoryTab = "all" | "restaurant" | "customer" | "rider" | "admin";
 
@@ -738,13 +739,8 @@ export default function AdminUsers() {
       {/* Users Table */}
       <div className="bg-white rounded-3xl border border-gray-100 shadow-sm overflow-hidden">
         {isLoading ? (
-          <div className="p-16 text-center space-y-4">
-            <div className="inline-block p-4 rounded-2xl bg-orange-50 text-[#FF6B35]">
-              <RefreshCw className="w-8 h-8 animate-spin" />
-            </div>
-            <p className="text-gray-500 font-semibold text-sm">
-              Loading users...
-            </p>
+          <div className="py-20 text-center flex items-center justify-center">
+            <LoadingSpinner size={50} color="#f97316" message="Loading users list..." />
           </div>
         ) : users.length === 0 ? (
           <div className="p-16 text-center space-y-3">

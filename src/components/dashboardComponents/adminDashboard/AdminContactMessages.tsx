@@ -34,6 +34,7 @@ import {
   getContactMessages,
   getContactStats,
 } from "@/lib/api/contact";
+import LoadingSpinner from "@/components/LoadingSpinner";
 import {
   replyToContactMessageAction,
   updateContactStatusAction,
@@ -408,9 +409,8 @@ export default function AdminContactMessages() {
       {/* Messages List Table */}
       <div className="bg-white rounded-3xl border border-gray-100 shadow-xs overflow-hidden">
         {loading ? (
-          <div className="p-16 flex flex-col items-center justify-center gap-3">
-            <Loader2 className="w-8 h-8 animate-spin text-[#FF6B35]" />
-            <p className="text-xs font-bold text-gray-500 animate-pulse">Loading inquiries...</p>
+          <div className="p-16 flex items-center justify-center">
+            <LoadingSpinner size={50} color="#f97316" message="Loading inquiries..." />
           </div>
         ) : messages.length === 0 ? (
           <div className="p-16 text-center space-y-3">

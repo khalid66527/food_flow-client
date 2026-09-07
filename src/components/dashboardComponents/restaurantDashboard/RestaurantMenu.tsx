@@ -50,7 +50,9 @@ import {
   toggleFoodItemAvailabilityAction,
   deleteFoodItemAction,
 } from "@/lib/actions/restaurant";
+import { getGlobalCategories, IGlobalCategory } from "@/lib/api/category";
 import { IMenuItem } from "@/types/restaurant";
+import LoadingSpinner from "@/components/LoadingSpinner";
 
 type CategoryType =
   | "Pizza"
@@ -119,6 +121,23 @@ export default function RestaurantMenu() {
   const [itemsLoading, setItemsLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
+
+  // Global categories state for edit dropdown
+  const [globalCategories, setGlobalCategories] = useState<IGlobalCategory[]>([]);
+
+  useEffect(() => {
+    const loadCategories = async () => {
+      try {
+        const res = await getGlobalCategories();
+        if (res.success && Array.isArray(res.data) && res.data.length > 0) {
+          setGlobalCategories(res.data);
+        }
+      } catch {
+        // fallback
+      }
+    };
+    loadCategories();
+  }, []);
 
   // Filter & Search states
   const [searchQuery, setSearchQuery] = useState("");
@@ -595,6 +614,7 @@ export default function RestaurantMenu() {
         });
         break;
       case "Burger":
+      case "Burgers":
         setEditDynamicData({
           pattyType: "Double Angus Beef",
           pattyCount: "2x Patties (300g)",
@@ -644,7 +664,11 @@ export default function RestaurantMenu() {
         });
         break;
       default:
-        setEditDynamicData({});
+        setEditDynamicData({
+          portionSize: "Standard Portion",
+          prepStyle: "Chef Special",
+          specialNotes: "",
+        });
         break;
     }
   };
@@ -1088,9 +1112,40 @@ export default function RestaurantMenu() {
 
       default:
         return (
-          <div className="col-span-2 p-4 rounded-xl bg-gray-50 border border-gray-200 text-xs text-gray-500 text-center">
-            Standard dish specification fields
-          </div>
+          <>
+            <div className="space-y-1">
+              <label className="text-xs font-bold text-gray-700">Portion / Serving Size</label>
+              <input
+                type="text"
+                value={editDynamicData.portionSize || ""}
+                onChange={(e) => setEditDynamicData((p) => ({ ...p, portionSize: e.target.value }))}
+                placeholder="e.g. Single Portion / 6 Pieces / 500ml Bowl"
+                className="w-full px-3.5 py-2.5 rounded-xl bg-gray-50 border border-gray-200 text-xs font-semibold focus:bg-white focus:border-[#FF6B35] outline-none"
+              />
+            </div>
+
+            <div className="space-y-1">
+              <label className="text-xs font-bold text-gray-700">Preparation / Flavor Notes</label>
+              <input
+                type="text"
+                value={editDynamicData.prepStyle || ""}
+                onChange={(e) => setEditDynamicData((p) => ({ ...p, prepStyle: e.target.value }))}
+                placeholder="e.g. House Specialty, Authentic Herbs & Spices"
+                className="w-full px-3.5 py-2.5 rounded-xl bg-gray-50 border border-gray-200 text-xs font-semibold focus:bg-white focus:border-[#FF6B35] outline-none"
+              />
+            </div>
+
+            <div className="space-y-1 sm:col-span-2">
+              <label className="text-xs font-bold text-gray-700">Special Serving Options</label>
+              <input
+                type="text"
+                value={editDynamicData.specialNotes || ""}
+                onChange={(e) => setEditDynamicData((p) => ({ ...p, specialNotes: e.target.value }))}
+                placeholder="e.g. Served fresh with dipping sauce and side garnish"
+                className="w-full px-3.5 py-2.5 rounded-xl bg-gray-50 border border-gray-200 text-xs font-semibold focus:bg-white focus:border-[#FF6B35] outline-none"
+              />
+            </div>
+          </>
         );
     }
   };
@@ -1318,12 +1373,7 @@ export default function RestaurantMenu() {
   /* Loading state                                              */
   /* ---------------------------------------------------------- */
   if (profileLoading) {
-    return (
-      <div className="w-full max-w-7xl mx-auto flex flex-col items-center justify-center py-28 gap-4">
-        <Loader2 className="w-10 h-10 text-[#FF6B35] animate-spin" />
-        <p className="text-sm font-semibold text-gray-500">Loading your menu table...</p>
-      </div>
-    );
+    return <LoadingSpinner size={50} minHeight="60vh" />;
   }
 
   /* ---------------------------------------------------------- */
@@ -1542,9 +1592,8 @@ export default function RestaurantMenu() {
       <div className="bg-white rounded-3xl border border-gray-200/90 shadow-sm overflow-hidden">
         
         {itemsLoading ? (
-          <div className="py-24 flex flex-col items-center justify-center gap-3">
-            <Loader2 className="w-8 h-8 text-[#FF6B35] animate-spin" />
-            <p className="text-xs font-bold text-gray-400">Loading menu table...</p>
+          <div className="py-24 flex flex-col items-center justify-center">
+            <LoadingSpinner size={50} color="#f97316" message="Loading restaurant menu table..." />
           </div>
         ) : filteredItems.length === 0 ? (
           <div className="py-20 px-6 flex flex-col items-center justify-center text-center gap-4">
@@ -2010,15 +2059,32 @@ export default function RestaurantMenu() {
                       <select
                         value={editFormData.category}
                         onChange={handleEditCategoryChange}
-                        className="w-full px-4 py-2.5 rounded-xl bg-gray-50/80 border border-gray-200 text-xs font-bold text-gray-900 focus:bg-white focus:border-[#FF6B35] outline-none"
+                        className="w-full px-4 py-2.5 rounded-xl bg-gray-50/80 border border-gray-200 text-xs font-bold text-gray-900 focus:bg-white focus:border-[#FF6B35] outline-none cursor-pointer"
                       >
-                        <option value="Pizza">🍕 Pizza & Calzones</option>
-                        <option value="Burger">🍔 Burgers & Sandwiches</option>
-                        <option value="Biryani">🍛 Biryani & Rice Platters</option>
-                        <option value="Pasta">🍝 Pasta & Noodles</option>
-                        <option value="BBQ & Grill">🍖 BBQ & Grilled Platters</option>
-                        <option value="Desserts">🍰 Desserts & Bakery</option>
-                        <option value="Drinks">🥤 Drinks & Beverages</option>
+                        {globalCategories.length > 0
+                          ? globalCategories.map((cat) => (
+                              <option key={cat._id} value={cat.name}>
+                                {cat.emoji || "🏷️"} {cat.name}
+                              </option>
+                            ))
+                          : [
+                              { name: "Pizza", emoji: "🍕" },
+                              { name: "Burger", emoji: "🍔" },
+                              { name: "Burgers", emoji: "🍔" },
+                              { name: "Biryani", emoji: "🍛" },
+                              { name: "Pasta", emoji: "🍝" },
+                              { name: "BBQ & Grill", emoji: "🍖" },
+                              { name: "Desserts", emoji: "🍰" },
+                              { name: "Drinks", emoji: "🥤" },
+                              { name: "Sushi", emoji: "🍣" },
+                              { name: "Chinese", emoji: "🍲" },
+                              { name: "Thai", emoji: "🌿" },
+                              { name: "Healthy", emoji: "🥗" },
+                            ].map((cat) => (
+                              <option key={cat.name} value={cat.name}>
+                                {cat.emoji} {cat.name}
+                              </option>
+                            ))}
                       </select>
                     </div>
 

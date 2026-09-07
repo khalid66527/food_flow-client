@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
+import LoadingSpinner from "@/components/LoadingSpinner";
 import {
   MapPin,
   Loader2,
@@ -676,10 +677,7 @@ export default function CustomerAddress() {
 
       {/* Loading Skeleton */}
       {isLoading ? (
-        <div className="flex flex-col items-center justify-center py-28 space-y-4">
-          <Loader2 className="w-10 h-10 text-[#FF6B35] animate-spin" />
-          <p className="text-sm font-semibold text-gray-500">Loading delivery addresses...</p>
-        </div>
+        <LoadingSpinner size={50} minHeight="300px" />
       ) : sortedAddresses.length === 0 ? (
         /* Empty State */
         <div className="flex flex-col items-center justify-center py-20 text-center bg-white rounded-3xl border border-gray-100 shadow-sm px-6">

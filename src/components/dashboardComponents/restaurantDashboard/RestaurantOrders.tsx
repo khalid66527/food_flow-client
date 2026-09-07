@@ -19,6 +19,7 @@ import { useSession } from "@/lib/auth-client";
 import { getRestaurantOrdersApi, updateOrderStatusApi } from "@/lib/api/order";
 import { getOrderSocket, joinOrderRoom, disconnectOrderSocket } from "@/lib/socket";
 import { TOrder, TOrderItem } from "@/types/order";
+import LoadingSpinner from "@/components/LoadingSpinner";
 
 type TTab = "ALL" | "PLACED" | "CONFIRMED" | "PREPARING" | "READY" | "OUT FOR DELIVERY" | "DELIVERED";
 
@@ -190,9 +191,8 @@ export default function RestaurantOrders() {
 
   if (sessionPending || loading) {
     return (
-      <div className="min-h-[60vh] flex flex-col items-center justify-center gap-3">
-        <Loader2 className="w-10 h-10 text-[#FF6B35] animate-spin" />
-        <p className="text-sm font-bold text-gray-600">Loading restaurant orders...</p>
+      <div className="min-h-[400px] flex items-center justify-center">
+        <LoadingSpinner size={50} color="#f97316" message="Loading restaurant orders..." />
       </div>
     );
   }

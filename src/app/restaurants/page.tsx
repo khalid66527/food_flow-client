@@ -1,6 +1,7 @@
 'use client';
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, Suspense } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Search,
@@ -15,22 +16,17 @@ import {
   Loader2,
   Leaf,
   Flame,
-  Utensils,
-  Pizza,
-  Fish,
-  CakeSlice,
-  Salad,
-  Sandwich,
-  Drumstick,
-  Coffee,
 } from 'lucide-react';
 import { IGlobalFoodItem, FoodSortOption, IPaginationMeta } from '@/types/restaurant';
-import { getAllGlobalFoodItems, getFoodCategories } from '@/lib/api/restaurant';
+import { getAllGlobalFoodItems, getFoodCategories, getAllRestaurants } from '@/lib/api/restaurant';
+import { getGlobalCategories } from '@/lib/api/category';
 import FoodCard from '@/components/restaurants/FoodCard';
 import { useCart } from '@/contexts/CartContext';
+import LoadingSpinner from '@/components/LoadingSpinner';
+import { getRealTimeLocation, subscribeLocation, detectRealTimeLocation, ILocationInfo } from '@/lib/location';
 
 // ---------------------------------------------------------------------------
-// SIDEBAR CATEGORY DEFINITIONS (dynamic, fetched from database)
+// SIDEBAR CATEGORY DEFINITIONS
 // ---------------------------------------------------------------------------
 interface SidebarCategory {
   id: string;
@@ -38,12 +34,26 @@ interface SidebarCategory {
   emoji: string;
 }
 
+const PREDEFINED_CATEGORIES: SidebarCategory[] = [
+  { id: 'all', label: 'All', emoji: '🍽️' },
+  { id: 'pizza', label: 'Pizza', emoji: '🍕' },
+  { id: 'sushi', label: 'Sushi', emoji: '🍣' },
+  { id: 'burgers', label: 'Burgers', emoji: '🍔' },
+  { id: 'chinese', label: 'Chinese', emoji: '🍲' },
+  { id: 'thai', label: 'Thai', emoji: '🌿' },
+  { id: 'desserts', label: 'Desserts', emoji: '🍰' },
+  { id: 'healthy', label: 'Healthy', emoji: '🥗' },
+  { id: 'drinks', label: 'Drinks', emoji: '🥤' },
+];
+
 const CATEGORY_EMOJIS: Record<string, string> = {
   pizza: '🍕',
   burger: '🍔',
+  burgers: '🍔',
   sushi: '🍣',
   seafood: '🐟',
   dessert: '🍰',
+  desserts: '🍰',
   healthy: '🥗',
   salad: '🥗',
   mexican: '🌮',
@@ -53,6 +63,9 @@ const CATEGORY_EMOJIS: Record<string, string> = {
   grill: '🍖',
   beverage: '🥤',
   drink: '🥤',
+  drinks: '🥤',
+  chinese: '🍲',
+  thai: '🌿',
   appetizer: '🍴',
   starter: '🍴',
   main: '🍽️',
@@ -72,7 +85,7 @@ const CATEGORY_EMOJIS: Record<string, string> = {
 };
 
 function getCategoryEmoji(categoryName: string): string {
-  const lower = categoryName.toLowerCase();
+  const lower = categoryName.toLowerCase().trim();
   for (const [key, emoji] of Object.entries(CATEGORY_EMOJIS)) {
     if (key !== 'default' && lower.includes(key)) return emoji;
   }
@@ -83,16 +96,22 @@ function getCategoryEmoji(categoryName: string): string {
 // RESPONSIVE ITEMS-PER-PAGE HOOK
 // ---------------------------------------------------------------------------
 function useResponsiveLimit() {
-  const [limit, setLimit] = useState(12);
+  const [limit, setLimit] = useState(() => {
+    if (typeof window !== 'undefined') {
+      const w = window.innerWidth;
+      if (w < 768) return 3;
+      if (w < 1024) return 6;
+      return 9;
+    }
+    return 9;
+  });
 
   useEffect(() => {
     const update = () => {
       const w = window.innerWidth;
-      if (w < 768) setLimit(3); // mobile: 1 column, 3 rows
-      else if (w < 1024) setLimit(6); // tablet: 2 columns, 3 rows
-      else setLimit(9); // desktop/laptop: 3 columns, 3 rows
+      const nextLimit = w < 768 ? 3 : w < 1024 ? 6 : 9;
+      setLimit((prev) => (prev !== nextLimit ? nextLimit : prev));
     };
-    update();
     window.addEventListener('resize', update);
     return () => window.removeEventListener('resize', update);
   }, []);
@@ -101,9 +120,12 @@ function useResponsiveLimit() {
 }
 
 // ---------------------------------------------------------------------------
-// PAGE COMPONENT
+// INNER CONTENT COMPONENT
 // ---------------------------------------------------------------------------
-export default function ExploreFoodPage() {
+function ExploreFoodContent() {
+  const searchParams = useSearchParams();
+  const urlCategory = searchParams.get('category') || searchParams.get('cuisine');
+
   const { addItem, canAddToCart } = useCart();
   const responsiveLimit = useResponsiveLimit();
 
@@ -132,7 +154,7 @@ export default function ExploreFoodPage() {
   const [currentPage, setCurrentPage] = useState(1);
   const [debouncedSearch, setDebouncedSearch] = useState('');
 
-  // Restaurant dropdown (extracted from food items)
+  // Restaurant dropdown (extracted from food items + DB)
   const [availableRestaurants, setAvailableRestaurants] = useState<
     Array<{ id: string; name: string }>
   >([]);
@@ -143,8 +165,31 @@ export default function ExploreFoodPage() {
   // Mobile sidebar overlay
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
-  // Dynamic categories from database
-  const [categories, setCategories] = useState<SidebarCategory[]>([]);
+  // Dynamic Real-Time Location State
+  const [locationInfo, setLocationInfo] = useState<ILocationInfo>(() => getRealTimeLocation());
+
+  useEffect(() => {
+    const unsubscribe = subscribeLocation(() => {
+      setLocationInfo(getRealTimeLocation());
+      setCurrentPage(1);
+    });
+    detectRealTimeLocation();
+    return unsubscribe;
+  }, []);
+
+  // Dynamic categories list (starts with predefined home categories)
+  const [categories, setCategories] = useState<SidebarCategory[]>(PREDEFINED_CATEGORIES);
+
+  // ---------------------------------------------------------------------------
+  // SYNC URL CATEGORY PARAMETER
+  // ---------------------------------------------------------------------------
+  useEffect(() => {
+    if (urlCategory) {
+      const normCat = urlCategory.trim().toLowerCase();
+      setSelectedCategory(normCat);
+      setCurrentPage(1);
+    }
+  }, [urlCategory]);
 
   // ---------------------------------------------------------------------------
   // DEBOUNCE SEARCH
@@ -157,30 +202,64 @@ export default function ExploreFoodPage() {
     return () => clearTimeout(timer);
   }, [searchQuery]);
 
-  // Fetch dynamic categories from database
+  // Fetch dynamic global categories from database
   useEffect(() => {
     const fetchCategories = async () => {
       try {
-        const res = await getFoodCategories();
-        if (res.success && Array.isArray(res.data)) {
-          const dynamicCategories: SidebarCategory[] = [
-            { id: 'all', label: 'All Cuisines', emoji: '🍽️' },
-            ...res.data.map((cat) => ({
-              id: cat,
-              label: cat,
-              emoji: getCategoryEmoji(cat),
-            })),
-          ];
-          setCategories(dynamicCategories);
+        const res = await getGlobalCategories();
+        if (res.success && Array.isArray(res.data) && res.data.length > 0) {
+          const fetchedCats: SidebarCategory[] = res.data.map((c) => ({
+            id: c.name.toLowerCase(),
+            label: c.name,
+            emoji: c.emoji || getCategoryEmoji(c.name),
+          }));
+
+          setCategories([
+            { id: 'all', label: 'All', emoji: '🍽️' },
+            ...fetchedCats,
+          ]);
         }
       } catch {
-        // Silently fall back to empty list
+        setCategories(PREDEFINED_CATEGORIES);
       }
     };
     fetchCategories();
   }, []);
 
-  // Reset to page 1 when the responsive limit changes (viewport resize)
+  // Fetch all active restaurants for the top-bar dropdown (filtered by real-time city & sorted by distance)
+  useEffect(() => {
+    const fetchRestaurants = async () => {
+      try {
+        const params: Record<string, any> = { city: locationInfo.city };
+        if (locationInfo.lat !== undefined && locationInfo.lng !== undefined) {
+          params.lat = locationInfo.lat;
+          params.lng = locationInfo.lng;
+        }
+        const res = await getAllRestaurants(params);
+        if (res.success && Array.isArray(res.data) && res.data.length > 0) {
+          const list = res.data
+            .map((r) => ({
+              id: r._id || r.id || '',
+              name: r.restaurantName || r.name || 'Restaurant',
+            }))
+            .filter((r) => r.id);
+
+          setAvailableRestaurants((prev) => {
+            const merged = new Map<string, string>(prev.map((item) => [item.id, item.name]));
+            list.forEach((item) => merged.set(item.id, item.name));
+            return Array.from(merged.entries()).map(([id, name]) => ({ id, name }));
+          });
+        } else {
+          setAvailableRestaurants([]);
+        }
+      } catch {
+        // Fallback to food items mapping
+      }
+    };
+    fetchRestaurants();
+  }, [locationInfo.city, locationInfo.lat, locationInfo.lng]);
+
+  // Reset to page 1 when responsive limit changes (viewport resize)
   useEffect(() => {
     setCurrentPage(1);
   }, [responsiveLimit]);
@@ -198,6 +277,11 @@ export default function ExploreFoodPage() {
       sortBy,
     };
 
+    if (locationInfo.city) query.city = locationInfo.city;
+    if (locationInfo.lat !== undefined && locationInfo.lng !== undefined) {
+      query.lat = String(locationInfo.lat);
+      query.lng = String(locationInfo.lng);
+    }
     if (debouncedSearch.trim()) query.search = debouncedSearch.trim();
     if (selectedRestaurant !== 'all') query.restaurantId = selectedRestaurant;
     if (selectedCategory !== 'all') query.category = selectedCategory;
@@ -234,7 +318,7 @@ export default function ExploreFoodPage() {
     } finally {
       setLoading(false);
     }
-  }, [currentPage, debouncedSearch, selectedRestaurant, sortBy, selectedCategory, isVegetarian, isSpicy, responsiveLimit]);
+  }, [currentPage, debouncedSearch, selectedRestaurant, sortBy, selectedCategory, isVegetarian, isSpicy, responsiveLimit, locationInfo.city]);
 
   useEffect(() => {
     fetchFoodItems();
@@ -243,6 +327,33 @@ export default function ExploreFoodPage() {
   // ---------------------------------------------------------------------------
   // HANDLERS
   // ---------------------------------------------------------------------------
+  const handleCategorySelect = (catId: string) => {
+    setSelectedCategory(catId);
+    setSearchQuery('');
+    setDebouncedSearch('');
+    setCurrentPage(1);
+
+    if (typeof window !== 'undefined') {
+      const url = new URL(window.location.href);
+      if (catId === 'all') {
+        url.searchParams.delete('category');
+        url.searchParams.delete('cuisine');
+      } else {
+        url.searchParams.set('category', catId);
+      }
+      window.history.replaceState(null, '', url.pathname + url.search);
+    }
+  };
+
+  const isCategoryActive = (catId: string) => {
+    const s = selectedCategory.toLowerCase();
+    const c = catId.toLowerCase();
+    if (s === c) return true;
+    if (s.endsWith('s') && s.slice(0, -1) === c) return true;
+    if (c.endsWith('s') && c.slice(0, -1) === s) return true;
+    return false;
+  };
+
   const handleAddToCart = (item: IGlobalFoodItem, e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
@@ -259,6 +370,13 @@ export default function ExploreFoodPage() {
     setIsSpicy(false);
     setSortBy('newest');
     setCurrentPage(1);
+
+    if (typeof window !== 'undefined') {
+      const url = new URL(window.location.href);
+      url.searchParams.delete('category');
+      url.searchParams.delete('cuisine');
+      window.history.replaceState(null, '', url.pathname);
+    }
   };
 
   const activeFilterCount =
@@ -277,25 +395,33 @@ export default function ExploreFoodPage() {
     <div className="flex flex-col gap-6">
       {/* Categories */}
       <div>
-        <h3 className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-3 px-1">Categories</h3>
-        <div className="space-y-0.5">
+        <div className="flex items-center justify-between mb-3 px-1">
+          <h3 className="text-xs font-bold text-gray-500 uppercase tracking-wider">Categories</h3>
+          <span className="text-[10px] font-semibold text-orange-500 bg-orange-50 px-2 py-0.5 rounded-full">
+            {categories.length} Types
+          </span>
+        </div>
+
+        <div className="space-y-1 max-h-[340px] overflow-y-auto pr-1">
           {categories.map((cat) => {
-            const isActive = selectedCategory === cat.id;
+            const isActive = isCategoryActive(cat.id);
             return (
               <button
                 key={cat.id}
                 type="button"
-                onClick={() => { setSelectedCategory(cat.id); setCurrentPage(1); }}
-                className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all cursor-pointer ${
+                onClick={() => handleCategorySelect(cat.id)}
+                className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 cursor-pointer ${
                   isActive
-                    ? 'bg-orange-50 text-orange-600 border border-orange-200 shadow-xs'
-                    : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900 border border-transparent'
+                    ? 'bg-gradient-to-r from-orange-500 to-orange-600 text-white font-bold shadow-md shadow-orange-500/20 border border-orange-500 scale-[1.01]'
+                    : 'text-gray-700 hover:bg-orange-50/70 hover:text-orange-600 hover:border-orange-200 border border-transparent'
                 }`}
               >
-                <span className="text-base">{cat.emoji}</span>
+                <span className={`text-base p-1 rounded-lg transition-colors ${isActive ? 'bg-white/20' : 'bg-gray-100'}`}>
+                  {cat.emoji}
+                </span>
                 <span className="flex-1 text-left">{cat.label}</span>
-                {isActive && cat.id !== 'all' && (
-                  <span className="w-1.5 h-1.5 rounded-full bg-orange-500" />
+                {isActive && (
+                  <span className="w-2 h-2 rounded-full bg-white animate-pulse" />
                 )}
               </button>
             );
@@ -310,14 +436,21 @@ export default function ExploreFoodPage() {
           {/* Vegetarian */}
           <button
             type="button"
-            onClick={() => { setIsVegetarian((v) => !v); setCurrentPage(1); }}
+            onClick={() => {
+              setIsVegetarian((prev) => {
+                const next = !prev;
+                if (next) setIsSpicy(false);
+                return next;
+              });
+              setCurrentPage(1);
+            }}
             className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all cursor-pointer ${
               isVegetarian
-                ? 'bg-emerald-50 text-emerald-600 border border-emerald-200'
+                ? 'bg-emerald-50 text-emerald-600 border border-emerald-200 shadow-xs'
                 : 'text-gray-600 hover:bg-gray-50 border border-transparent'
             }`}
           >
-            <Leaf className="w-4 h-4" />
+            <Leaf className="w-4 h-4 text-emerald-500" />
             <span className="flex-1 text-left">Vegetarian</span>
             <span className={`w-8 h-5 rounded-full transition-all relative ${isVegetarian ? 'bg-emerald-500' : 'bg-gray-200'}`}>
               <span className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow-sm transition-transform ${isVegetarian ? 'left-[14px]' : 'left-0.5'}`} />
@@ -326,14 +459,21 @@ export default function ExploreFoodPage() {
           {/* Spicy */}
           <button
             type="button"
-            onClick={() => { setIsSpicy((s) => !s); setCurrentPage(1); }}
+            onClick={() => {
+              setIsSpicy((prev) => {
+                const next = !prev;
+                if (next) setIsVegetarian(false);
+                return next;
+              });
+              setCurrentPage(1);
+            }}
             className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all cursor-pointer ${
               isSpicy
-                ? 'bg-rose-50 text-rose-600 border border-rose-200'
+                ? 'bg-rose-50 text-rose-600 border border-rose-200 shadow-xs'
                 : 'text-gray-600 hover:bg-gray-50 border border-transparent'
             }`}
           >
-            <Flame className="w-4 h-4" />
+            <Flame className="w-4 h-4 text-rose-500" />
             <span className="flex-1 text-left">Spicy</span>
             <span className={`w-8 h-5 rounded-full transition-all relative ${isSpicy ? 'bg-rose-500' : 'bg-gray-200'}`}>
               <span className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow-sm transition-transform ${isSpicy ? 'left-[14px]' : 'left-0.5'}`} />
@@ -375,9 +515,11 @@ export default function ExploreFoodPage() {
 
             <div className="flex items-center gap-3">
               {/* Location display */}
-              <div className="hidden sm:flex items-center gap-2 bg-white/10 backdrop-blur-md border border-white/20 rounded-xl px-3 py-2 text-white text-xs font-medium">
-                <MapPin className="w-3.5 h-3.5 text-amber-200" />
-                <span className="truncate max-w-[140px]">Downtown, Manhattan, NY</span>
+              <div className="hidden sm:flex items-center gap-2 bg-white/10 backdrop-blur-md border border-white/20 rounded-xl px-3.5 py-2 text-white text-xs font-medium">
+                <MapPin className="w-3.5 h-3.5 text-amber-200 shrink-0" />
+                <span className="truncate max-w-[190px] font-bold text-amber-100">
+                  {locationInfo.area || `${locationInfo.city} Central`}
+                </span>
               </div>
 
               {/* Restaurant dropdown */}
@@ -445,6 +587,7 @@ export default function ExploreFoodPage() {
               onChange={(e) => { setSortBy(e.target.value as FoodSortOption); setCurrentPage(1); }}
               className="appearance-none bg-white text-gray-700 text-sm font-medium py-2.5 pl-3.5 pr-8 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-orange-300 cursor-pointer"
             >
+              <option value="distance">Nearest First (Proximity)</option>
               <option value="newest">Newest First</option>
               <option value="price_asc">Price: Low to High</option>
               <option value="price_desc">Price: High to Low</option>
@@ -457,9 +600,9 @@ export default function ExploreFoodPage() {
         {hasActiveFilters && (
           <div className="mt-3 flex items-center gap-2 flex-wrap text-xs">
             {selectedCategory !== 'all' && (
-              <span className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-orange-50 text-orange-700 font-semibold rounded-full border border-orange-200">
-                {categories.find((c) => c.id === selectedCategory)?.label || selectedCategory}
-                <button type="button" onClick={() => { setSelectedCategory('all'); setCurrentPage(1); }} className="text-orange-400 hover:text-orange-700 cursor-pointer">
+              <span className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-orange-50 text-orange-700 font-semibold rounded-full border border-orange-200 capitalize">
+                Category: {categories.find((c) => isCategoryActive(c.id))?.label || selectedCategory}
+                <button type="button" onClick={() => handleCategorySelect('all')} className="text-orange-400 hover:text-orange-700 cursor-pointer">
                   <X className="w-3 h-3" />
                 </button>
               </span>
@@ -556,10 +699,10 @@ export default function ExploreFoodPage() {
 
           {/* RIGHT CONTENT */}
           <main className="flex-1 min-w-0">
-            {/* LOADING */}
+            {/* LOADING WITH HASHLOADER */}
             {loading && (
-              <div className="flex items-center justify-center py-32">
-                <Loader2 className="w-8 h-8 text-orange-500 animate-spin" />
+              <div className="flex items-center justify-center min-h-[450px] w-full">
+                <LoadingSpinner size={50} color="#f97316" />
               </div>
             )}
 
@@ -639,5 +782,22 @@ export default function ExploreFoodPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// MAIN EXPORT WITH SUSPENSE
+// ---------------------------------------------------------------------------
+export default function ExploreFoodPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen flex items-center justify-center bg-[#FFFDF8]">
+          <LoadingSpinner size={50} color="#f97316" />
+        </div>
+      }
+    >
+      <ExploreFoodContent />
+    </Suspense>
   );
 }

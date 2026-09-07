@@ -48,6 +48,7 @@ import {
 } from "lucide-react";
 import { useCart } from "@/contexts/CartContext";
 import { IGlobalFoodItem } from "@/types/restaurant";
+import LoadingSpinner from "@/components/LoadingSpinner";
 
 interface FoodDetailsProps {
   foodId?: string;
@@ -440,9 +441,8 @@ export default function FoodDetails({ foodId }: FoodDetailsProps) {
 
   if (loading) {
     return (
-      <div className="w-full min-h-[70vh] flex flex-col items-center justify-center gap-3">
-        <Loader2 className="w-10 h-10 text-[#FF6B35] animate-spin" />
-        <p className="text-sm font-bold text-gray-600">Loading delicious food details...</p>
+      <div className="w-full min-h-[70vh] flex flex-col items-center justify-center">
+        <LoadingSpinner size={50} color="#f97316" message="Loading delicious food details..." />
       </div>
     );
   }

@@ -182,6 +182,38 @@ export async function getMyRestaurantProfile(
 }
 
 /**
+ * Fetch all active restaurants for top-bar filter dropdown
+ */
+export async function getAllRestaurants(
+  query: Record<string, string> = {}
+): Promise<ApiResponse<IRestaurant[]>> {
+  try {
+    const url = new URL(`${API_BASE_URL}/restaurants`);
+    url.searchParams.append("limit", "100");
+    Object.entries(query).forEach(([key, val]) => {
+      if (val) url.searchParams.append(key, val);
+    });
+
+    const res = await fetch(url.toString(), {
+      method: "GET",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      cache: "no-store",
+    });
+
+    const data = await res.json();
+    return { ...data, data: Array.isArray(data?.data) ? data.data : [] };
+  } catch (err: any) {
+    return {
+      success: false,
+      message: err.message || "Failed to fetch restaurants.",
+      data: [],
+    };
+  }
+}
+
+/**
  * Get all global food items across all restaurants with filters/pagination
  */
 export async function getAllGlobalFoodItems(

@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useState, useCallback } from "react";
-import { useParams, useSearchParams } from "next/navigation";
+import { useParams, useSearchParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import {
   ArrowLeft,
@@ -9,24 +9,28 @@ import {
   CheckCircle2,
   Wifi,
   WifiOff,
-  Loader2,
-  DraftingCompass,
   Bike,
   Phone,
   MapPin,
   RefreshCw,
   Store,
   Wallet,
+  ShoppingBag,
+  Clock,
+  DraftingCompass,
+  UtensilsCrossed,
+  Layers,
+  ChevronRight,
+  Navigation,
+  ArrowRight
 } from "lucide-react";
 import { useSession } from "@/lib/auth-client";
-import { getOrderByIdApi } from "@/lib/api/order";
+import { getOrderByIdApi, getUserOrdersApi } from "@/lib/api/order";
 import { getOrderSocket, joinOrderRoom, disconnectOrderSocket } from "@/lib/socket";
 import OrderStatusStepper, { resolveStepIndex } from "@/components/tracking/OrderStatusStepper";
-import dynamic from "next/dynamic";
-const OrderTrackingMap = dynamic(
-  () => import("@/components/tracking/OrderTrackingMap"),
-  { ssr: false }
-);
+
+import OrderTrackingMap from "@/components/tracking/OrderTrackingMap";
+import LoadingSpinner from "@/components/LoadingSpinner";
 import { TOrder } from "@/types/order";
 
 interface OrderStatusUpdateEvent {
@@ -66,6 +70,24 @@ interface RiderLocationState {
   vehicleNumber?: string;
 }
 
+// Robust check for active (in-progress) order statuses.
+// Excludes orders that are completed, delivered, or cancelled.
+export function isOrderActive(orderStatus?: string): boolean {
+  if (!orderStatus) return true; // Default/newly placed orders are active
+  const s = orderStatus.toLowerCase().trim();
+  if (
+    s === "delivered" ||
+    s === "completed" ||
+    s === "cancelled" ||
+    s === "canceled" ||
+    s === "rejected" ||
+    s === "failed"
+  ) {
+    return false;
+  }
+  return true;
+}
+
 function toNumber(value: unknown): number | undefined {
   const n = Number(value);
   return Number.isFinite(n) ? n : undefined;
@@ -87,6 +109,7 @@ function readLocationPayload(payload: RiderLocationEvent | null): RiderLocationS
 }
 
 export default function OrderTracking() {
+  const router = useRouter();
   const params = useParams();
   const searchParams = useSearchParams();
   const { data: session, isPending: sessionPending } = useSession();
@@ -95,49 +118,114 @@ export default function OrderTracking() {
   const userId = user?.id;
   const userEmail = user?.email;
 
-  const orderId =
-    (params?.orderId as string) ||
+  const rawParamId = params?.orderId as string;
+  const explicitOrderId =
+    (rawParamId && rawParamId !== "N/A" ? rawParamId : null) ||
     searchParams.get("orderId") ||
-    searchParams.get("id") ||
-    "N/A";
+    searchParams.get("id");
 
+  const [viewMode, setViewMode] = useState<"list" | "detail">(
+    explicitOrderId ? "detail" : "list"
+  );
   const [order, setOrder] = useState<TOrder | null>(null);
+  const [activeOrders, setActiveOrders] = useState<TOrder[]>([]);
+  const [selectedOrderId, setSelectedOrderId] = useState<string | null>(explicitOrderId || null);
   const [liveStatus, setLiveStatus] = useState<string | null>(null);
   const [riderLocation, setRiderLocation] = useState<RiderLocationState | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const [connected, setConnected] = useState<boolean>(false);
 
-  const fetchOrder = useCallback(async () => {
-    if (!orderId || orderId === "N/A") return;
+  // Derive active view mode and target tracking ID
+  const isListView = viewMode === "list" || (!explicitOrderId && !selectedOrderId);
+  const activeTrackId = isListView ? null : (selectedOrderId || explicitOrderId);
+
+  // Sync selectedOrderId and viewMode when explicitOrderId changes in URL
+  useEffect(() => {
+    if (explicitOrderId) {
+      setSelectedOrderId(explicitOrderId);
+      setViewMode("detail");
+    } else if (!selectedOrderId) {
+      setViewMode("list");
+    }
+  }, [explicitOrderId, selectedOrderId]);
+
+  // Fetch data for initial card list view (Step 1) or specific detailed view (Step 2)
+  const fetchOrderData = useCallback(async () => {
+    if (sessionPending) return;
     setLoading(true);
     setError(null);
-    const res = await getOrderByIdApi(orderId, userId, userEmail);
-    if (res.success && res.data) {
-      setOrder(res.data as TOrder);
-    } else {
-      setError(res.message || "Could not load order details.");
+
+    try {
+      // 1. Fetch user's active orders (for initial card list view or fallback)
+      if (userId && userEmail) {
+        const userOrdersRes = await getUserOrdersApi(userId, userEmail);
+        if (userOrdersRes.success && Array.isArray(userOrdersRes.data)) {
+          const allOrders = userOrdersRes.data as TOrder[];
+          const liveOrders = allOrders.filter((o) => isOrderActive(o.orderStatus));
+          setActiveOrders(liveOrders);
+        }
+      }
+
+      // 2. Fetch specific order details if tracking a target ID (Step 2)
+      if (activeTrackId) {
+        const res = await getOrderByIdApi(activeTrackId, userId, userEmail);
+        if (res.success && res.data) {
+          setOrder(res.data as TOrder);
+        } else {
+          setError(res.message || "Could not load specified order details.");
+          setOrder(null);
+        }
+      } else {
+        // Step 1 initial state: No specific order ID tracked yet
+        setOrder(null);
+      }
+    } catch (err: any) {
+      console.error("Failed to load order tracking data:", err);
+      setError(err.message || "Failed to load order tracking information.");
+      setOrder(null);
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
-  }, [orderId, userId, userEmail]);
+  }, [activeTrackId, userId, userEmail, sessionPending]);
 
   useEffect(() => {
-    if (!sessionPending) {
-      fetchOrder();
-    }
-  }, [sessionPending, fetchOrder]);
+    fetchOrderData();
+  }, [fetchOrderData]);
 
-  // ─── Socket.IO: connect on mount, join `order_<orderId>` room ───
+  // Transition from Step 1 (Card List View) -> Step 2 (Detailed Tracking View)
+  const handleTrackOrderClick = (targetId: string) => {
+    setViewMode("detail");
+    setSelectedOrderId(targetId);
+    setLoading(true);
+    setLiveStatus(null);
+    setRiderLocation(null);
+    setError(null);
+    router.push(`/dashboard/customer/order-tracking?orderId=${targetId}`);
+  };
+
+  // Transition from Step 2 (Detailed View) -> Step 1 (Active Order Cards List View)
+  const handleBackToCardList = () => {
+    setViewMode("list");
+    setSelectedOrderId(null);
+    setOrder(null);
+    setLiveStatus(null);
+    setRiderLocation(null);
+    setError(null);
+    router.replace("/dashboard/customer/order-tracking");
+  };
+
+  // Socket.IO real-time order & rider location tracking
   useEffect(() => {
-    if (!orderId || orderId === "N/A" || sessionPending) return;
+    if (!activeTrackId || sessionPending) return;
 
-    const socket = getOrderSocket(orderId);
-    joinOrderRoom(orderId);
+    const socket = getOrderSocket(activeTrackId);
+    joinOrderRoom(activeTrackId);
     setConnected(socket.connected);
 
     const onConnect = () => {
       setConnected(true);
-      joinOrderRoom(orderId);
+      joinOrderRoom(activeTrackId);
     };
     const onDisconnect = () => setConnected(false);
 
@@ -151,6 +239,15 @@ export default function OrderTracking() {
         setLiveStatus(newStatus);
         const location = readLocationPayload(payload as unknown as RiderLocationEvent);
         if (location) setRiderLocation(location);
+
+        if (!isOrderActive(newStatus)) {
+          const updatedId = payload.orderId || payload.order?._id || payload.order?.orderId;
+          if (updatedId) {
+            setActiveOrders((prev) =>
+              prev.filter((o) => (o._id || o.orderId || o.id) !== updatedId)
+            );
+          }
+        }
       }
     };
 
@@ -170,9 +267,8 @@ export default function OrderTracking() {
       socket.off("order_status_updated", onStatusUpdated);
       socket.off("location_updated", onLocationUpdated);
     };
-  }, [orderId, sessionPending]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [activeTrackId, sessionPending]);
 
-  // Cleanup socket connection on page leave
   useEffect(() => {
     return () => disconnectOrderSocket();
   }, []);
@@ -180,25 +276,151 @@ export default function OrderTracking() {
   const currentStatus = liveStatus || order?.orderStatus || "Pending";
   const isCancelled = currentStatus.toLowerCase() === "cancelled";
 
-  if (loading && !order) {
+  // Loading state (initial data fetch)
+  if (loading && !order && activeTrackId) {
     return (
-      <div className="max-w-4xl mx-auto min-h-[60vh] flex flex-col items-center justify-center gap-3">
-        <Loader2 className="w-10 h-10 text-[#FF6B35] animate-spin" />
-        <p className="text-sm font-bold text-gray-600">Loading live tracking...</p>
+      <div className="max-w-4xl mx-auto min-h-[400px] flex items-center justify-center">
+        <LoadingSpinner size={50} color="#f97316" message="Fetching live order tracking details..." />
       </div>
     );
   }
 
+  // ===========================================================================
+  // STEP 1: INITIAL STATE — ACTIVE ORDERS CARD LIST VIEW
+  // (Rendered when user clicks "Order Tracking" in sidebar with NO orderId query)
+  // ===========================================================================
+  if (!activeTrackId) {
+    return (
+      <div className="max-w-4xl mx-auto py-8 px-4 space-y-6">
+        {/* Navigation Bar */}
+        <div className="flex items-center justify-between">
+          <Link
+            href="/dashboard/customer/orders"
+            className="inline-flex items-center gap-2 text-xs font-bold text-gray-600 hover:text-[#FF6B35] transition"
+          >
+            <ArrowLeft className="w-4 h-4" /> Back to My Orders
+          </Link>
+          <button
+            type="button"
+            onClick={fetchOrderData}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-gray-100 text-gray-700 text-xs font-bold hover:bg-gray-200 transition cursor-pointer"
+          >
+            <RefreshCw className="w-3.5 h-3.5" /> Refresh List
+          </button>
+        </div>
+
+        {/* Initial Loading Spinner for Active Orders List */}
+        {loading ? (
+          <div className="py-16 flex justify-center">
+            <LoadingSpinner size={50} color="#f97316" message="Loading active orders in progress..." />
+          </div>
+        ) : activeOrders.length === 0 ? (
+          /* EMPTY STATE: NO ACTIVE ORDERS FOUND */
+          <div className="bg-white border border-gray-100 rounded-3xl p-8 sm:p-12 text-center space-y-5 shadow-xs">
+            <div className="w-16 h-16 rounded-3xl bg-orange-100 text-[#FF6B35] flex items-center justify-center mx-auto shadow-md">
+              <Bike className="w-8 h-8" />
+            </div>
+            <div className="space-y-2 max-w-md mx-auto">
+              <h2 className="text-2xl font-black text-gray-900">No Active Orders Found</h2>
+              <p className="text-xs sm:text-sm text-gray-500 font-medium leading-relaxed">
+                You don&apos;t have any live food orders currently being prepared or delivered right now.
+              </p>
+            </div>
+            <div className="flex flex-wrap items-center justify-center gap-3 pt-2">
+              <Link
+                href="/restaurants"
+                className="inline-flex items-center gap-2 px-6 py-3 rounded-2xl bg-orange-600 text-white font-extrabold text-xs shadow-md hover:bg-orange-700 hover:scale-105 active:scale-95 transition-all cursor-pointer"
+              >
+                <UtensilsCrossed className="w-4 h-4" /> Browse Restaurants
+              </Link>
+              <Link
+                href="/dashboard/customer/orders"
+                className="inline-flex items-center gap-2 px-5 py-3 rounded-2xl bg-gray-100 text-gray-700 font-extrabold text-xs hover:bg-gray-200 transition cursor-pointer"
+              >
+                View Order History
+              </Link>
+            </div>
+          </div>
+        ) : (
+          /* ACTIVE ORDERS CARD CONTAINER */
+          <section className="space-y-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <h1 className="text-xl sm:text-2xl font-black text-gray-900 flex items-center gap-2">
+                  <Layers className="w-6 h-6 text-orange-600" /> Active Orders in Progress ({activeOrders.length})
+                </h1>
+                <p className="text-xs font-medium text-gray-500 mt-1">
+                  Select an active order card below to view its live progress bar and map location.
+                </p>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
+              {activeOrders.map((o) => {
+                const oId = o._id || o.id || o.orderId || "";
+                const displayId = o.orderId || oId;
+                const statusStr = o.orderStatus || "Pending";
+                const rNames = [...new Set((o.items || []).map((i) => i.restaurantName).filter(Boolean))].join(", ") || "FoodFlow Kitchen";
+                const itemCount = (o.items || []).reduce((sum, i) => sum + (i.quantity || 1), 0);
+
+                return (
+                  <div
+                    key={oId}
+                    className="bg-white p-5 rounded-3xl border border-gray-100 shadow-sm hover:shadow-md hover:border-orange-200 transition flex flex-col justify-between space-y-4"
+                  >
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="text-sm font-black text-gray-900">
+                          Order #{displayId.slice(-6).toUpperCase()}
+                        </span>
+                        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-amber-50 text-amber-700 border border-amber-200 shrink-0">
+                          <span className="w-2 h-2 rounded-full bg-amber-500 animate-ping" />
+                          {statusStr}
+                        </span>
+                      </div>
+
+                      <p className="text-xs font-bold text-gray-800 line-clamp-1">{rNames}</p>
+                      <p className="text-xs font-medium text-gray-500">
+                        {itemCount} item{itemCount === 1 ? "" : "s"} • Tk {o.totalAmount?.toFixed(2)}
+                      </p>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => handleTrackOrderClick(oId)}
+                      className="w-full py-3 rounded-2xl bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white text-xs font-extrabold flex items-center justify-center gap-2 shadow-md shadow-orange-500/20 transition cursor-pointer"
+                    >
+                      <Bike className="w-4 h-4 text-white" />
+                      Track Order
+                      <ArrowRight className="w-3.5 h-3.5 ml-1" />
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+          </section>
+        )}
+      </div>
+    );
+  }
+
+  // ===========================================================================
+  // STEP 2: TRANSITION & DETAILS VIEW — SPECIFIC ORDER DETAILED TRACKING VIEW
+  // (Rendered when user clicks "Track Order" on a card or arrives via ?orderId=...)
+  // ===========================================================================
+
   if (error && !order) {
     return (
-      <div className="max-w-4xl mx-auto py-12 px-4 space-y-6">
-        <Link
-          href="/dashboard/customer/orders"
-          className="inline-flex items-center gap-2 text-xs font-bold text-gray-600 hover:text-[#FF6B35] transition"
+      <div className="max-w-4xl mx-auto py-8 px-4 space-y-6">
+        <button
+          type="button"
+          onClick={handleBackToCardList}
+          className="inline-flex items-center gap-2 text-xs font-bold text-gray-600 hover:text-[#FF6B35] transition cursor-pointer"
         >
           <ArrowLeft className="w-4 h-4" /> Back to My Orders
-        </Link>
-        <div className="bg-rose-50 border border-rose-200 rounded-2xl p-8 text-center space-y-4">
+        </button>
+
+        <div className="bg-rose-50 border border-rose-200 rounded-3xl p-8 text-center space-y-4 shadow-xs">
           <div className="w-12 h-12 rounded-full bg-rose-100 flex items-center justify-center mx-auto text-rose-600">
             <AlertTriangle className="w-6 h-6" />
           </div>
@@ -206,17 +428,17 @@ export default function OrderTracking() {
           <p className="text-xs sm:text-sm text-rose-700 max-w-md mx-auto">{error}</p>
           <button
             type="button"
-            onClick={fetchOrder}
+            onClick={handleBackToCardList}
             className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-rose-600 text-white font-extrabold text-xs shadow-md hover:bg-rose-700 transition cursor-pointer"
           >
-            <RefreshCw className="w-4 h-4" /> Retry
+            Return to Active Orders
           </button>
         </div>
       </div>
     );
   }
 
-  // Delivery / restaurant coordinates (may arrive from the order payload or socket events)
+  // Delivery / restaurant coordinates
   const deliveryLat = toNumber(
     (order as TOrder & { deliveryLatitude?: unknown })?.deliveryLatitude ??
     (order as { deliveryAddress?: { latitude?: unknown } })?.deliveryAddress?.latitude
@@ -251,38 +473,49 @@ export default function OrderTracking() {
   const city = order?.deliveryAddress?.area || order?.deliveryAddress?.postalCode || "";
   const restaurantNames = [...new Set((order?.items || []).map((i) => i.restaurantName).filter(Boolean))];
   const totalItems = (order?.items || []).reduce((sum, i) => sum + (i.quantity || 0), 0);
+  const displayOrderId = order?.orderId || order?._id || order?.id || activeTrackId || "N/A";
 
   return (
     <div className="max-w-4xl mx-auto py-8 px-4 space-y-6">
-      {/* Back Button */}
-      <Link
-        href="/dashboard/customer/orders"
-        className="inline-flex items-center gap-2 text-xs font-bold text-gray-600 hover:text-[#FF6B35] transition"
-      >
-        <ArrowLeft className="w-4 h-4" /> Back to My Orders
-      </Link>
+      {/* Seamless Back Button to Card List View */}
+      <div className="flex items-center justify-between">
+        <button
+          type="button"
+          onClick={handleBackToCardList}
+          className="inline-flex items-center gap-2 text-xs font-extrabold text-gray-700 hover:text-orange-600 transition bg-white px-3.5 py-2 rounded-2xl border border-gray-200 shadow-2xs cursor-pointer hover:shadow-xs"
+        >
+          <ArrowLeft className="w-4 h-4 text-orange-600" /> Back to Active Orders List
+        </button>
+
+        {activeOrders.length > 1 && (
+          <span className="text-xs font-bold text-gray-500">
+            Tracking 1 of {activeOrders.length} active orders
+          </span>
+        )}
+      </div>
 
       {isCancelled ? (
-        <div className="bg-rose-50 border border-rose-200 rounded-2xl p-8 text-center space-y-4 shadow-xs">
+        <div className="bg-rose-50 border border-rose-200 rounded-3xl p-8 text-center space-y-4 shadow-xs">
           <div className="w-12 h-12 rounded-full bg-rose-100 flex items-center justify-center mx-auto text-rose-600">
             <AlertTriangle className="w-6 h-6" />
           </div>
           <h2 className="text-xl font-black text-rose-900">
-            Order Has Been Cancelled (#{orderId})
+            Order Has Been Cancelled (#{displayOrderId.slice(-6).toUpperCase()})
           </h2>
           <p className="text-xs sm:text-sm text-rose-700 max-w-md mx-auto">
             Live order tracking is disabled because this order was cancelled. Please check your order history or place a new order.
           </p>
-          <Link
-            href="/dashboard/customer/orders"
-            className="inline-block px-5 py-2.5 rounded-xl bg-rose-600 text-white font-extrabold text-xs shadow-md hover:bg-rose-700 transition"
+          <button
+            type="button"
+            onClick={handleBackToCardList}
+            className="inline-block px-5 py-2.5 rounded-xl bg-rose-600 text-white font-extrabold text-xs shadow-md hover:bg-rose-700 transition cursor-pointer"
           >
-            Return to My Orders
-          </Link>
+            Return to Active Orders
+          </button>
         </div>
       ) : (
         <>
-          {/* Header banner + live connection status */}
+          {/* 1. Live Order Tracking Header Banner */}
           <section className="bg-gradient-to-r from-[#FF6B35] via-amber-500 to-orange-600 rounded-3xl p-6 sm:p-8 text-white shadow-xl relative overflow-hidden">
             <div className="absolute right-0 top-0 translate-x-8 -translate-y-8 w-56 h-56 rounded-full bg-white/10 blur-3xl pointer-events-none" />
             <div className="relative z-10 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
@@ -291,7 +524,7 @@ export default function OrderTracking() {
                   <DraftingCompass className="w-3.5 h-3.5" /> Live Order Tracking
                 </div>
                 <h1 className="text-2xl sm:text-3xl font-black tracking-tight">
-                  Order #{orderId}
+                  Order #{displayOrderId.slice(-6).toUpperCase()}
                 </h1>
                 <p className="text-orange-100 text-xs sm:text-sm">
                   {restaurantNames.length > 0
@@ -299,6 +532,7 @@ export default function OrderTracking() {
                     : "Follow your order in real-time"}
                 </p>
               </div>
+
               <div className="flex items-center gap-2 shrink-0">
                 <span
                   className={[
@@ -320,7 +554,7 @@ export default function OrderTracking() {
                 </span>
                 <button
                   type="button"
-                  onClick={fetchOrder}
+                  onClick={fetchOrderData}
                   className="p-2 rounded-full bg-white/15 hover:bg-white/25 border border-white/20 cursor-pointer transition"
                   title="Refresh order details"
                 >
@@ -330,7 +564,7 @@ export default function OrderTracking() {
             </div>
           </section>
 
-          {/* Status Stepper */}
+          {/* 2. Step-by-Step Order Progress Bar */}
           <div className="bg-white rounded-3xl border border-gray-100 shadow-sm p-5 sm:p-8">
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-6">
               <h2 className="text-sm sm:text-base font-black text-gray-900">Order Progress</h2>
@@ -353,7 +587,7 @@ export default function OrderTracking() {
             <OrderStatusStepper currentStatus={currentStatus} />
           </div>
 
-          {/* Live Map */}
+          {/* 3. Live Rider Location Map */}
           <div className="bg-white rounded-3xl border border-gray-100 shadow-sm overflow-hidden">
             <div className="p-5 sm:p-6 pb-4 flex flex-wrap items-center justify-between gap-3 border-b border-gray-100">
               <div className="flex items-center gap-3">

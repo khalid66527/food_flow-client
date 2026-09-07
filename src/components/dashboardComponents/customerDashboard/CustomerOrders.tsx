@@ -31,6 +31,7 @@ import {
   Layers,
 } from "lucide-react";
 import { useSession } from "@/lib/auth-client";
+import LoadingSpinner from "@/components/LoadingSpinner";
 import { TOrder, TOrderItem } from "@/types/order";
 import { downloadInvoicePdf } from "@/lib/pdf/generateInvoice";
 
@@ -59,7 +60,7 @@ export default function CustomerOrders() {
 
   // Pagination State
   const [currentPage, setCurrentPage] = useState<number>(1);
-  const ORDERS_PER_PAGE = 5;
+  const ORDERS_PER_PAGE = 10;
 
   // Reset pagination when search or filter changes
   useEffect(() => {
@@ -196,8 +197,29 @@ export default function CustomerOrders() {
 
       // 2. Status filter
       const currentStatus = (order.orderStatus || "Placed").toUpperCase();
-      const matchesStatus =
-        statusFilter === "ALL" || currentStatus === statusFilter.toUpperCase();
+      let matchesStatus = statusFilter === "ALL";
+
+      if (statusFilter === "PLACED") {
+        matchesStatus = currentStatus === "PLACED" || currentStatus === "PENDING";
+      } else if (statusFilter === "CONFIRMED") {
+        matchesStatus =
+          currentStatus === "CONFIRMED" ||
+          currentStatus === "PREPARING" ||
+          currentStatus === "ACCEPTED" ||
+          currentStatus === "COOKING" ||
+          currentStatus === "PROCESSING" ||
+          currentStatus === "ON-THE-WAY" ||
+          currentStatus === "ON_THE_WAY" ||
+          currentStatus === "OUT FOR DELIVERY" ||
+          currentStatus === "OUT_FOR_DELIVERY";
+      } else if (statusFilter === "DELIVERED") {
+        matchesStatus = currentStatus === "DELIVERED" || currentStatus === "COMPLETED";
+      } else if (statusFilter === "CANCELLED") {
+        matchesStatus =
+          currentStatus === "CANCELLED" ||
+          currentStatus === "CANCELED" ||
+          currentStatus === "REJECTED";
+      }
 
       return matchesSearch && matchesStatus;
     });
@@ -310,9 +332,8 @@ export default function CustomerOrders() {
 
   if (sessionPending || loading) {
     return (
-      <div className="w-full min-h-[60vh] flex flex-col items-center justify-center gap-3">
-        <Loader2 className="w-10 h-10 text-[#FF6B35] animate-spin" />
-        <p className="text-sm font-bold text-gray-600">Loading your orders history...</p>
+      <div className="w-full min-h-[60vh] flex flex-col items-center justify-center">
+        <LoadingSpinner size={50} color="#f97316" message="Loading your orders history..." />
       </div>
     );
   }
@@ -651,7 +672,7 @@ export default function CustomerOrders() {
                     {/* Action 1: Track Order */}
                     {isTrackEnabled ? (
                       <Link
-                        href={`/dashboard/customer/order-tracking?orderId=${order.orderId}`}
+                        href={`/dashboard/customer/order-tracking?orderId=${order.orderId || order._id || order.id}`}
                         className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-gradient-to-r from-[#FF6B35] to-amber-500 text-white text-xs font-extrabold transition shadow-xs cursor-pointer hover:brightness-110 hover:scale-102 active:scale-98"
                       >
                         <MapPin className="w-3.5 h-3.5 text-white" />

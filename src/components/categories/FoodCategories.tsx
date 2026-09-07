@@ -160,7 +160,7 @@ const FoodCategories = () => {
                                 }}
                             >
                                 <Link
-                                    href={`/restaurants?cuisine=${category.name.toLowerCase()}`}
+                                    href={`/restaurants?category=${category.name.toLowerCase()}`}
                                     className="group relative block aspect-[4/5] overflow-hidden rounded-2xl border border-gray-100 shadow-sm transition-shadow duration-300 hover:shadow-xl"
                                 >
                                     {/* Food Image */}
