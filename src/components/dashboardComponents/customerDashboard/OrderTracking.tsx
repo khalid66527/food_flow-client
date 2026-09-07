@@ -22,7 +22,11 @@ import { useSession } from "@/lib/auth-client";
 import { getOrderByIdApi } from "@/lib/api/order";
 import { getOrderSocket, joinOrderRoom, disconnectOrderSocket } from "@/lib/socket";
 import OrderStatusStepper, { resolveStepIndex } from "@/components/tracking/OrderStatusStepper";
-import OrderTrackingMap from "@/components/tracking/OrderTrackingMap";
+import dynamic from "next/dynamic";
+const OrderTrackingMap = dynamic(
+  () => import("@/components/tracking/OrderTrackingMap"),
+  { ssr: false }
+);
 import { TOrder } from "@/types/order";
 
 interface OrderStatusUpdateEvent {

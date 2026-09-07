@@ -21,11 +21,13 @@ import {
   Plus,
   X,
   Eye,
+  ChevronDown,
 } from "lucide-react";
 import { FaFacebookF, FaInstagram, FaTwitter } from "react-icons/fa6";
 import { useRouter } from "next/navigation";
 import AOS from "aos";
 import { IRestaurant, RestaurantFormData } from "@/lib/api/restaurant";
+import { BANGLADESH_LOCATIONS } from "@/data/bangladeshLocations";
 import {
   createRestaurantProfile,
   updateRestaurantProfile,
@@ -130,6 +132,44 @@ export default function CreateRestaurant({
   ) => {
     const { name, value } = e.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
+  };
+
+  // Bangladesh Administrative Hierarchy Cascading logic
+  const selectedDivisionObj = BANGLADESH_LOCATIONS.find(
+    (loc) => loc.division.toLowerCase() === (formData.city || "").trim().toLowerCase()
+  );
+  const availableDistricts = selectedDivisionObj ? selectedDivisionObj.districts : [];
+
+  const selectedDistrictObj = availableDistricts.find(
+    (d) => d.name.toLowerCase() === (formData.state || "").trim().toLowerCase()
+  );
+  const availablePostalCodes = selectedDistrictObj ? selectedDistrictObj.postalCodes : [];
+
+  const handleCitySelect = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const val = e.target.value;
+    setFormData((prev) => ({
+      ...prev,
+      city: val,
+      state: "",
+      postalCode: "",
+    }));
+  };
+
+  const handleStateSelect = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const val = e.target.value;
+    setFormData((prev) => ({
+      ...prev,
+      state: val,
+      postalCode: "",
+    }));
+  };
+
+  const handlePostalCodeSelect = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const val = e.target.value;
+    setFormData((prev) => ({
+      ...prev,
+      postalCode: val,
+    }));
   };
 
   const handleCheckboxChange = (name: keyof RestaurantFormData) => {
@@ -642,43 +682,105 @@ export default function CreateRestaurant({
                     <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1.5">
                       City / Area <span className="text-rose-500">*</span>
                     </label>
-                    <input
-                      type="text"
-                      name="city"
-                      value={formData.city}
-                      onChange={handleInputChange}
-                      placeholder="e.g. Dhaka"
-                      required
-                      className="w-full px-4 py-3 rounded-xl bg-gray-50/80 border border-gray-200 focus:bg-white focus:border-[#FF6B35] outline-none text-sm font-medium transition"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1.5">
-                      Postal Code / Zip
-                    </label>
-                    <input
-                      type="text"
-                      name="postalCode"
-                      value={formData.postalCode}
-                      onChange={handleInputChange}
-                      placeholder="e.g. 1213"
-                      className="w-full px-4 py-3 rounded-xl bg-gray-50/80 border border-gray-200 focus:bg-white focus:border-[#FF6B35] outline-none text-sm font-medium transition"
-                    />
+                    <div className="relative">
+                      <select
+                        name="city"
+                        value={formData.city}
+                        onChange={handleCitySelect}
+                        required
+                        className="w-full px-4 py-3 rounded-xl bg-gray-50/80 border border-gray-200 focus:bg-white focus:border-[#FF6B35] outline-none text-sm font-medium transition appearance-none cursor-pointer pr-10"
+                      >
+                        <option value="">Select City / Division</option>
+                        {BANGLADESH_LOCATIONS.map((loc) => (
+                          <option key={loc.division} value={loc.division}>
+                            {loc.division}
+                          </option>
+                        ))}
+                        {formData.city &&
+                          !BANGLADESH_LOCATIONS.some(
+                            (loc) =>
+                              loc.division.toLowerCase() ===
+                              formData.city.toLowerCase()
+                          ) && (
+                            <option value={formData.city}>
+                              {formData.city}
+                            </option>
+                          )}
+                      </select>
+                      <ChevronDown className="w-4 h-4 absolute right-3.5 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+                    </div>
                   </div>
 
                   <div>
                     <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1.5">
                       State / Division
                     </label>
-                    <input
-                      type="text"
-                      name="state"
-                      value={formData.state}
-                      onChange={handleInputChange}
-                      placeholder="e.g. Dhaka Division"
-                      className="w-full px-4 py-3 rounded-xl bg-gray-50/80 border border-gray-200 focus:bg-white focus:border-[#FF6B35] outline-none text-sm font-medium transition"
-                    />
+                    <div className="relative">
+                      <select
+                        name="state"
+                        value={formData.state}
+                        onChange={handleStateSelect}
+                        disabled={!formData.city}
+                        className="w-full px-4 py-3 rounded-xl bg-gray-50/80 border border-gray-200 focus:bg-white focus:border-[#FF6B35] outline-none text-sm font-medium transition appearance-none cursor-pointer pr-10 disabled:bg-gray-100 disabled:text-gray-400 disabled:cursor-not-allowed"
+                      >
+                        <option value="">
+                          {formData.city
+                            ? "Select District / Zila"
+                            : "Select City / Area first"}
+                        </option>
+                        {availableDistricts.map((d) => (
+                          <option key={d.name} value={d.name}>
+                            {d.name}
+                          </option>
+                        ))}
+                        {formData.state &&
+                          !availableDistricts.some(
+                            (d) =>
+                              d.name.toLowerCase() ===
+                              formData.state.toLowerCase()
+                          ) && (
+                            <option value={formData.state}>
+                              {formData.state}
+                            </option>
+                          )}
+                      </select>
+                      <ChevronDown className="w-4 h-4 absolute right-3.5 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1.5">
+                      Postal Code / Zip
+                    </label>
+                    <div className="relative">
+                      <select
+                        name="postalCode"
+                        value={formData.postalCode}
+                        onChange={handlePostalCodeSelect}
+                        disabled={!formData.state}
+                        className="w-full px-4 py-3 rounded-xl bg-gray-50/80 border border-gray-200 focus:bg-white focus:border-[#FF6B35] outline-none text-sm font-medium transition appearance-none cursor-pointer pr-10 disabled:bg-gray-100 disabled:text-gray-400 disabled:cursor-not-allowed"
+                      >
+                        <option value="">
+                          {formData.state
+                            ? "Select Postal Code / Zip"
+                            : "Select State / Division first"}
+                        </option>
+                        {availablePostalCodes.map((p) => (
+                          <option key={p.code} value={p.code}>
+                            {p.code} - {p.name}
+                          </option>
+                        ))}
+                        {formData.postalCode &&
+                          !availablePostalCodes.some(
+                            (p) => p.code === formData.postalCode
+                          ) && (
+                            <option value={formData.postalCode}>
+                              {formData.postalCode}
+                            </option>
+                          )}
+                      </select>
+                      <ChevronDown className="w-4 h-4 absolute right-3.5 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+                    </div>
                   </div>
 
                   <div>
@@ -688,10 +790,9 @@ export default function CreateRestaurant({
                     <input
                       type="text"
                       name="country"
-                      value={formData.country}
-                      onChange={handleInputChange}
-                      placeholder="Bangladesh"
-                      className="w-full px-4 py-3 rounded-xl bg-gray-50/80 border border-gray-200 focus:bg-white focus:border-[#FF6B35] outline-none text-sm font-medium transition"
+                      value={formData.country || "Bangladesh"}
+                      readOnly
+                      className="w-full px-4 py-3 rounded-xl bg-gray-100/90 border border-gray-200 text-gray-600 outline-none text-sm font-medium transition cursor-not-allowed"
                     />
                   </div>
                 </div>

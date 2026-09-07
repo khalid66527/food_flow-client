@@ -31,6 +31,7 @@ const Polyline = dynamic(
 const DEFAULT_CENTER: [number, number] = [23.8103, 90.4125];
 
 function getUserLocationMarkerIcon() {
+  if (!L) return undefined;
   return L.divIcon({
     className: "",
     html: `
@@ -47,6 +48,7 @@ function getUserLocationMarkerIcon() {
 }
 
 function getRiderMarkerIcon() {
+  if (!L) return undefined;
   return L.divIcon({
     className: "",
     html: `
@@ -62,6 +64,7 @@ function getRiderMarkerIcon() {
 }
 
 function getDestinationMarkerIcon() {
+  if (!L) return undefined;
   return L.divIcon({
     className: "",
     html: `
