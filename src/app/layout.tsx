@@ -27,6 +27,11 @@ export const metadata: Metadata = {
   title: "Food Flow — Online Food Delivery System",
   description:
     "Order your favorite food from the best restaurants near you with Food Flow.",
+  icons: {
+    icon: "/foodNav.png",
+    shortcut: "/foodNav.png",
+    apple: "/foodNav.png",
+  },
 };
 
 export default function RootLayout({
