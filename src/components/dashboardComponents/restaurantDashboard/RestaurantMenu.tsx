@@ -1591,7 +1591,7 @@ export default function RestaurantMenu() {
 
         {itemsLoading ? (
           <div className="py-24 flex flex-col items-center justify-center">
-            <LoadingSpinner size={50} color="#f97316" message="Loading restaurant menu table..." />
+            <LoadingSpinner size={50} color="#f97316" />
           </div>
         ) : filteredItems.length === 0 ? (
           <div className="py-20 px-6 flex flex-col items-center justify-center text-center gap-4">

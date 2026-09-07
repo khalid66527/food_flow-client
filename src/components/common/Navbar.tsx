@@ -23,7 +23,6 @@ import {
   detectRealTimeLocation, 
   subscribeLocation, 
   updateRealTimeLocation,
-  loadLocationFromStorage,
   ILocationInfo 
 } from "@/lib/location";
 import { getAddresses } from "@/lib/api/address";
@@ -66,7 +65,6 @@ export default function Navbar({
   // Sync real-time location and trigger browser geolocation
   useEffect(() => {
     setIsMounted(true);
-    loadLocationFromStorage();
     setLocationInfo(getRealTimeLocation());
 
     const unsubscribe = subscribeLocation(() => {
@@ -209,9 +207,9 @@ export default function Navbar({
           </Link>
           <Link 
             href="/restaurants" 
-            className={`px-4 py-1.5 rounded-full transition-all ${pathname === "/restaurants" ? "bg-white text-orange-600 shadow-xs font-semibold" : "hover:bg-white hover:text-orange-600"}`}
+            className={`px-4 py-1.5 rounded-full transition-all ${pathname === "/restaurants" || pathname === "/dishes" ? "bg-white text-orange-600 shadow-xs font-semibold" : "hover:bg-white hover:text-orange-600"}`}
           >
-            Restaurants
+            Dishes
           </Link>
           <Link 
             href="/about" 
@@ -355,9 +353,9 @@ export default function Navbar({
           <Link 
             href="/restaurants" 
             onClick={() => setIsMobileMenuOpen(false)}
-            className={`block px-3 py-2 rounded-lg text-base font-medium transition-colors ${pathname === "/restaurants" ? "bg-orange-50 text-orange-600" : "text-gray-700 hover:bg-orange-50 hover:text-orange-600"}`}
+            className={`block px-3 py-2 rounded-lg text-base font-medium transition-colors ${pathname === "/restaurants" || pathname === "/dishes" ? "bg-orange-50 text-orange-600" : "text-gray-700 hover:bg-orange-50 hover:text-orange-600"}`}
           >
-            Restaurants
+            Dishes
           </Link>
           <Link 
             href="/contact" 

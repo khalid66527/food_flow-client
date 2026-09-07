@@ -193,7 +193,7 @@ export default function ActiveDelivery() {
   if (sessionPending || loading) {
     return (
       <div className="min-h-[400px] flex items-center justify-center">
-        <LoadingSpinner size={50} color="#f97316" message="Loading active delivery..." />
+        <LoadingSpinner size={50} color="#f97316" />
       </div>
     );
   }

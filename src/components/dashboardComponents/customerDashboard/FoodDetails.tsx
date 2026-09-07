@@ -442,7 +442,7 @@ export default function FoodDetails({ foodId }: FoodDetailsProps) {
   if (loading) {
     return (
       <div className="w-full min-h-[70vh] flex flex-col items-center justify-center">
-        <LoadingSpinner size={50} color="#f97316" message="Loading delicious food details..." />
+        <LoadingSpinner size={50} color="#f97316" />
       </div>
     );
   }

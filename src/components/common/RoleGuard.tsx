@@ -86,7 +86,7 @@ export default function RoleGuard({
   if (!isClient || isPending) {
     return (
       <div className="min-h-[70vh] flex flex-col items-center justify-center p-8">
-        <LoadingSpinner size={50} color="#f97316" message="Verifying security & permissions..." />
+        <LoadingSpinner size={50} color="#f97316" />
       </div>
     );
   }

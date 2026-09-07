@@ -176,7 +176,7 @@ export default function OrderTrackingMap({
       {/* Loading veil while the Leaflet map module loads on the client */}
       {(!mapReady || !hasPoints) && (
         <div className="absolute inset-0 z-[5] flex items-center justify-center bg-gray-50">
-          <LoadingSpinner size={50} color="#f97316" message="Loading live map..." />
+          <LoadingSpinner size={50} color="#f97316" />
         </div>
       )}
 

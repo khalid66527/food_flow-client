@@ -140,7 +140,7 @@ export default function RestaurantProfile() {
   if (sessionLoading || loading) {
     return (
       <div className="min-h-[400px] flex items-center justify-center p-8">
-        <LoadingSpinner size={50} color="#f97316" message="Loading your restaurant profile..." />
+        <LoadingSpinner size={50} color="#f97316" />
       </div>
     );
   }

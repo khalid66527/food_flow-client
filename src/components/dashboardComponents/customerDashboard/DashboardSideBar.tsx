@@ -73,7 +73,7 @@ export default function DashboardSideBar() {
           icon: Home,
         },
         {
-          label: "Restaurants",
+          label: "Dishes",
           href: "/restaurants",
           icon: Store,
         },

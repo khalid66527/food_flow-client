@@ -100,7 +100,7 @@ const Footer = () => {
                   href="/restaurants"
                   className="text-gray-500 transition-colors hover:text-orange-500"
                 >
-                  Restaurants
+                  Dishes
                 </Link>
               </li>
 

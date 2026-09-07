@@ -280,7 +280,7 @@ export default function OrderTracking() {
   if (loading && !order && activeTrackId) {
     return (
       <div className="max-w-4xl mx-auto min-h-[400px] flex items-center justify-center">
-        <LoadingSpinner size={50} color="#f97316" message="Fetching live order tracking details..." />
+        <LoadingSpinner size={50} color="#f97316" />
       </div>
     );
   }
@@ -312,7 +312,7 @@ export default function OrderTracking() {
         {/* Initial Loading Spinner for Active Orders List */}
         {loading ? (
           <div className="py-16 flex justify-center">
-            <LoadingSpinner size={50} color="#f97316" message="Loading active orders in progress..." />
+            <LoadingSpinner size={50} color="#f97316" />
           </div>
         ) : activeOrders.length === 0 ? (
           /* EMPTY STATE: NO ACTIVE ORDERS FOUND */

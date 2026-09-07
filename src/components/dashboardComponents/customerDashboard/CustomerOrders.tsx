@@ -333,7 +333,7 @@ export default function CustomerOrders() {
   if (sessionPending || loading) {
     return (
       <div className="w-full min-h-[60vh] flex flex-col items-center justify-center">
-        <LoadingSpinner size={50} color="#f97316" message="Loading your orders history..." />
+        <LoadingSpinner size={50} color="#f97316" />
       </div>
     );
   }

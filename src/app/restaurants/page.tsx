@@ -23,7 +23,7 @@ import { getGlobalCategories } from '@/lib/api/category';
 import FoodCard from '@/components/restaurants/FoodCard';
 import { useCart } from '@/contexts/CartContext';
 import LoadingSpinner from '@/lib/api/LoadingSpinner';
-import { getRealTimeLocation, subscribeLocation, detectRealTimeLocation, loadLocationFromStorage, ILocationInfo } from '@/lib/location';
+import { getRealTimeLocation, subscribeLocation, detectRealTimeLocation, ILocationInfo } from '@/lib/location';
 
 // ---------------------------------------------------------------------------
 // SIDEBAR CATEGORY DEFINITIONS
@@ -162,7 +162,6 @@ function ExploreFoodContent() {
   const [locationInfo, setLocationInfo] = useState<ILocationInfo>(() => getRealTimeLocation());
 
   useEffect(() => {
-    loadLocationFromStorage();
     setLocationInfo(getRealTimeLocation());
 
     const unsubscribe = subscribeLocation(() => {
