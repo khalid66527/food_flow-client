@@ -3,7 +3,7 @@
 import React, { useEffect, useState, Suspense } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import Link from "next/link";
-import LoadingSpinner from "@/components/LoadingSpinner";
+import LoadingSpinner from "@/lib/api/LoadingSpinner";
 import {
   CheckCircle2,
   FileText,
@@ -142,7 +142,7 @@ function OrderSuccessContent() {
       {/* Top Banner Celebration Card (Signature Bright Orange Gradient Theme) */}
       <div className="bg-gradient-to-r from-[#FF6B35] via-[#FF7843] to-[#FF8C42] rounded-3xl p-8 sm:p-10 text-white shadow-xl relative overflow-hidden text-center">
         <div className="absolute right-0 top-0 translate-x-8 -translate-y-8 w-56 h-56 rounded-full bg-white/10 blur-3xl pointer-events-none" />
-        
+
         <div className="w-20 h-20 rounded-full bg-white/20 backdrop-blur-md flex items-center justify-center mx-auto mb-4 border border-white/30 shadow-inner">
           <CheckCircle2 className="w-10 h-10 text-white" />
         </div>
@@ -164,11 +164,10 @@ function OrderSuccessContent() {
             Method: {isStripe ? "Stripe Online Payment" : "Cash on Delivery (COD)"}
           </span>
           <span
-            className={`px-4 py-1.5 rounded-full border backdrop-blur-md ${
-              isPaid
+            className={`px-4 py-1.5 rounded-full border backdrop-blur-md ${isPaid
                 ? "bg-emerald-500/20 text-emerald-300 border-emerald-500/40"
                 : "bg-amber-500/20 text-amber-300 border-amber-500/40"
-            }`}
+              }`}
           >
             Payment Status: {isPaid ? "Paid" : "Cash on Delivery (Unpaid)"}
           </span>
@@ -194,11 +193,10 @@ function OrderSuccessContent() {
             type="button"
             onClick={handleDownloadInvoice}
             disabled={isDownloading || !isVoucherEnabled}
-            className={`flex items-center justify-center gap-2.5 px-6 py-4 rounded-2xl font-extrabold text-sm shadow-lg transition ${
-              isVoucherEnabled
+            className={`flex items-center justify-center gap-2.5 px-6 py-4 rounded-2xl font-extrabold text-sm shadow-lg transition ${isVoucherEnabled
                 ? "bg-gradient-to-r from-gray-900 to-gray-800 text-white hover:brightness-125 active:scale-98 cursor-pointer"
                 : "bg-gray-100 text-gray-400 border border-gray-200 cursor-not-allowed opacity-60"
-            }`}
+              }`}
             title={
               isVoucherEnabled
                 ? "Download Invoice Voucher"

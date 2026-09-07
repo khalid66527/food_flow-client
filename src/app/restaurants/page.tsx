@@ -22,8 +22,8 @@ import { getAllGlobalFoodItems, getFoodCategories, getAllRestaurants } from '@/l
 import { getGlobalCategories } from '@/lib/api/category';
 import FoodCard from '@/components/restaurants/FoodCard';
 import { useCart } from '@/contexts/CartContext';
-import LoadingSpinner from '@/components/LoadingSpinner';
-import { getRealTimeLocation, subscribeLocation, detectRealTimeLocation, ILocationInfo } from '@/lib/location';
+import LoadingSpinner from '@/lib/api/LoadingSpinner';
+import { getRealTimeLocation, subscribeLocation, detectRealTimeLocation, loadLocationFromStorage, ILocationInfo } from '@/lib/location';
 
 // ---------------------------------------------------------------------------
 // SIDEBAR CATEGORY DEFINITIONS
@@ -96,15 +96,7 @@ function getCategoryEmoji(categoryName: string): string {
 // RESPONSIVE ITEMS-PER-PAGE HOOK
 // ---------------------------------------------------------------------------
 function useResponsiveLimit() {
-  const [limit, setLimit] = useState(() => {
-    if (typeof window !== 'undefined') {
-      const w = window.innerWidth;
-      if (w < 768) return 3;
-      if (w < 1024) return 6;
-      return 9;
-    }
-    return 9;
-  });
+  const [limit, setLimit] = useState(9);
 
   useEffect(() => {
     const update = () => {
@@ -112,6 +104,7 @@ function useResponsiveLimit() {
       const nextLimit = w < 768 ? 3 : w < 1024 ? 6 : 9;
       setLimit((prev) => (prev !== nextLimit ? nextLimit : prev));
     };
+    update();
     window.addEventListener('resize', update);
     return () => window.removeEventListener('resize', update);
   }, []);
@@ -169,6 +162,9 @@ function ExploreFoodContent() {
   const [locationInfo, setLocationInfo] = useState<ILocationInfo>(() => getRealTimeLocation());
 
   useEffect(() => {
+    loadLocationFromStorage();
+    setLocationInfo(getRealTimeLocation());
+
     const unsubscribe = subscribeLocation(() => {
       setLocationInfo(getRealTimeLocation());
       setCurrentPage(1);
@@ -410,11 +406,10 @@ function ExploreFoodContent() {
                 key={cat.id}
                 type="button"
                 onClick={() => handleCategorySelect(cat.id)}
-                className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 cursor-pointer ${
-                  isActive
+                className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 cursor-pointer ${isActive
                     ? 'bg-gradient-to-r from-orange-500 to-orange-600 text-white font-bold shadow-md shadow-orange-500/20 border border-orange-500 scale-[1.01]'
                     : 'text-gray-700 hover:bg-orange-50/70 hover:text-orange-600 hover:border-orange-200 border border-transparent'
-                }`}
+                  }`}
               >
                 <span className={`text-base p-1 rounded-lg transition-colors ${isActive ? 'bg-white/20' : 'bg-gray-100'}`}>
                   {cat.emoji}
@@ -444,11 +439,10 @@ function ExploreFoodContent() {
               });
               setCurrentPage(1);
             }}
-            className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all cursor-pointer ${
-              isVegetarian
+            className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all cursor-pointer ${isVegetarian
                 ? 'bg-emerald-50 text-emerald-600 border border-emerald-200 shadow-xs'
                 : 'text-gray-600 hover:bg-gray-50 border border-transparent'
-            }`}
+              }`}
           >
             <Leaf className="w-4 h-4 text-emerald-500" />
             <span className="flex-1 text-left">Vegetarian</span>
@@ -467,11 +461,10 @@ function ExploreFoodContent() {
               });
               setCurrentPage(1);
             }}
-            className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all cursor-pointer ${
-              isSpicy
+            className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all cursor-pointer ${isSpicy
                 ? 'bg-rose-50 text-rose-600 border border-rose-200 shadow-xs'
                 : 'text-gray-600 hover:bg-gray-50 border border-transparent'
-            }`}
+              }`}
           >
             <Flame className="w-4 h-4 text-rose-500" />
             <span className="flex-1 text-left">Spicy</span>

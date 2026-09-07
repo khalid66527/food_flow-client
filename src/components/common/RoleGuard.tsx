@@ -15,7 +15,7 @@ import {
 } from "lucide-react";
 import { useSession, signOut } from "@/lib/auth-client";
 
-import LoadingSpinner from "@/components/LoadingSpinner";
+import LoadingSpinner from "@/lib/api/LoadingSpinner";
 
 interface RoleGuardProps {
   children: React.ReactNode;

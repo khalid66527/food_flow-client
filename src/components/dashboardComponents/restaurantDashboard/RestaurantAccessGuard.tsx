@@ -19,7 +19,7 @@ import {
 import { useSession } from "@/lib/auth-client";
 import { getMyRestaurantProfile, IRestaurant } from "@/lib/api/restaurant";
 
-import LoadingSpinner from "@/components/LoadingSpinner";
+import LoadingSpinner from "@/lib/api/LoadingSpinner";
 
 interface RestaurantAccessGuardProps {
   children: React.ReactNode;

@@ -29,7 +29,7 @@ import { getOrderByIdApi, getUserOrdersApi } from "@/lib/api/order";
 import { getOrderSocket, joinOrderRoom, disconnectOrderSocket } from "@/lib/socket";
 import OrderStatusStepper, { resolveStepIndex } from "@/components/tracking/OrderStatusStepper";
 import OrderTrackingMap from "@/components/tracking/OrderTrackingMap";
-import LoadingSpinner from "@/components/LoadingSpinner";
+import LoadingSpinner from "@/lib/api/LoadingSpinner";
 import { TOrder } from "@/types/order";
 
 interface OrderStatusUpdateEvent {

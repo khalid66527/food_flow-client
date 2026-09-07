@@ -31,7 +31,7 @@ import {
   Layers,
 } from "lucide-react";
 import { useSession } from "@/lib/auth-client";
-import LoadingSpinner from "@/components/LoadingSpinner";
+import LoadingSpinner from "@/lib/api/LoadingSpinner";
 import { TOrder, TOrderItem } from "@/types/order";
 import { downloadInvoicePdf } from "@/lib/pdf/generateInvoice";
 
@@ -340,7 +340,7 @@ export default function CustomerOrders() {
 
   return (
     <div className="max-w-6xl mx-auto space-y-8 pb-16 animate-in fade-in duration-200">
-      
+
       {/* 🟠 TOP HEADER BANNER (Signature Bright Orange Gradient Theme) */}
       <section className="bg-gradient-to-r from-[#FF6B35] via-[#FF7843] to-[#FF8C42] rounded-3xl p-6 sm:p-8 text-white shadow-xl relative overflow-hidden">
         <div className="absolute right-0 top-0 translate-x-8 -translate-y-8 w-56 h-56 rounded-full bg-white/10 blur-3xl pointer-events-none" />
@@ -427,11 +427,10 @@ export default function CustomerOrders() {
               key={st}
               type="button"
               onClick={() => setStatusFilter(st)}
-              className={`px-3 py-1.5 rounded-xl text-xs font-extrabold transition cursor-pointer shrink-0 ${
-                statusFilter === st
+              className={`px-3 py-1.5 rounded-xl text-xs font-extrabold transition cursor-pointer shrink-0 ${statusFilter === st
                   ? "bg-[#FF6B35] text-white shadow-xs"
                   : "bg-gray-100 text-gray-600 hover:bg-gray-200"
-              }`}
+                }`}
             >
               {st === "ALL" ? "All Orders" : st}
             </button>
@@ -482,12 +481,12 @@ export default function CustomerOrders() {
             const statusBadge = getOrderStatusBadge(order.orderStatus);
             const formattedDate = order.createdAt
               ? new Date(order.createdAt).toLocaleDateString("en-US", {
-                  year: "numeric",
-                  month: "short",
-                  day: "numeric",
-                  hour: "2-digit",
-                  minute: "2-digit",
-                })
+                year: "numeric",
+                month: "short",
+                day: "numeric",
+                hour: "2-digit",
+                minute: "2-digit",
+              })
               : "Recent Order";
 
             const groupedItems = groupItemsByRestaurant(order.items || []);
@@ -695,11 +694,10 @@ export default function CustomerOrders() {
                       type="button"
                       onClick={() => isVoucherEnabled && handleDownloadVoucher(order)}
                       disabled={isDownloading || !isVoucherEnabled}
-                      className={`inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-extrabold transition shadow-xs ${
-                        isVoucherEnabled
+                      className={`inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-extrabold transition shadow-xs ${isVoucherEnabled
                           ? "bg-gradient-to-r from-gray-900 to-black text-white cursor-pointer hover:brightness-125 hover:scale-102 active:scale-98"
                           : "bg-gray-100 text-gray-400 border border-gray-200 cursor-not-allowed opacity-60"
-                      }`}
+                        }`}
                       title={
                         isVoucherEnabled
                           ? "Download Official Invoice Voucher"
@@ -710,9 +708,8 @@ export default function CustomerOrders() {
                         <Loader2 className="w-3.5 h-3.5 animate-spin text-amber-400" />
                       ) : (
                         <Download
-                          className={`w-3.5 h-3.5 ${
-                            isVoucherEnabled ? "text-amber-400" : "text-gray-400"
-                          }`}
+                          className={`w-3.5 h-3.5 ${isVoucherEnabled ? "text-amber-400" : "text-gray-400"
+                            }`}
                         />
                       )}
                       <span>Download Voucher</span>
@@ -764,11 +761,10 @@ export default function CustomerOrders() {
                       key={pageNum}
                       type="button"
                       onClick={() => setCurrentPage(pageNum)}
-                      className={`w-8 h-8 rounded-xl text-xs font-black transition cursor-pointer ${
-                        isActive
+                      className={`w-8 h-8 rounded-xl text-xs font-black transition cursor-pointer ${isActive
                           ? "bg-gradient-to-r from-[#FF6B35] to-amber-500 text-white shadow-sm shadow-orange-500/20"
                           : "text-gray-600 hover:bg-gray-100"
-                      }`}
+                        }`}
                     >
                       {pageNum}
                     </button>

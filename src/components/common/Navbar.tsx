@@ -23,6 +23,7 @@ import {
   detectRealTimeLocation, 
   subscribeLocation, 
   updateRealTimeLocation,
+  loadLocationFromStorage,
   ILocationInfo 
 } from "@/lib/location";
 import { getAddresses } from "@/lib/api/address";
@@ -65,6 +66,9 @@ export default function Navbar({
   // Sync real-time location and trigger browser geolocation
   useEffect(() => {
     setIsMounted(true);
+    loadLocationFromStorage();
+    setLocationInfo(getRealTimeLocation());
+
     const unsubscribe = subscribeLocation(() => {
       setLocationInfo(getRealTimeLocation());
     });

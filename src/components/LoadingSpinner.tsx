@@ -26,12 +26,13 @@ export default function LoadingSpinner({
       style={{ minHeight: minHeight || '450px' }}
     >
       <HashLoader color={color} size={size} />
+      {message && <p className="mt-4 text-sm font-medium text-gray-600">{message}</p>}
     </div>
   );
 
   if (fullScreen) {
     return (
-      <div className="fixed inset-0 z-50 flex flex-col items-center justify-center min-h-screen w-full bg-white/85 backdrop-blur-sm">
+      <div className="fixed inset-0 z-50 flex flex-col items-center justify-center min-h-screen w-full bg-white/85 dark:bg-gray-950/85 backdrop-blur-sm">
         {content}
       </div>
     );

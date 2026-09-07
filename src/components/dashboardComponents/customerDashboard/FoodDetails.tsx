@@ -48,7 +48,7 @@ import {
 } from "lucide-react";
 import { useCart } from "@/contexts/CartContext";
 import { IGlobalFoodItem } from "@/types/restaurant";
-import LoadingSpinner from "@/components/LoadingSpinner";
+import LoadingSpinner from "@/lib/api/LoadingSpinner";
 
 interface FoodDetailsProps {
   foodId?: string;
@@ -274,8 +274,8 @@ export default function FoodDetails({ foodId }: FoodDetailsProps) {
     food?.images && Array.isArray(food.images) && food.images.length > 0
       ? food.images
       : food?.image
-      ? [food.image]
-      : DEFAULT_FOOD_DATA.images;
+        ? [food.image]
+        : DEFAULT_FOOD_DATA.images;
 
   // 🔄 Automatic Photo Cycling Animation (Changes photo every 3.5 seconds)
   useEffect(() => {
@@ -449,7 +449,7 @@ export default function FoodDetails({ foodId }: FoodDetailsProps) {
 
   return (
     <div className="space-y-8 animate-in fade-in duration-200 overflow-hidden">
-      
+
       {/* 🟠 THEMATIC HEADER SECTION with AOS (fade-down) */}
       <section
         data-aos="fade-down"
@@ -460,7 +460,7 @@ export default function FoodDetails({ foodId }: FoodDetailsProps) {
 
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 md:py-8 relative z-10">
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-            
+
             {/* Left Header Title & Breadcrumb */}
             <div className="space-y-1">
               <div className="flex items-center gap-2 text-xs font-semibold text-orange-100">
@@ -505,19 +505,19 @@ export default function FoodDetails({ foodId }: FoodDetailsProps) {
 
       {/* 🍱 MAIN CONTENT CONTAINER */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-8">
-        
+
         {/* ======================================================= */}
         {/* 🍱 MAIN PRODUCT GRID: GALLERY & FOOD INFORMATION        */}
         {/* ======================================================= */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-10 items-start">
-          
+
           {/* 📸 LEFT COLUMN (6 COLS): MULTI-IMAGE SPOTLIGHT GALLERY with AOS (fade-right) */}
           <div
             data-aos="fade-right"
             data-aos-duration="700"
             className="lg:col-span-6 space-y-4"
           >
-            
+
             {/* Main Spotlight Photo with Auto-Cycle Animation */}
             <div
               onMouseEnter={() => setIsAutoPlayPaused(true)}
@@ -559,11 +559,10 @@ export default function FoodDetails({ foodId }: FoodDetailsProps) {
               {/* Stock Availability & Diet Badges Top Right */}
               <div className="absolute top-3.5 right-3.5 flex flex-col items-end gap-1.5 z-10">
                 <span
-                  className={`text-[10px] font-black px-3 py-1 rounded-xl backdrop-blur-md shadow-md flex items-center gap-1.5 ${
-                    food.status === "available" || food.isAvailable !== false
+                  className={`text-[10px] font-black px-3 py-1 rounded-xl backdrop-blur-md shadow-md flex items-center gap-1.5 ${food.status === "available" || food.isAvailable !== false
                       ? "bg-emerald-500/90 text-white"
                       : "bg-rose-500/90 text-white"
-                  }`}
+                    }`}
                 >
                   <span className="w-2 h-2 rounded-full bg-white animate-ping" />
                   <span>{food.status === "available" || food.isAvailable !== false ? "In Stock" : "Out of Stock"}</span>
@@ -614,9 +613,8 @@ export default function FoodDetails({ foodId }: FoodDetailsProps) {
                         key={dotIdx}
                         type="button"
                         onClick={() => setActiveImageIndex(dotIdx)}
-                        className={`h-1.5 rounded-full transition-all duration-300 cursor-pointer ${
-                          activeImageIndex === dotIdx ? "w-5 bg-[#FF6B35]" : "w-1.5 bg-white/50 hover:bg-white"
-                        }`}
+                        className={`h-1.5 rounded-full transition-all duration-300 cursor-pointer ${activeImageIndex === dotIdx ? "w-5 bg-[#FF6B35]" : "w-1.5 bg-white/50 hover:bg-white"
+                          }`}
                       />
                     ))}
                   </div>
@@ -644,11 +642,10 @@ export default function FoodDetails({ foodId }: FoodDetailsProps) {
                     key={idx}
                     type="button"
                     onClick={() => setActiveImageIndex(idx)}
-                    className={`relative w-20 h-16 sm:w-24 sm:h-18 rounded-2xl overflow-hidden shrink-0 border-2 transition-all duration-200 cursor-pointer shadow-xs ${
-                      activeImageIndex === idx
+                    className={`relative w-20 h-16 sm:w-24 sm:h-18 rounded-2xl overflow-hidden shrink-0 border-2 transition-all duration-200 cursor-pointer shadow-xs ${activeImageIndex === idx
                         ? "border-[#FF6B35] ring-2 ring-orange-500/40 scale-105 shadow-md"
                         : "border-orange-100 opacity-60 hover:opacity-100 hover:border-orange-300 bg-white"
-                    }`}
+                      }`}
                   >
                     <img src={thumbUrl} alt={`Thumbnail ${idx + 1}`} className="w-full h-full object-cover" />
                     {idx === 0 && (
@@ -708,7 +705,7 @@ export default function FoodDetails({ foodId }: FoodDetailsProps) {
             data-aos-duration="700"
             className="lg:col-span-6 space-y-6"
           >
-            
+
             {/* Header & Restaurant Name */}
             <div className="space-y-2">
               <div className="flex items-center justify-between gap-2">
@@ -731,11 +728,10 @@ export default function FoodDetails({ foodId }: FoodDetailsProps) {
                   <button
                     type="button"
                     onClick={() => setIsLiked((p) => !p)}
-                    className={`p-1.5 rounded-lg border transition cursor-pointer ${
-                      isLiked
+                    className={`p-1.5 rounded-lg border transition cursor-pointer ${isLiked
                         ? "bg-rose-50 border-rose-200 text-rose-500"
                         : "bg-white border-gray-200 text-gray-400 hover:text-rose-500"
-                    }`}
+                      }`}
                     title="Save to Favorites"
                   >
                     <Heart className={`w-4 h-4 ${isLiked ? "fill-rose-500" : ""}`} />
@@ -833,7 +829,7 @@ export default function FoodDetails({ foodId }: FoodDetailsProps) {
             {/* 🛒 QUANTITY & 2 ACTION BUTTONS (ADD TO CART + ORDER NOW) */}
             {/* ======================================================= */}
             <div data-aos="fade-up" data-aos-delay="350" className="pt-2 space-y-4">
-              
+
               {/* Quantity Selector & Live Total Price */}
               <div className="flex items-center justify-between gap-4 p-4 rounded-2xl bg-white border border-orange-100 shadow-2xs">
                 <div className="space-y-0.5">
@@ -885,7 +881,7 @@ export default function FoodDetails({ foodId }: FoodDetailsProps) {
 
               {/* 2 ACTION BUTTONS */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 pt-1">
-                
+
                 {/* BUTTON 1: Add to Cart */}
                 <button
                   type="button"
@@ -931,7 +927,7 @@ export default function FoodDetails({ foodId }: FoodDetailsProps) {
           data-aos-duration="700"
           className="rounded-3xl bg-white border border-orange-100 shadow-md overflow-hidden space-y-6"
         >
-          
+
           {/* Restaurant Banner & Brand Header */}
           <div className="relative h-40 sm:h-52 bg-gray-900 overflow-hidden">
             <img
@@ -968,9 +964,8 @@ export default function FoodDetails({ foodId }: FoodDetailsProps) {
 
               <div className="shrink-0 hidden sm:block">
                 <span
-                  className={`text-xs font-black px-3.5 py-1.5 rounded-xl shadow-xs ${
-                    restaurant?.isOpen !== false ? "bg-emerald-500 text-white" : "bg-rose-500 text-white"
-                  }`}
+                  className={`text-xs font-black px-3.5 py-1.5 rounded-xl shadow-xs ${restaurant?.isOpen !== false ? "bg-emerald-500 text-white" : "bg-rose-500 text-white"
+                    }`}
                 >
                   {restaurant?.isOpen !== false ? "Open for Orders" : "Currently Closed"}
                 </span>
@@ -980,9 +975,9 @@ export default function FoodDetails({ foodId }: FoodDetailsProps) {
 
           {/* Restaurant Body Info */}
           <div className="p-5 sm:p-7 space-y-6">
-            
+
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-              
+
               {/* 1. Address & Location */}
               <div
                 data-aos="fade-up"
@@ -995,8 +990,7 @@ export default function FoodDetails({ foodId }: FoodDetailsProps) {
                 </div>
                 <p className="text-xs font-bold text-gray-900 line-clamp-2">
                   {restaurant?.address?.fullAddress ||
-                    `${restaurant?.address?.street || "Main Street"}, ${
-                      restaurant?.address?.city || "City Center"
+                    `${restaurant?.address?.street || "Main Street"}, ${restaurant?.address?.city || "City Center"
                     }`}
                 </p>
               </div>
@@ -1059,7 +1053,7 @@ export default function FoodDetails({ foodId }: FoodDetailsProps) {
 
             {/* Features & Social Media Bar */}
             <div className="flex flex-wrap items-center justify-between gap-4 pt-4 border-t border-orange-100">
-              
+
               {/* Features Tags */}
               <div className="flex flex-wrap items-center gap-2">
                 {restaurant?.features?.hasDelivery !== false && (
