@@ -10,12 +10,33 @@ export interface ILocationInfo {
 }
 
 let cachedLocation: ILocationInfo = {
-  city: typeof window !== "undefined" ? localStorage.getItem("foodflow_real_city") || "Chattogram" : "Chattogram",
-  area: typeof window !== "undefined" ? localStorage.getItem("foodflow_real_area") || "GEC, Chattogram" : "GEC, Chattogram",
-  lat: typeof window !== "undefined" && localStorage.getItem("foodflow_real_lat") ? parseFloat(localStorage.getItem("foodflow_real_lat")!) : undefined,
-  lng: typeof window !== "undefined" && localStorage.getItem("foodflow_real_lng") ? parseFloat(localStorage.getItem("foodflow_real_lng")!) : undefined,
+  city: "Chattogram",
+  area: "GEC, Chattogram",
   isDetecting: false,
 };
+
+let storageLoaded = false;
+
+export function loadLocationFromStorage(): ILocationInfo {
+  if (typeof window === "undefined" || storageLoaded) return cachedLocation;
+  storageLoaded = true;
+
+  const storedCity = localStorage.getItem("foodflow_real_city");
+  const storedArea = localStorage.getItem("foodflow_real_area");
+  const storedLat = localStorage.getItem("foodflow_real_lat");
+  const storedLng = localStorage.getItem("foodflow_real_lng");
+
+  if (storedCity || storedArea) {
+    cachedLocation = {
+      city: storedCity || "Chattogram",
+      area: storedArea || "GEC, Chattogram",
+      lat: storedLat ? parseFloat(storedLat) : undefined,
+      lng: storedLng ? parseFloat(storedLng) : undefined,
+      isDetecting: false,
+    };
+  }
+  return cachedLocation;
+}
 
 const LISTENERS = new Set<() => void>();
 
@@ -55,8 +76,11 @@ export function updateRealTimeLocation(city: string, area?: string, lat?: number
 export async function detectRealTimeLocation(): Promise<ILocationInfo> {
   if (typeof window === "undefined") return cachedLocation;
 
+  loadLocationFromStorage();
+
   cachedLocation = { ...cachedLocation, isDetecting: true };
   notifyLocationListeners();
+
 
   return new Promise((resolve) => {
     if (!navigator.geolocation) {

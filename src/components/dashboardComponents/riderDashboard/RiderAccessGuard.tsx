@@ -17,7 +17,7 @@ import {
 import { useSession } from "@/lib/auth-client";
 import { getMyRiderProfile, IRiderProfile } from "@/lib/api/rider";
 
-import LoadingSpinner from "@/components/LoadingSpinner";
+import LoadingSpinner from "@/lib/api/LoadingSpinner";
 
 interface RiderAccessGuardProps {
   children: React.ReactNode;

@@ -1,4 +1,4 @@
-import LoadingSpinner from '@/components/LoadingSpinner';
+import LoadingSpinner from '@/lib/api/LoadingSpinner';
 
 export default function CustomerDashboardLoading() {
   return (

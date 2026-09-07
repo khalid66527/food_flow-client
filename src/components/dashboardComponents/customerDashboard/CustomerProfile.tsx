@@ -20,7 +20,7 @@ import {
 import { useSession } from "@/lib/auth-client";
 import { getUserById, IUser } from "@/lib/api/user";
 import { updateUserDetails } from "@/lib/actions/user";
-import LoadingSpinner from "@/components/LoadingSpinner";
+import LoadingSpinner from "@/lib/api/LoadingSpinner";
 
 export default function CustomerProfile() {
   const { data: session, isPending: sessionLoading } = useSession();
@@ -215,11 +215,10 @@ export default function CustomerProfile() {
       {toast && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-xs p-4 animate-in fade-in duration-200">
           <div
-            className={`flex items-center gap-3.5 px-6 py-4 rounded-2xl shadow-2xl border text-sm font-bold max-w-md w-full sm:w-auto bg-white transition-all transform scale-100 ${
-              toast.type === "success"
+            className={`flex items-center gap-3.5 px-6 py-4 rounded-2xl shadow-2xl border text-sm font-bold max-w-md w-full sm:w-auto bg-white transition-all transform scale-100 ${toast.type === "success"
                 ? "border-emerald-200 text-emerald-900 shadow-emerald-500/10"
                 : "border-rose-200 text-rose-900 shadow-rose-500/10"
-            }`}
+              }`}
           >
             {toast.type === "success" ? (
               <div className="p-2 rounded-xl bg-emerald-50 text-emerald-600 shrink-0">
@@ -368,9 +367,8 @@ export default function CustomerProfile() {
                 <div className="flex flex-wrap items-center justify-center sm:justify-start gap-3">
                   <label
                     htmlFor="profile-image-input"
-                    className={`inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-[#FF6B35] to-[#FF8C42] text-white font-bold text-xs shadow-md shadow-orange-500/20 hover:opacity-95 transition-all cursor-pointer active:scale-95 ${
-                      isUploadingImage ? "opacity-60 pointer-events-none" : ""
-                    }`}
+                    className={`inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-[#FF6B35] to-[#FF8C42] text-white font-bold text-xs shadow-md shadow-orange-500/20 hover:opacity-95 transition-all cursor-pointer active:scale-95 ${isUploadingImage ? "opacity-60 pointer-events-none" : ""
+                      }`}
                   >
                     {isUploadingImage ? (
                       <Loader2 className="w-4 h-4 animate-spin" />

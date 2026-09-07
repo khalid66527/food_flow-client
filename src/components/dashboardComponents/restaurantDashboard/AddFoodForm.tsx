@@ -39,7 +39,7 @@ import { useSession } from "@/lib/auth-client";
 import { getMyRestaurantProfile, IRestaurant } from "@/lib/api/restaurant";
 import { createFoodItem } from "@/lib/actions/restaurant";
 import { getGlobalCategories, IGlobalCategory } from "@/lib/api/category";
-import LoadingSpinner from "@/components/LoadingSpinner";
+import LoadingSpinner from "@/lib/api/LoadingSpinner";
 
 type CategoryType = string;
 
@@ -345,10 +345,10 @@ export default function AddFoodForm() {
   const handleImageSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const rawFiles = e.target.files;
     if (!rawFiles || rawFiles.length === 0) return;
-    
+
     // Convert to array before touching the input element
     const files = Array.from(rawFiles);
-    
+
     // Clear input value so selecting the same file again later will still fire onChange
     if (e.target) e.target.value = "";
     if (fileInputRef.current) fileInputRef.current.value = "";
@@ -1082,7 +1082,7 @@ export default function AddFoodForm() {
 
   return (
     <div className="w-full max-w-7xl mx-auto pb-16 space-y-8">
-      
+
       {/* 🌟 HERO BANNER */}
       <div className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-orange-600 via-[#FF6B35] to-amber-500 text-white p-7 sm:p-9 shadow-xl">
         <div className="relative z-10 space-y-2">
@@ -1116,14 +1116,14 @@ export default function AddFoodForm() {
 
       {/* MAIN FORM */}
       <form onSubmit={handleSubmit} className="space-y-8">
-        
+
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-start">
-          
+
           {/* ======================================================= */}
           {/* 👈 LEFT COLUMN: GENERAL FOOD INFORMATION                */}
           {/* ======================================================= */}
           <div className="bg-white rounded-3xl border border-gray-200/90 shadow-sm p-6 sm:p-8 space-y-5">
-            
+
             <div className="flex items-center justify-between border-b border-gray-100 pb-3">
               <div className="flex items-center gap-2.5 text-sm font-black text-gray-900">
                 <UtensilsCrossed className="w-4 h-4 text-[#FF6B35]" />
@@ -1163,27 +1163,27 @@ export default function AddFoodForm() {
               >
                 {globalCategories.length > 0
                   ? globalCategories.map((cat) => (
-                      <option key={cat._id} value={cat.name}>
-                        {cat.emoji || "🏷️"} {cat.name}
-                      </option>
-                    ))
+                    <option key={cat._id} value={cat.name}>
+                      {cat.emoji || "🏷️"} {cat.name}
+                    </option>
+                  ))
                   : [
-                      { name: "Pizza", emoji: "🍕" },
-                      { name: "Burgers", emoji: "🍔" },
-                      { name: "Biryani", emoji: "🍛" },
-                      { name: "Pasta", emoji: "🍝" },
-                      { name: "BBQ & Grill", emoji: "🍖" },
-                      { name: "Desserts", emoji: "🍰" },
-                      { name: "Drinks", emoji: "🥤" },
-                      { name: "Sushi", emoji: "🍣" },
-                      { name: "Chinese", emoji: "🍲" },
-                      { name: "Thai", emoji: "🌿" },
-                      { name: "Healthy", emoji: "🥗" },
-                    ].map((cat) => (
-                      <option key={cat.name} value={cat.name}>
-                        {cat.emoji} {cat.name}
-                      </option>
-                    ))}
+                    { name: "Pizza", emoji: "🍕" },
+                    { name: "Burgers", emoji: "🍔" },
+                    { name: "Biryani", emoji: "🍛" },
+                    { name: "Pasta", emoji: "🍝" },
+                    { name: "BBQ & Grill", emoji: "🍖" },
+                    { name: "Desserts", emoji: "🍰" },
+                    { name: "Drinks", emoji: "🥤" },
+                    { name: "Sushi", emoji: "🍣" },
+                    { name: "Chinese", emoji: "🍲" },
+                    { name: "Thai", emoji: "🌿" },
+                    { name: "Healthy", emoji: "🥗" },
+                  ].map((cat) => (
+                    <option key={cat.name} value={cat.name}>
+                      {cat.emoji} {cat.name}
+                    </option>
+                  ))}
                 <option value="Custom">✨ Add Custom / New Category...</option>
               </select>
 
@@ -1254,9 +1254,8 @@ export default function AddFoodForm() {
             <div className="space-y-1.5 pt-1">
               <label className="text-xs font-bold text-gray-700 uppercase tracking-wider flex items-center justify-between">
                 <span>Food Availability / Stock Status <span className="text-rose-500">*</span></span>
-                <span className={`text-[10px] font-black px-2 py-0.5 rounded-md ${
-                  commonData.status === "available" ? "bg-emerald-100 text-emerald-800" : "bg-rose-100 text-rose-800"
-                }`}>
+                <span className={`text-[10px] font-black px-2 py-0.5 rounded-md ${commonData.status === "available" ? "bg-emerald-100 text-emerald-800" : "bg-rose-100 text-rose-800"
+                  }`}>
                   {commonData.status === "available" ? "● In Stock" : "● Out of Stock"}
                 </span>
               </label>
@@ -1265,11 +1264,10 @@ export default function AddFoodForm() {
                 <button
                   type="button"
                   onClick={() => setCommonData((p) => ({ ...p, status: "available" }))}
-                  className={`py-3 px-4 rounded-xl text-xs font-bold transition flex items-center justify-center gap-2 cursor-pointer ${
-                    commonData.status === "available"
+                  className={`py-3 px-4 rounded-xl text-xs font-bold transition flex items-center justify-center gap-2 cursor-pointer ${commonData.status === "available"
                       ? "bg-emerald-500 text-white shadow-md shadow-emerald-500/20 scale-[1.02]"
                       : "text-gray-600 hover:text-gray-900 bg-transparent"
-                  }`}
+                    }`}
                 >
                   <CheckCircle className="w-4 h-4" />
                   <span>Available (In Stock)</span>
@@ -1278,11 +1276,10 @@ export default function AddFoodForm() {
                 <button
                   type="button"
                   onClick={() => setCommonData((p) => ({ ...p, status: "unavailable" }))}
-                  className={`py-3 px-4 rounded-xl text-xs font-bold transition flex items-center justify-center gap-2 cursor-pointer ${
-                    commonData.status === "unavailable"
+                  className={`py-3 px-4 rounded-xl text-xs font-bold transition flex items-center justify-center gap-2 cursor-pointer ${commonData.status === "unavailable"
                       ? "bg-rose-500 text-white shadow-md shadow-rose-500/20 scale-[1.02]"
                       : "text-gray-600 hover:text-gray-900 bg-transparent"
-                  }`}
+                    }`}
                 >
                   <XCircle className="w-4 h-4" />
                   <span>Unavailable (Out of Stock)</span>
@@ -1341,11 +1338,10 @@ export default function AddFoodForm() {
               <button
                 type="button"
                 onClick={() => setCommonData((p) => ({ ...p, isVegetarian: !p.isVegetarian }))}
-                className={`flex items-center justify-center gap-2 p-3 rounded-2xl border text-xs font-bold transition cursor-pointer ${
-                  commonData.isVegetarian
+                className={`flex items-center justify-center gap-2 p-3 rounded-2xl border text-xs font-bold transition cursor-pointer ${commonData.isVegetarian
                     ? "bg-emerald-50 border-emerald-300 text-emerald-700 shadow-xs"
                     : "bg-gray-50 border-gray-200 text-gray-600 hover:bg-gray-100"
-                }`}
+                  }`}
               >
                 <Leaf className="w-4 h-4" />
                 <span>Vegetarian</span>
@@ -1354,11 +1350,10 @@ export default function AddFoodForm() {
               <button
                 type="button"
                 onClick={() => setCommonData((p) => ({ ...p, isSpicy: !p.isSpicy }))}
-                className={`flex items-center justify-center gap-2 p-3 rounded-2xl border text-xs font-bold transition cursor-pointer ${
-                  commonData.isSpicy
+                className={`flex items-center justify-center gap-2 p-3 rounded-2xl border text-xs font-bold transition cursor-pointer ${commonData.isSpicy
                     ? "bg-rose-50 border-rose-300 text-rose-700 shadow-xs"
                     : "bg-gray-50 border-gray-200 text-gray-600 hover:bg-gray-100"
-                }`}
+                  }`}
               >
                 <Flame className="w-4 h-4" />
                 <span>Spicy Hot 🔥</span>
@@ -1371,10 +1366,10 @@ export default function AddFoodForm() {
           {/* 👉 RIGHT COLUMN: DYNAMIC SPECS & MULTI-IMAGE GALLERY    */}
           {/* ======================================================= */}
           <div className="space-y-6">
-            
+
             {/* 1. DYNAMIC CATEGORY SPECIFICATIONS CARD */}
             <div className="bg-white rounded-3xl border border-gray-200/90 shadow-sm p-6 sm:p-8 space-y-5">
-              
+
               <div className="flex items-center justify-between border-b border-gray-100 pb-3">
                 <div className="flex items-center gap-2 text-sm font-black text-gray-900">
                   {getCategoryIcon()}
@@ -1394,7 +1389,7 @@ export default function AddFoodForm() {
 
             {/* 2. MULTIPLE PHOTO GALLERY UPLOADER CARD (3-4 PHOTOS) */}
             <div className="bg-white rounded-3xl border border-gray-200/90 shadow-sm p-6 sm:p-8 space-y-4">
-              
+
               <div className="flex items-center justify-between border-b border-gray-100 pb-3">
                 <div className="flex items-center gap-2 text-sm font-black text-gray-900">
                   <ImageIcon className="w-4 h-4 text-[#FF6B35]" />
@@ -1405,18 +1400,16 @@ export default function AddFoodForm() {
                   <button
                     type="button"
                     onClick={() => setImageInputMode("upload")}
-                    className={`px-2.5 py-1 rounded-lg transition cursor-pointer ${
-                      imageInputMode === "upload" ? "bg-white text-[#FF6B35] shadow-xs" : "text-gray-500"
-                    }`}
+                    className={`px-2.5 py-1 rounded-lg transition cursor-pointer ${imageInputMode === "upload" ? "bg-white text-[#FF6B35] shadow-xs" : "text-gray-500"
+                      }`}
                   >
                     Upload Files
                   </button>
                   <button
                     type="button"
                     onClick={() => setImageInputMode("url")}
-                    className={`px-2.5 py-1 rounded-lg transition cursor-pointer ${
-                      imageInputMode === "url" ? "bg-white text-[#FF6B35] shadow-xs" : "text-gray-500"
-                    }`}
+                    className={`px-2.5 py-1 rounded-lg transition cursor-pointer ${imageInputMode === "url" ? "bg-white text-[#FF6B35] shadow-xs" : "text-gray-500"
+                      }`}
                   >
                     Paste URL
                   </button>
@@ -1498,7 +1491,7 @@ export default function AddFoodForm() {
                       + Add Image
                     </button>
                   </div>
-                  
+
                   {/* 1-Click Auto Fill Demo Photos */}
                   <button
                     type="button"
@@ -1526,13 +1519,12 @@ export default function AddFoodForm() {
                     {images.map((imgUrl, idx) => (
                       <div
                         key={idx}
-                        className={`relative rounded-2xl overflow-hidden border-2 aspect-square group bg-gray-100 shadow-xs cursor-pointer ${
-                          idx === 0
+                        className={`relative rounded-2xl overflow-hidden border-2 aspect-square group bg-gray-100 shadow-xs cursor-pointer ${idx === 0
                             ? "border-[#FF6B35] ring-2 ring-orange-500/20"
                             : idx === activePreviewIndex
-                            ? "border-blue-500 ring-2 ring-blue-500/20"
-                            : "border-gray-200"
-                        }`}
+                              ? "border-blue-500 ring-2 ring-blue-500/20"
+                              : "border-gray-200"
+                          }`}
                         onClick={() => setActivePreviewIndex(idx)}
                       >
                         <img
@@ -1628,7 +1620,7 @@ export default function AddFoodForm() {
                         {Math.round(
                           ((Number(commonData.price) - Number(commonData.discountPrice)) /
                             Number(commonData.price)) *
-                            100
+                          100
                         )}
                         % OFF
                       </span>
@@ -1637,11 +1629,10 @@ export default function AddFoodForm() {
 
                   <div className="absolute top-3 right-3 z-10">
                     <span
-                      className={`text-[10px] font-black px-2.5 py-1 rounded-lg backdrop-blur-md shadow-sm ${
-                        commonData.status === "available"
+                      className={`text-[10px] font-black px-2.5 py-1 rounded-lg backdrop-blur-md shadow-sm ${commonData.status === "available"
                           ? "bg-emerald-500/90 text-white"
                           : "bg-rose-500/90 text-white"
-                      }`}
+                        }`}
                     >
                       {commonData.status === "available" ? "● In Stock" : "● Out of Stock"}
                     </span>
@@ -1662,11 +1653,10 @@ export default function AddFoodForm() {
                         key={idx}
                         type="button"
                         onClick={() => setActivePreviewIndex(idx)}
-                        className={`relative w-16 h-12 rounded-xl overflow-hidden shrink-0 border-2 transition cursor-pointer ${
-                          activePreviewIndex === idx
+                        className={`relative w-16 h-12 rounded-xl overflow-hidden shrink-0 border-2 transition cursor-pointer ${activePreviewIndex === idx
                             ? "border-[#FF6B35] ring-2 ring-orange-500/30 scale-105"
                             : "border-gray-200 opacity-70 hover:opacity-100"
-                        }`}
+                          }`}
                       >
                         <img src={thumbUrl} alt={`Thumbnail ${idx + 1}`} className="w-full h-full object-cover" />
                       </button>

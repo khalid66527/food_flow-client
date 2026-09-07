@@ -27,7 +27,7 @@ import {
   updateGlobalCategory,
   deleteGlobalCategory,
 } from "@/lib/api/category";
-import LoadingSpinner from "@/components/LoadingSpinner";
+import LoadingSpinner from "@/lib/api/LoadingSpinner";
 
 const POPULAR_EMOJIS = [
   "🍕", "🍔", "🍛", "🍝", "🍖", "🍰", "🥤", "🍣", "🍲", "🌿", "🥗", "🥣", "🍿", "🐟", "🌮", "☕", "🍦", "🥞", "🍗", "🥩", "📦"
@@ -237,8 +237,8 @@ export default function AdminCategories() {
       statusFilter === "all"
         ? true
         : statusFilter === "active"
-        ? cat.isActive
-        : !cat.isActive;
+          ? cat.isActive
+          : !cat.isActive;
 
     return matchesSearch && matchesStatus;
   });
@@ -249,15 +249,14 @@ export default function AdminCategories() {
 
   return (
     <div className="w-full max-w-7xl mx-auto pb-16 space-y-6">
-      
+
       {/* Toast Notification */}
       {toast && (
         <div
-          className={`fixed top-6 right-6 z-50 p-4 rounded-2xl border shadow-xl flex items-center gap-3 transition-all animate-bounce ${
-            toast.type === "success"
+          className={`fixed top-6 right-6 z-50 p-4 rounded-2xl border shadow-xl flex items-center gap-3 transition-all animate-bounce ${toast.type === "success"
               ? "bg-emerald-50 border-emerald-200 text-emerald-800"
               : "bg-rose-50 border-rose-200 text-rose-800"
-          }`}
+            }`}
         >
           {toast.type === "success" ? (
             <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0" />
@@ -357,27 +356,24 @@ export default function AdminCategories() {
             <button
               type="button"
               onClick={() => setStatusFilter("all")}
-              className={`px-3 py-1.5 rounded-lg transition cursor-pointer ${
-                statusFilter === "all" ? "bg-white text-gray-900 shadow-xs" : "text-gray-500 hover:text-gray-700"
-              }`}
+              className={`px-3 py-1.5 rounded-lg transition cursor-pointer ${statusFilter === "all" ? "bg-white text-gray-900 shadow-xs" : "text-gray-500 hover:text-gray-700"
+                }`}
             >
               All ({totalCount})
             </button>
             <button
               type="button"
               onClick={() => setStatusFilter("active")}
-              className={`px-3 py-1.5 rounded-lg transition cursor-pointer ${
-                statusFilter === "active" ? "bg-white text-emerald-600 shadow-xs" : "text-gray-500 hover:text-gray-700"
-              }`}
+              className={`px-3 py-1.5 rounded-lg transition cursor-pointer ${statusFilter === "active" ? "bg-white text-emerald-600 shadow-xs" : "text-gray-500 hover:text-gray-700"
+                }`}
             >
               Active ({activeCount})
             </button>
             <button
               type="button"
               onClick={() => setStatusFilter("inactive")}
-              className={`px-3 py-1.5 rounded-lg transition cursor-pointer ${
-                statusFilter === "inactive" ? "bg-white text-rose-500 shadow-xs" : "text-gray-500 hover:text-gray-700"
-              }`}
+              className={`px-3 py-1.5 rounded-lg transition cursor-pointer ${statusFilter === "inactive" ? "bg-white text-rose-500 shadow-xs" : "text-gray-500 hover:text-gray-700"
+                }`}
             >
               Inactive ({inactiveCount})
             </button>
@@ -416,11 +412,10 @@ export default function AdminCategories() {
           {filteredCategories.map((cat) => (
             <div
               key={cat._id}
-              className={`group relative bg-white rounded-3xl border p-6 shadow-sm hover:shadow-md transition-all duration-300 flex flex-col justify-between ${
-                cat.isActive
+              className={`group relative bg-white rounded-3xl border p-6 shadow-sm hover:shadow-md transition-all duration-300 flex flex-col justify-between ${cat.isActive
                   ? "border-gray-200/90 hover:border-orange-300"
                   : "border-gray-200 bg-gray-50/60 opacity-80"
-              }`}
+                }`}
             >
               <div>
                 {/* Header: Emoji Badge + Actions */}
@@ -443,11 +438,10 @@ export default function AdminCategories() {
                   <button
                     type="button"
                     onClick={() => handleToggleStatus(cat)}
-                    className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider transition-all cursor-pointer ${
-                      cat.isActive
+                    className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider transition-all cursor-pointer ${cat.isActive
                         ? "bg-emerald-100 text-emerald-800 hover:bg-emerald-200"
                         : "bg-rose-100 text-rose-800 hover:bg-rose-200"
-                    }`}
+                      }`}
                     title="Click to toggle active status"
                   >
                     {cat.isActive ? "● Active" : "○ Inactive"}
@@ -549,9 +543,8 @@ export default function AdminCategories() {
                         key={emoji}
                         type="button"
                         onClick={() => setFormData((p) => ({ ...p, emoji }))}
-                        className={`text-base p-1 rounded-lg transition hover:bg-white hover:scale-110 cursor-pointer ${
-                          formData.emoji === emoji ? "bg-white shadow-xs border border-orange-300" : ""
-                        }`}
+                        className={`text-base p-1 rounded-lg transition hover:bg-white hover:scale-110 cursor-pointer ${formData.emoji === emoji ? "bg-white shadow-xs border border-orange-300" : ""
+                          }`}
                       >
                         {emoji}
                       </button>
@@ -596,11 +589,10 @@ export default function AdminCategories() {
                   <button
                     type="button"
                     onClick={() => setFormData((p) => ({ ...p, isActive: !p.isActive }))}
-                    className={`w-full py-2.5 px-3 rounded-xl text-xs font-bold flex items-center justify-center gap-2 border transition cursor-pointer ${
-                      formData.isActive
+                    className={`w-full py-2.5 px-3 rounded-xl text-xs font-bold flex items-center justify-center gap-2 border transition cursor-pointer ${formData.isActive
                         ? "bg-emerald-50 border-emerald-200 text-emerald-700"
                         : "bg-rose-50 border-rose-200 text-rose-700"
-                    }`}
+                      }`}
                   >
                     {formData.isActive ? <CheckCircle2 className="w-4 h-4" /> : <XCircle className="w-4 h-4" />}
                     <span>{formData.isActive ? "Active (Visible)" : "Inactive (Hidden)"}</span>
@@ -685,9 +677,8 @@ export default function AdminCategories() {
                         key={emoji}
                         type="button"
                         onClick={() => setFormData((p) => ({ ...p, emoji }))}
-                        className={`text-base p-1 rounded-lg transition hover:bg-white hover:scale-110 cursor-pointer ${
-                          formData.emoji === emoji ? "bg-white shadow-xs border border-orange-300" : ""
-                        }`}
+                        className={`text-base p-1 rounded-lg transition hover:bg-white hover:scale-110 cursor-pointer ${formData.emoji === emoji ? "bg-white shadow-xs border border-orange-300" : ""
+                          }`}
                       >
                         {emoji}
                       </button>
@@ -729,11 +720,10 @@ export default function AdminCategories() {
                   <button
                     type="button"
                     onClick={() => setFormData((p) => ({ ...p, isActive: !p.isActive }))}
-                    className={`w-full py-2.5 px-3 rounded-xl text-xs font-bold flex items-center justify-center gap-2 border transition cursor-pointer ${
-                      formData.isActive
+                    className={`w-full py-2.5 px-3 rounded-xl text-xs font-bold flex items-center justify-center gap-2 border transition cursor-pointer ${formData.isActive
                         ? "bg-emerald-50 border-emerald-200 text-emerald-700"
                         : "bg-rose-50 border-rose-200 text-rose-700"
-                    }`}
+                      }`}
                   >
                     {formData.isActive ? <CheckCircle2 className="w-4 h-4" /> : <XCircle className="w-4 h-4" />}
                     <span>{formData.isActive ? "Active (Visible)" : "Inactive (Hidden)"}</span>

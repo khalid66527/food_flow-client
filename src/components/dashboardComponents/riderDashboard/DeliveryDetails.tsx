@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
-import LoadingSpinner from "@/components/LoadingSpinner";
+import LoadingSpinner from "@/lib/api/LoadingSpinner";
 import {
   Loader2,
   RefreshCw,
@@ -128,10 +128,10 @@ export default function DeliveryDetails() {
           prev.map((o) =>
             o.orderId === orderId || o._id === orderId
               ? {
-                  ...o,
-                  orderStatus: "Out for Delivery" as TOrder["orderStatus"],
-                  riderInfo: { riderId: user.id, name: user.name, phone: riderProfile?.phone, vehicleNumber: riderProfile?.vehicleNumber },
-                }
+                ...o,
+                orderStatus: "Out for Delivery" as TOrder["orderStatus"],
+                riderInfo: { riderId: user.id, name: user.name, phone: riderProfile?.phone, vehicleNumber: riderProfile?.vehicleNumber },
+              }
               : o
           )
         );
