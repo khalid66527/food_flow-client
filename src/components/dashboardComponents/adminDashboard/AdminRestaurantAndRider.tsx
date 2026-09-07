@@ -495,7 +495,7 @@ export default function AdminRestaurantAndRider() {
       {/* Main Content Area */}
       {loading ? (
         <div className="min-h-[400px] flex items-center justify-center bg-white rounded-3xl border border-gray-100 p-12">
-          <LoadingSpinner size={50} color="#f97316" message="Loading partner applications..." />
+          <LoadingSpinner size={50} color="#f97316" />
         </div>
       ) : (
         <div className="space-y-8">

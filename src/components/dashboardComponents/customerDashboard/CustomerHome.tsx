@@ -21,7 +21,7 @@ import {
 } from "lucide-react";
 import { useSession } from "@/lib/auth-client";
 import { getUserOrdersApi } from "@/lib/api/order";
-import { getRealTimeLocation, subscribeLocation, loadLocationFromStorage, ILocationInfo } from "@/lib/location";
+import { getRealTimeLocation, subscribeLocation, ILocationInfo } from "@/lib/location";
 import { useCart } from "@/contexts/CartContext";
 import { TOrder } from "@/types/order";
 
@@ -39,7 +39,6 @@ export default function CustomerHome() {
   const [locationInfo, setLocationInfo] = useState<ILocationInfo>(() => getRealTimeLocation());
 
   useEffect(() => {
-    loadLocationFromStorage();
     setLocationInfo(getRealTimeLocation());
 
     const unsubscribe = subscribeLocation(() => {

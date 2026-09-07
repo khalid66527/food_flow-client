@@ -192,7 +192,7 @@ export default function RestaurantOrders() {
   if (sessionPending || loading) {
     return (
       <div className="min-h-[400px] flex items-center justify-center">
-        <LoadingSpinner size={50} color="#f97316" message="Loading restaurant orders..." />
+        <LoadingSpinner size={50} color="#f97316" />
       </div>
     );
   }

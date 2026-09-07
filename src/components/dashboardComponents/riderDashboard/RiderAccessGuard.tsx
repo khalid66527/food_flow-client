@@ -88,7 +88,7 @@ export default function RiderAccessGuard({ children }: RiderAccessGuardProps) {
   if (sessionLoading || loading) {
     return (
       <div className="min-h-[70vh] flex flex-col items-center justify-center p-8">
-        <LoadingSpinner size={50} color="#f97316" message="Verifying delivery partner credentials..." />
+        <LoadingSpinner size={50} color="#f97316" />
       </div>
     );
   }

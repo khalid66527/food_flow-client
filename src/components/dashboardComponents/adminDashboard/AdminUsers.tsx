@@ -729,7 +729,7 @@ export default function AdminUsers() {
       <div className="bg-white rounded-3xl border border-gray-100 shadow-sm overflow-hidden">
         {isLoading ? (
           <div className="py-20 text-center flex items-center justify-center">
-            <LoadingSpinner size={50} color="#f97316" message="Loading users list..." />
+            <LoadingSpinner size={50} color="#f97316" />
           </div>
         ) : users.length === 0 ? (
           <div className="p-16 text-center space-y-3">

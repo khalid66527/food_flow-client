@@ -408,7 +408,7 @@ export default function AdminContactMessages() {
       <div className="bg-white rounded-3xl border border-gray-100 shadow-xs overflow-hidden">
         {loading ? (
           <div className="p-16 flex items-center justify-center">
-            <LoadingSpinner size={50} color="#f97316" message="Loading inquiries..." />
+            <LoadingSpinner size={50} color="#f97316" />
           </div>
         ) : messages.length === 0 ? (
           <div className="p-16 text-center space-y-3">
