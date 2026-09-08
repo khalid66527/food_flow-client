@@ -20,6 +20,9 @@ export type TAddress = {
   street: string;
   city: string;
   state?: string;
+  division?: string;
+  district?: string;
+  upazila?: string;
   postalCode?: string;
   country?: string;
   latitude?: number;

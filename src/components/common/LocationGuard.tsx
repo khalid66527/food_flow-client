@@ -14,6 +14,7 @@ import {
   updateRealTimeLocation,
   getRealTimeLocation,
   subscribeLocation,
+  parseBangladeshHierarchy,
 } from "@/lib/location";
 import LoadingSpinner from "@/components/LoadingSpinner";
 
@@ -70,42 +71,26 @@ export default function LocationGuard({ children }: { children?: React.ReactNode
 
   // Reverse geocode helper & in-memory location updater
   const processCoordinates = useCallback(async (lat: number, lon: number) => {
-    let city = "Chattogram";
-    let area = "Chattogram Central";
-
     try {
       const res = await fetch(
         `https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${lat}&longitude=${lon}&localityLanguage=en`
       );
       const data = await res.json();
+      const parsed = parseBangladeshHierarchy(data);
 
-      const detectedCityRaw =
-        data.city ||
-        data.principalSubdivision ||
-        data.locality ||
-        "Chattogram";
-
-      const detectedAreaRaw =
-        data.locality || data.localityInfo?.locality?.[0]?.name || detectedCityRaw;
-
-      const lowerRaw = detectedCityRaw.toLowerCase();
-      if (lowerRaw.includes("dhaka")) city = "Dhaka";
-      else if (lowerRaw.includes("chittagong") || lowerRaw.includes("chattogram")) city = "Chattogram";
-      else if (lowerRaw.includes("sylhet")) city = "Sylhet";
-      else if (lowerRaw.includes("rajshahi")) city = "Rajshahi";
-      else if (lowerRaw.includes("khulna")) city = "Khulna";
-      else if (lowerRaw.includes("barisal") || lowerRaw.includes("barishal")) city = "Barishal";
-      else if (lowerRaw.includes("rangpur")) city = "Rangpur";
-      else if (lowerRaw.includes("comilla") || lowerRaw.includes("cumilla")) city = "Comilla";
-      else if (lowerRaw.includes("mymensingh")) city = "Mymensingh";
-      else if (detectedCityRaw) city = detectedCityRaw;
-
-      area = detectedAreaRaw ? `${detectedAreaRaw}, ${city}` : `${city} Central`;
+      updateRealTimeLocation(parsed.city, parsed.area, lat, lon, {
+        division: parsed.division,
+        district: parsed.district,
+        upazila: parsed.upazila,
+      });
     } catch {
-      area = `${city} Central`;
+      updateRealTimeLocation("Chattogram", "Chattogram Central", lat, lon, {
+        division: "Chattogram",
+        district: "Chattogram",
+        upazila: "Chattogram GPO",
+      });
     }
 
-    updateRealTimeLocation(city, area, lat, lon);
     setHasLocation(true);
     setIsOpen(false);
     setIsDetecting(false);

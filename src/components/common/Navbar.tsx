@@ -23,6 +23,7 @@ import {
   detectRealTimeLocation, 
   subscribeLocation, 
   updateRealTimeLocation,
+  parseBangladeshHierarchy,
   ILocationInfo 
 } from "@/lib/location";
 import { getAddresses } from "@/lib/api/address";
@@ -86,26 +87,40 @@ export default function Navbar({
   const session = sessionProp || clientSession;
   const user = (userProp || session?.user || null) as UserSession | null;
 
-  // Auto detect user default delivery address city if logged in
+  // Auto detect user default delivery address city if logged in (only as fallback if real GPS is not present)
   useEffect(() => {
     if (!user?.id || !user?.email) return;
     let isCancelled = false;
 
     const syncUserAddressCity = async () => {
       try {
+        const currentLoc = getRealTimeLocation();
+        if (currentLoc.hasRealLocation) return;
+
         const res = await getAddresses(user.id, user.email);
         if (isCancelled) return;
         if (res.success && Array.isArray(res.data) && res.data.length > 0) {
           const defaultAddr = res.data.find((a) => a.isDefault) || res.data[0];
           if (defaultAddr) {
             const addrObj = defaultAddr as any;
-            const detectedCity = addrObj.city || defaultAddr.area;
-            if (detectedCity) {
-              updateRealTimeLocation(
-                detectedCity,
-                defaultAddr.area || defaultAddr.streetAddress || `${detectedCity} Central`
-              );
-            }
+            const rawAddrText = `${addrObj.area || ''} ${addrObj.city || ''} ${addrObj.state || ''} ${addrObj.streetAddress || ''}`;
+            const parsed = parseBangladeshHierarchy({
+              locality: defaultAddr.area,
+              city: addrObj.city,
+              principalSubdivision: addrObj.state,
+            });
+
+            updateRealTimeLocation(
+              parsed.city,
+              parsed.area,
+              undefined,
+              undefined,
+              {
+                division: parsed.division,
+                district: parsed.district,
+                upazila: parsed.upazila,
+              }
+            );
           }
         }
       } catch (e) {
@@ -233,7 +248,7 @@ export default function Navbar({
           <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-orange-50/90 text-orange-700 border border-orange-200/80 text-xs font-bold shadow-2xs">
             <MapPin className="h-3.5 w-3.5 text-orange-500 shrink-0 animate-pulse" />
             <span className="truncate max-w-[90px] sm:max-w-[125px]">
-              {isMounted ? (locationInfo.city || "Chattogram") : "Chattogram"}
+              {isMounted ? (locationInfo.upazila || locationInfo.district || locationInfo.city || "Chattogram") : "Chattogram"}
             </span>
           </div>
 

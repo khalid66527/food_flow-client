@@ -237,6 +237,11 @@ export default function CreateRestaurant({
       return;
     }
 
+    const matchedPostal = availablePostalCodes.find(
+      (p) => p.code === formData.postalCode.trim()
+    );
+    const upazilaName = matchedPostal?.name || formData.postalCode.trim() || formData.state.trim();
+
     const payload: Partial<IRestaurant> = {
       ownerId: userId || initialData?.ownerId,
       ownerEmail: userEmail || formData.contactEmail,
@@ -254,9 +259,13 @@ export default function CreateRestaurant({
         street: formData.street.trim(),
         city: formData.city.trim(),
         state: formData.state.trim(),
+        division: formData.city.trim(),
+        district: formData.state.trim(),
+        upazila: upazilaName,
+        area: upazilaName,
         postalCode: formData.postalCode.trim(),
         country: formData.country.trim() || "Bangladesh",
-        fullAddress: `${formData.street.trim()}, ${formData.city.trim()}`,
+        fullAddress: `${formData.street.trim()}, ${upazilaName ? upazilaName + ', ' : ''}${formData.state.trim()}, ${formData.city.trim()}`,
       },
       generalOpenTime: formData.generalOpenTime,
       generalCloseTime: formData.generalCloseTime,

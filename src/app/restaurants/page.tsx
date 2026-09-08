@@ -13,12 +13,14 @@ import {
   AlertCircle,
   X,
   SlidersHorizontal,
-  Loader2,
   Leaf,
   Flame,
+  Compass,
+  CheckCircle2,
+  Info,
 } from 'lucide-react';
 import { IGlobalFoodItem, FoodSortOption, IPaginationMeta } from '@/types/restaurant';
-import { getAllGlobalFoodItems, getFoodCategories, getAllRestaurants } from '@/lib/api/restaurant';
+import { getAllGlobalFoodItems, getAllRestaurants } from '@/lib/api/restaurant';
 import { getGlobalCategories } from '@/lib/api/category';
 import FoodCard from '@/components/restaurants/FoodCard';
 import { useCart } from '@/contexts/CartContext';
@@ -112,6 +114,9 @@ function useResponsiveLimit() {
   return limit;
 }
 
+export type LocationTierType = 'upazila' | 'district' | 'division' | 'all';
+export type LocationFilterMode = 'auto' | 'upazila' | 'district' | 'division' | 'all';
+
 // ---------------------------------------------------------------------------
 // INNER CONTENT COMPONENT
 // ---------------------------------------------------------------------------
@@ -146,6 +151,16 @@ function ExploreFoodContent() {
   const [sortBy, setSortBy] = useState<FoodSortOption>('newest');
   const [currentPage, setCurrentPage] = useState(1);
   const [debouncedSearch, setDebouncedSearch] = useState('');
+
+  // Location Hierarchy Modes & Fallback State
+  const [locationFilterMode, setLocationFilterMode] = useState<LocationFilterMode>('auto');
+  const [activeMatchedTier, setActiveMatchedTier] = useState<LocationTierType>('all');
+  const [fallbackNotice, setFallbackNotice] = useState<{
+    tier: LocationTierType;
+    title: string;
+    description: string;
+    badge: string;
+  } | null>(null);
 
   // Restaurant dropdown (extracted from food items + DB)
   const [availableRestaurants, setAvailableRestaurants] = useState<
@@ -221,17 +236,33 @@ function ExploreFoodContent() {
     fetchCategories();
   }, []);
 
-  // Fetch all active restaurants for the top-bar dropdown (filtered by real-time city & sorted by distance)
+  // Fetch restaurants for the top-bar dropdown strictly filtered by active location
   useEffect(() => {
     const fetchRestaurants = async () => {
       try {
-        const params: Record<string, any> = { city: locationInfo.city };
-        if (locationInfo.lat !== undefined && locationInfo.lng !== undefined) {
-          params.lat = locationInfo.lat;
-          params.lng = locationInfo.lng;
+        const params: Record<string, any> = {};
+        if (locationFilterMode === 'upazila' && locationInfo.upazila) {
+          params.upazila = locationInfo.upazila;
+        } else if (locationFilterMode === 'district' && locationInfo.district) {
+          params.district = locationInfo.district;
+        } else if (locationFilterMode === 'division' && locationInfo.division) {
+          params.division = locationInfo.division;
+        } else if (locationFilterMode === 'auto') {
+          if (activeMatchedTier === 'upazila' && locationInfo.upazila) {
+            params.upazila = locationInfo.upazila;
+          } else if (activeMatchedTier === 'district' && locationInfo.district) {
+            params.district = locationInfo.district;
+          } else if (activeMatchedTier === 'division' && locationInfo.division) {
+            params.division = locationInfo.division;
+          } else if (locationInfo.district) {
+            params.district = locationInfo.district;
+          } else if (locationInfo.division) {
+            params.division = locationInfo.division;
+          }
         }
+
         const res = await getAllRestaurants(params);
-        if (res.success && Array.isArray(res.data) && res.data.length > 0) {
+        if (res.success && Array.isArray(res.data)) {
           const list = res.data
             .map((r) => ({
               id: r._id || r.id || '',
@@ -239,20 +270,16 @@ function ExploreFoodContent() {
             }))
             .filter((r) => r.id);
 
-          setAvailableRestaurants((prev) => {
-            const merged = new Map<string, string>(prev.map((item) => [item.id, item.name]));
-            list.forEach((item) => merged.set(item.id, item.name));
-            return Array.from(merged.entries()).map(([id, name]) => ({ id, name }));
-          });
+          setAvailableRestaurants(list);
         } else {
           setAvailableRestaurants([]);
         }
       } catch {
-        // Fallback to food items mapping
+        setAvailableRestaurants([]);
       }
     };
     fetchRestaurants();
-  }, [locationInfo.city, locationInfo.lat, locationInfo.lng]);
+  }, [locationInfo, activeMatchedTier, locationFilterMode]);
 
   // Reset to page 1 when responsive limit changes (viewport resize)
   useEffect(() => {
@@ -260,60 +287,217 @@ function ExploreFoodContent() {
   }, [responsiveLimit]);
 
   // ---------------------------------------------------------------------------
-  // BUILD QUERY & FETCH
+  // CASCADING HIERARCHICAL FETCH ALGORITHM (উপজেলা -> জেলা -> বিভাগ -> All)
   // ---------------------------------------------------------------------------
   const fetchFoodItems = useCallback(async () => {
     setLoading(true);
     setError(null);
 
-    const query: Record<string, string> = {
+    const baseQuery: Record<string, string> = {
       page: String(currentPage),
       limit: String(responsiveLimit),
       sortBy,
     };
 
-    if (locationInfo.city) query.city = locationInfo.city;
     if (locationInfo.lat !== undefined && locationInfo.lng !== undefined) {
-      query.lat = String(locationInfo.lat);
-      query.lng = String(locationInfo.lng);
+      baseQuery.lat = String(locationInfo.lat);
+      baseQuery.lng = String(locationInfo.lng);
     }
-    if (debouncedSearch.trim()) query.search = debouncedSearch.trim();
-    if (selectedRestaurant !== 'all') query.restaurantId = selectedRestaurant;
-    if (selectedCategory !== 'all') query.category = selectedCategory;
-    if (isVegetarian) query.isVegetarian = 'true';
-    if (isSpicy) query.isSpicy = 'true';
+    if (debouncedSearch.trim()) baseQuery.search = debouncedSearch.trim();
+    if (selectedRestaurant !== 'all') baseQuery.restaurantId = selectedRestaurant;
+    if (selectedCategory !== 'all') baseQuery.category = selectedCategory;
+    if (isVegetarian) baseQuery.isVegetarian = 'true';
+    if (isSpicy) baseQuery.isSpicy = 'true';
 
     try {
-      const res = await getAllGlobalFoodItems(query);
-      if (res.success && Array.isArray(res.data)) {
-        setFoodItems(res.data);
-        if ((res as unknown as { pagination?: typeof pagination }).pagination) {
-          setPagination((res as unknown as { pagination: typeof pagination }).pagination);
-        }
-
-        const restaurantMap = new Map<string, string>();
-        res.data.forEach((item) => {
-          if (item.restaurantId && item.restaurantName) {
-            restaurantMap.set(item.restaurantId, item.restaurantName);
+      // 1. User selected explicit Upazila filter
+      if (locationFilterMode === 'upazila') {
+        const query = { ...baseQuery, upazila: locationInfo.upazila || locationInfo.area || '' };
+        const res = await getAllGlobalFoodItems(query);
+        if (res.success && Array.isArray(res.data) && res.data.length > 0) {
+          setFoodItems(res.data);
+          setActiveMatchedTier('upazila');
+          setFallbackNotice({
+            tier: 'upazila',
+            title: `Showing Upazila Dishes`,
+            description: `Showing dishes from restaurants in ${locationInfo.upazila || 'your Upazila'}.`,
+            badge: 'Upazila / Area',
+          });
+          if ((res as unknown as { pagination?: typeof pagination }).pagination) {
+            setPagination((res as unknown as { pagination: typeof pagination }).pagination);
           }
-        });
-        const restaurants = Array.from(restaurantMap.entries()).map(([id, name]) => ({ id, name }));
-        setAvailableRestaurants((prev) => {
-          const merged = new Map<string, string>(prev.map((r) => [r.id, r.name]));
-          restaurants.forEach((r) => merged.set(r.id, r.name));
-          return Array.from(merged.entries()).map(([id, name]) => ({ id, name }));
-        });
-      } else {
-        setFoodItems([]);
-        setError(res.message || 'Failed to load dishes.');
+        } else {
+          setFoodItems([]);
+          setActiveMatchedTier('upazila');
+          setFallbackNotice(null);
+        }
+        return;
       }
+
+      // 2. User selected explicit District filter
+      if (locationFilterMode === 'district') {
+        const query = { ...baseQuery, district: locationInfo.district || locationInfo.city || '' };
+        const res = await getAllGlobalFoodItems(query);
+        if (res.success && Array.isArray(res.data) && res.data.length > 0) {
+          setFoodItems(res.data);
+          setActiveMatchedTier('district');
+          setFallbackNotice({
+            tier: 'district',
+            title: `Showing District Dishes`,
+            description: `Showing dishes from restaurants across ${locationInfo.district || 'your District'}.`,
+            badge: 'District / Zila',
+          });
+          if ((res as unknown as { pagination?: typeof pagination }).pagination) {
+            setPagination((res as unknown as { pagination: typeof pagination }).pagination);
+          }
+        } else {
+          setFoodItems([]);
+          setActiveMatchedTier('district');
+          setFallbackNotice(null);
+        }
+        return;
+      }
+
+      // 3. User selected explicit Division filter
+      if (locationFilterMode === 'division') {
+        const query = { ...baseQuery, division: locationInfo.division || locationInfo.city || '' };
+        const res = await getAllGlobalFoodItems(query);
+        if (res.success && Array.isArray(res.data) && res.data.length > 0) {
+          setFoodItems(res.data);
+          setActiveMatchedTier('division');
+          setFallbackNotice({
+            tier: 'division',
+            title: `Showing Division Dishes`,
+            description: `Showing dishes from restaurants across ${locationInfo.division || 'your Division'}.`,
+            badge: 'Division',
+          });
+          if ((res as unknown as { pagination?: typeof pagination }).pagination) {
+            setPagination((res as unknown as { pagination: typeof pagination }).pagination);
+          }
+        } else {
+          setFoodItems([]);
+          setActiveMatchedTier('division');
+          setFallbackNotice(null);
+        }
+        return;
+      }
+
+      // 4. User selected explicit All regions filter
+      if (locationFilterMode === 'all') {
+        const res = await getAllGlobalFoodItems(baseQuery);
+        if (res.success && Array.isArray(res.data)) {
+          setFoodItems(res.data);
+          setActiveMatchedTier('all');
+          setFallbackNotice(null);
+          if ((res as unknown as { pagination?: typeof pagination }).pagination) {
+            setPagination((res as unknown as { pagination: typeof pagination }).pagination);
+          }
+        } else {
+          setFoodItems([]);
+        }
+        return;
+      }
+
+      // 5. DEFAULT SMART CASCADING MODE ('auto'):
+      // Step A: Check Upazila (উপজেলা) if present and distinct from district
+      const userUpazila = locationInfo.upazila?.trim();
+      const userDistrict = (locationInfo.district || locationInfo.city || '').trim();
+      const userDivision = (locationInfo.division || locationInfo.city || '').trim();
+
+      if (userUpazila && userUpazila.toLowerCase() !== userDistrict.toLowerCase()) {
+        const upazilaRes = await getAllGlobalFoodItems({
+          ...baseQuery,
+          upazila: userUpazila,
+        });
+
+        if (upazilaRes.success && Array.isArray(upazilaRes.data) && upazilaRes.data.length > 0) {
+          setFoodItems(upazilaRes.data);
+          setActiveMatchedTier('upazila');
+          setFallbackNotice({
+            tier: 'upazila',
+            title: `Found in your Upazila: ${userUpazila}`,
+            description: `Showing freshly prepared dishes from restaurants in ${userUpazila}.`,
+            badge: 'Upazila Match',
+          });
+          if ((upazilaRes as unknown as { pagination?: typeof pagination }).pagination) {
+            setPagination((upazilaRes as unknown as { pagination: typeof pagination }).pagination);
+          }
+          return;
+        }
+      }
+
+      // Step B: Check District (জেলা)
+      if (userDistrict) {
+        const districtRes = await getAllGlobalFoodItems({
+          ...baseQuery,
+          district: userDistrict,
+        });
+
+        if (districtRes.success && Array.isArray(districtRes.data) && districtRes.data.length > 0) {
+          setFoodItems(districtRes.data);
+          setActiveMatchedTier('district');
+          setFallbackNotice({
+            tier: 'district',
+            title: `Showing Dishes from ${userDistrict} District`,
+            description: userUpazila && userUpazila.toLowerCase() !== userDistrict.toLowerCase()
+              ? `No partner restaurants found in ${userUpazila} Upazila. Showing dishes from restaurants in ${userDistrict} District.`
+              : `Showing dishes from partner restaurants in ${userDistrict} District.`,
+            badge: 'District Match',
+          });
+          if ((districtRes as unknown as { pagination?: typeof pagination }).pagination) {
+            setPagination((districtRes as unknown as { pagination: typeof pagination }).pagination);
+          }
+          return;
+        }
+      }
+
+      // Step C: Check Division (বিভাগ) if 0 items in District
+      if (userDivision) {
+        const divisionRes = await getAllGlobalFoodItems({
+          ...baseQuery,
+          division: userDivision,
+        });
+
+        if (divisionRes.success && Array.isArray(divisionRes.data) && divisionRes.data.length > 0) {
+          setFoodItems(divisionRes.data);
+          setActiveMatchedTier('division');
+          setFallbackNotice({
+            tier: 'division',
+            title: `Expanded to Division: ${userDivision}`,
+            description: userDistrict
+              ? `No partner restaurants found in ${userDistrict} District. Showing dishes available across ${userDivision} Division.`
+              : `Showing dishes available in ${userDivision} Division.`,
+            badge: 'Division Match',
+          });
+          if ((divisionRes as unknown as { pagination?: typeof pagination }).pagination) {
+            setPagination((divisionRes as unknown as { pagination: typeof pagination }).pagination);
+          }
+          return;
+        }
+      }
+
+      // Step D: If no restaurants exist in the user's division, do not mix unrelated cities
+      setFoodItems([]);
+      setActiveMatchedTier('all');
+      setFallbackNotice(null);
     } catch {
       setFoodItems([]);
-      setError('Something went wrong. Please try again.');
+      setError('Something went wrong while fetching dishes. Please try again.');
     } finally {
       setLoading(false);
     }
-  }, [currentPage, debouncedSearch, selectedRestaurant, sortBy, selectedCategory, isVegetarian, isSpicy, responsiveLimit, locationInfo.city]);
+  }, [
+    currentPage,
+    debouncedSearch,
+    selectedRestaurant,
+    sortBy,
+    selectedCategory,
+    isVegetarian,
+    isSpicy,
+    responsiveLimit,
+    locationFilterMode,
+    locationInfo,
+  ]);
 
   useEffect(() => {
     fetchFoodItems();
@@ -364,6 +548,7 @@ function ExploreFoodContent() {
     setIsVegetarian(false);
     setIsSpicy(false);
     setSortBy('newest');
+    setLocationFilterMode('auto');
     setCurrentPage(1);
 
     if (typeof window !== 'undefined') {
@@ -379,7 +564,8 @@ function ExploreFoodContent() {
     (selectedRestaurant !== 'all' ? 1 : 0) +
     (selectedCategory !== 'all' ? 1 : 0) +
     (isVegetarian ? 1 : 0) +
-    (isSpicy ? 1 : 0);
+    (isSpicy ? 1 : 0) +
+    (locationFilterMode !== 'auto' ? 1 : 0);
 
   const hasActiveFilters = activeFilterCount > 0;
 
@@ -405,10 +591,11 @@ function ExploreFoodContent() {
                 key={cat.id}
                 type="button"
                 onClick={() => handleCategorySelect(cat.id)}
-                className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 cursor-pointer ${isActive
+                className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 cursor-pointer ${
+                  isActive
                     ? 'bg-gradient-to-r from-orange-500 to-orange-600 text-white font-bold shadow-md shadow-orange-500/20 border border-orange-500 scale-[1.01]'
                     : 'text-gray-700 hover:bg-orange-50/70 hover:text-orange-600 hover:border-orange-200 border border-transparent'
-                  }`}
+                }`}
               >
                 <span className={`text-base p-1 rounded-lg transition-colors ${isActive ? 'bg-white/20' : 'bg-gray-100'}`}>
                   {cat.emoji}
@@ -438,10 +625,11 @@ function ExploreFoodContent() {
               });
               setCurrentPage(1);
             }}
-            className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all cursor-pointer ${isVegetarian
+            className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all cursor-pointer ${
+              isVegetarian
                 ? 'bg-emerald-50 text-emerald-600 border border-emerald-200 shadow-xs'
                 : 'text-gray-600 hover:bg-gray-50 border border-transparent'
-              }`}
+            }`}
           >
             <Leaf className="w-4 h-4 text-emerald-500" />
             <span className="flex-1 text-left">Vegetarian</span>
@@ -460,10 +648,11 @@ function ExploreFoodContent() {
               });
               setCurrentPage(1);
             }}
-            className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all cursor-pointer ${isSpicy
+            className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all cursor-pointer ${
+              isSpicy
                 ? 'bg-rose-50 text-rose-600 border border-rose-200 shadow-xs'
                 : 'text-gray-600 hover:bg-gray-50 border border-transparent'
-              }`}
+            }`}
           >
             <Flame className="w-4 h-4 text-rose-500" />
             <span className="flex-1 text-left">Spicy</span>
@@ -492,26 +681,36 @@ function ExploreFoodContent() {
   // ---------------------------------------------------------------------------
   return (
     <div className="min-h-screen bg-[#FFFDF8] text-gray-900 font-sans pb-20">
-      {/* HEADER */}
+      {/* HEADER WITH LOCATION CONTEXT */}
       <section className="bg-gradient-to-r from-[#FF6B35] via-[#FF7843] to-[#FF8C42] text-white shadow-md">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 md:py-8">
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
             <div>
+              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/20 backdrop-blur-md text-xs font-bold uppercase tracking-wider text-amber-100 mb-2">
+                <Compass className="w-3.5 h-3.5 animate-spin text-amber-200" style={{ animationDuration: '10s' }} />
+                <span>Smart Location Discovery</span>
+              </div>
               <h1 className="text-2xl md:text-3xl font-extrabold tracking-tight text-white">
-                Explore Dishes
+                Explore Dishes Near You
               </h1>
-              <p className="text-orange-100 text-sm mt-1 max-w-md">
-                Browse dishes from our partner restaurants, fast delivery to your doorstep.
+              <p className="text-orange-100 text-xs sm:text-sm mt-1 max-w-xl">
+                Automatically checking restaurants in your <strong>Upazila</strong>, <strong>District</strong>, and <strong>Division</strong> for express doorstep delivery.
               </p>
             </div>
 
-            <div className="flex items-center gap-3">
-              {/* Location display */}
-              <div className="hidden sm:flex items-center gap-2 bg-white/10 backdrop-blur-md border border-white/20 rounded-xl px-3.5 py-2 text-white text-xs font-medium">
-                <MapPin className="w-3.5 h-3.5 text-amber-200 shrink-0" />
-                <span className="truncate max-w-[190px] font-bold text-amber-100">
-                  {locationInfo.area || `${locationInfo.city} Central`}
-                </span>
+            <div className="flex flex-wrap items-center gap-3">
+              {/* Location display badge */}
+              <div className="flex items-center gap-2 bg-white/15 backdrop-blur-md border border-white/25 rounded-2xl px-4 py-2.5 text-white text-xs font-medium shadow-inner">
+                <MapPin className="w-4 h-4 text-amber-300 shrink-0 animate-bounce" />
+                <div className="flex flex-col text-left">
+                  <span className="text-[10px] text-amber-200 uppercase font-extrabold tracking-wider">
+                    Detected Location
+                  </span>
+                  <span className="truncate max-w-[200px] font-bold text-white text-xs">
+                    {locationInfo.upazila ? `${locationInfo.upazila}, ` : ''}
+                    {locationInfo.district || locationInfo.city}
+                  </span>
+                </div>
               </div>
 
               {/* Restaurant dropdown */}
@@ -521,7 +720,7 @@ function ExploreFoodContent() {
                   onChange={(e) => { setSelectedRestaurant(e.target.value); setCurrentPage(1); }}
                   className="appearance-none bg-white text-gray-800 text-xs sm:text-sm font-medium py-2.5 pl-3.5 pr-8 rounded-xl shadow-sm border border-orange-200 focus:outline-none focus:ring-2 focus:ring-amber-300 cursor-pointer"
                 >
-                  <option value="all">All Restaurants</option>
+                  <option value="all">All Partner Restaurants</option>
                   {availableRestaurants.map((r) => (
                     <option key={r.id} value={r.id}>{r.name}</option>
                   ))}
@@ -558,7 +757,7 @@ function ExploreFoodContent() {
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search dishes, cuisines..."
+              placeholder="Search dishes, cuisines, ingredients..."
               className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-gray-200 bg-white text-sm text-gray-800 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-orange-300 focus:border-orange-300 transition"
             />
             {searchQuery && (
@@ -579,7 +778,7 @@ function ExploreFoodContent() {
               onChange={(e) => { setSortBy(e.target.value as FoodSortOption); setCurrentPage(1); }}
               className="appearance-none bg-white text-gray-700 text-sm font-medium py-2.5 pl-3.5 pr-8 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-orange-300 cursor-pointer"
             >
-              <option value="distance">Nearest First (Proximity)</option>
+              <option value="distance">Nearest First (GPS Proximity)</option>
               <option value="newest">Newest First</option>
               <option value="price_asc">Price: Low to High</option>
               <option value="price_desc">Price: High to Low</option>
@@ -591,6 +790,14 @@ function ExploreFoodContent() {
         {/* Active filter chips */}
         {hasActiveFilters && (
           <div className="mt-3 flex items-center gap-2 flex-wrap text-xs">
+            {locationFilterMode !== 'auto' && (
+              <span className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-orange-100 text-orange-800 font-bold rounded-full border border-orange-300 capitalize">
+                Scope: {locationFilterMode}
+                <button type="button" onClick={() => { setLocationFilterMode('auto'); setCurrentPage(1); }} className="text-orange-500 hover:text-orange-800 cursor-pointer">
+                  <X className="w-3 h-3" />
+                </button>
+              </span>
+            )}
             {selectedCategory !== 'all' && (
               <span className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-orange-50 text-orange-700 font-semibold rounded-full border border-orange-200 capitalize">
                 Category: {categories.find((c) => isCategoryActive(c.id))?.label || selectedCategory}
@@ -625,7 +832,7 @@ function ExploreFoodContent() {
             )}
             {activeFilterCount > 1 && (
               <button type="button" onClick={handleResetFilters} className="text-orange-500 hover:text-orange-700 font-medium underline cursor-pointer">
-                Clear all
+                Clear all filters
               </button>
             )}
           </div>
@@ -633,7 +840,7 @@ function ExploreFoodContent() {
       </div>
 
       {/* MAIN CONTENT: SIDEBAR + GRID */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-8">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-6">
         <div className="flex gap-8">
 
           {/* DESKTOP SIDEBAR */}
@@ -691,7 +898,57 @@ function ExploreFoodContent() {
 
           {/* RIGHT CONTENT */}
           <main className="flex-1 min-w-0">
-            {/* LOADING WITH HASHLOADER */}
+            {/* DYNAMIC SMART LOCATION NOTIFICATION BANNER */}
+            {fallbackNotice && !loading && foodItems.length > 0 && (
+              <motion.div
+                initial={{ opacity: 0, y: -10 }}
+                animate={{ opacity: 1, y: 0 }}
+                className={`mb-6 p-4 rounded-2xl border flex items-start sm:items-center justify-between gap-4 shadow-xs ${
+                  fallbackNotice.tier === 'upazila'
+                    ? 'bg-emerald-50/80 border-emerald-200 text-emerald-900'
+                    : fallbackNotice.tier === 'district'
+                    ? 'bg-amber-50/90 border-amber-200 text-amber-900'
+                    : fallbackNotice.tier === 'division'
+                    ? 'bg-orange-50/90 border-orange-200 text-orange-900'
+                    : 'bg-blue-50/90 border-blue-200 text-blue-900'
+                }`}
+              >
+                <div className="flex items-start sm:items-center gap-3">
+                  <div className={`p-2 rounded-xl shrink-0 ${
+                    fallbackNotice.tier === 'upazila'
+                      ? 'bg-emerald-500 text-white'
+                      : fallbackNotice.tier === 'district'
+                      ? 'bg-amber-500 text-white'
+                      : fallbackNotice.tier === 'division'
+                      ? 'bg-orange-500 text-white'
+                      : 'bg-blue-500 text-white'
+                  }`}>
+                    {fallbackNotice.tier === 'upazila' ? (
+                      <CheckCircle2 className="w-5 h-5" />
+                    ) : (
+                      <Info className="w-5 h-5" />
+                    )}
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <h4 className="font-extrabold text-sm">{fallbackNotice.title}</h4>
+                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-white/80 border shadow-2xs">
+                        {fallbackNotice.badge}
+                      </span>
+                    </div>
+                    <p className="text-xs mt-0.5 opacity-90 leading-relaxed max-w-xl">
+                      {fallbackNotice.description}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="hidden md:flex items-center gap-2 text-xs font-bold text-gray-500 shrink-0">
+                  <span>{pagination.totalItems} dishes available</span>
+                </div>
+              </motion.div>
+            )}
+
+            {/* LOADING WITH SPINNER */}
             {loading && (
               <div className="flex items-center justify-center min-h-[450px] w-full">
                 <LoadingSpinner size={50} color="#f97316" />
@@ -713,15 +970,30 @@ function ExploreFoodContent() {
 
             {/* EMPTY */}
             {!loading && !error && foodItems.length === 0 && (
-              <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="text-center py-20">
-                <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-orange-50 border border-orange-200 mb-4">
-                  <UtensilsCrossed className="w-7 h-7 text-orange-400" />
+              <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="text-center py-20 bg-white rounded-3xl border border-gray-100 p-8 shadow-xs">
+                <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-orange-50 border border-orange-200 mb-4">
+                  <UtensilsCrossed className="w-8 h-8 text-orange-400" />
                 </div>
-                <p className="text-sm font-medium text-gray-700 mb-1">No dishes found</p>
-                <p className="text-xs text-gray-400 mb-4">Try adjusting your search or filters</p>
-                <button type="button" onClick={handleResetFilters} className="px-5 py-2.5 bg-orange-500 hover:bg-orange-600 text-white text-xs font-bold rounded-xl transition cursor-pointer">
-                  Reset Filters
-                </button>
+                <h3 className="text-base font-bold text-gray-800 mb-1">No dishes found in this area</h3>
+                <p className="text-xs text-gray-500 max-w-md mx-auto mb-6">
+                  {locationFilterMode !== 'all'
+                    ? `No partner restaurants have published dishes matching your search in ${locationFilterMode.toUpperCase()} scope. Try broadening your location to "All Locations".`
+                    : 'Try adjusting your search keywords or clearing active filters.'}
+                </p>
+                <div className="flex flex-wrap items-center justify-center gap-3">
+                  {locationFilterMode !== 'all' && (
+                    <button
+                      type="button"
+                      onClick={() => { setLocationFilterMode('all'); setCurrentPage(1); }}
+                      className="px-5 py-2.5 bg-gray-900 hover:bg-black text-white text-xs font-bold rounded-xl transition cursor-pointer shadow-sm"
+                    >
+                      Show All Locations
+                    </button>
+                  )}
+                  <button type="button" onClick={handleResetFilters} className="px-5 py-2.5 bg-orange-500 hover:bg-orange-600 text-white text-xs font-bold rounded-xl transition cursor-pointer shadow-sm shadow-orange-500/20">
+                    Reset All Filters
+                  </button>
+                </div>
               </motion.div>
             )}
 
