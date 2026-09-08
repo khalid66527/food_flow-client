@@ -53,21 +53,18 @@ function isRouteLocationRequired(pathname: string): boolean {
 
 export default function LocationGuard({ children }: { children?: React.ReactNode }) {
   const pathname = usePathname();
+  const [mounted, setMounted] = useState<boolean>(false);
   const isProtected = isRouteLocationRequired(pathname);
 
-  const [hasLocation, setHasLocation] = useState<boolean>(
-    () => getRealTimeLocation().hasRealLocation
-  );
-  
-  // Checking state for protected routes to prevent modal pop-up flickering
-  const [isChecking, setIsChecking] = useState<boolean>(() => {
-    if (typeof window === "undefined") return false;
-    return isProtected && !getRealTimeLocation().hasRealLocation;
-  });
-
+  const [hasLocation, setHasLocation] = useState<boolean>(false);
+  const [isChecking, setIsChecking] = useState<boolean>(false);
   const [isOpen, setIsOpen] = useState<boolean>(false);
   const [isDetecting, setIsDetecting] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   // Reverse geocode helper & in-memory location updater
   const processCoordinates = useCallback(async (lat: number, lon: number) => {
@@ -141,6 +138,8 @@ export default function LocationGuard({ children }: { children?: React.ReactNode
 
   // Initial & route-change background scan
   useEffect(() => {
+    if (!mounted) return;
+
     if (!isProtected) {
       setIsOpen(false);
       setIsChecking(false);
@@ -195,7 +194,7 @@ export default function LocationGuard({ children }: { children?: React.ReactNode
       window.removeEventListener("focus", handleFocus);
       window.removeEventListener("visibilitychange", handleFocus);
     };
-  }, [pathname, isProtected, scanAndDetectLocation]);
+  }, [mounted, pathname, isProtected, scanAndDetectLocation]);
 
   // Strict Guard: Prevent closing modal on Escape key press when open
   useEffect(() => {
@@ -208,6 +207,11 @@ export default function LocationGuard({ children }: { children?: React.ReactNode
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [isOpen]);
+
+  // 0. Pre-hydration SSR pass -> match server HTML output exactly
+  if (!mounted) {
+    return <>{children}</>;
+  }
 
   // 1. Unprotected public route -> render children immediately
   if (!isProtected) {
