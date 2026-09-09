@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState, useCallback } from "react";
+import React, { useEffect, useState, useCallback, useMemo } from "react";
 import LoadingSpinner from "@/lib/api/LoadingSpinner";
 import {
   RefreshCw,
@@ -14,11 +14,17 @@ import {
   Search,
   Truck,
   Package,
+  Navigation,
+  Eye,
+  X,
+  CreditCard,
 } from "lucide-react";
 import { useSession } from "@/lib/auth-client";
 import { getRestaurantOrdersApi } from "@/lib/api/order";
 import { getOrderSocket, joinOrderRoom, disconnectOrderSocket } from "@/lib/socket";
 import { TOrder } from "@/types/order";
+import OrderStatusStepper from "@/components/tracking/OrderStatusStepper";
+import OrderTrackingMap from "@/components/tracking/OrderTrackingMap";
 
 function getRestaurantProfile() {
   if (typeof window === "undefined") return null;
@@ -40,6 +46,10 @@ export default function RestaurantDelivery() {
   const [searchQuery, setSearchQuery] = useState("");
   const [socketConnected, setSocketConnected] = useState(false);
 
+  // Live Tracking Modal
+  const [selectedOrder, setSelectedOrder] = useState<TOrder | null>(null);
+  const [riderLiveCoords, setRiderLiveCoords] = useState<Record<string, { lat: number; lng: number }>>({});
+
   const profile = getRestaurantProfile();
 
   const fetchOrders = useCallback(async () => {
@@ -49,7 +59,7 @@ export default function RestaurantDelivery() {
     const res = await getRestaurantOrdersApi(user.id, user.email, {
       restaurantId: profile?._id,
       restaurantName: profile?.restaurantName,
-      status: "Ready,Out for Delivery,Delivered",
+      status: "Ready,Ready for Pickup,Out for Delivery,Delivered",
     });
     if (res.success && Array.isArray(res.data)) {
       setOrders(res.data as TOrder[]);
@@ -64,7 +74,17 @@ export default function RestaurantDelivery() {
     if (!sessionPending && user?.id) fetchOrders();
   }, [sessionPending, user?.id, fetchOrders]);
 
-  // Socket: listen for out-for-delivery / completion updates
+  // Keep selected order updated
+  useEffect(() => {
+    if (selectedOrder) {
+      const match = orders.find(
+        (o) => (o.orderId && o.orderId === selectedOrder.orderId) || (o._id && o._id === selectedOrder._id)
+      );
+      if (match) setSelectedOrder(match);
+    }
+  }, [orders, selectedOrder]);
+
+  // Socket: listen for out-for-delivery / completion updates & live coordinates
   useEffect(() => {
     if (!user?.id || sessionPending) return;
 
@@ -87,28 +107,51 @@ export default function RestaurantDelivery() {
       );
     };
 
+    const onRiderLocation = (payload: {
+      orderId?: string;
+      lat?: number;
+      lng?: number;
+      latitude?: number;
+      longitude?: number;
+    }) => {
+      const oId = payload?.orderId;
+      const lat = payload?.lat ?? payload?.latitude;
+      const lng = payload?.lng ?? payload?.longitude;
+      if (oId && lat && lng) {
+        setRiderLiveCoords((prev) => ({
+          ...prev,
+          [oId]: { lat, lng },
+        }));
+      }
+    };
+
     socket.on("connect", onConnect);
     socket.on("disconnect", onDisconnect);
     socket.on("order_status_updated", onStatusUpdated);
+    socket.on("update_rider_location", onRiderLocation);
 
     return () => {
       socket.off("connect", onConnect);
       socket.off("disconnect", onDisconnect);
       socket.off("order_status_updated", onStatusUpdated);
+      socket.off("update_rider_location", onRiderLocation);
     };
   }, [sessionPending, user?.id]);
 
   useEffect(() => () => disconnectOrderSocket(), []);
 
-  const filteredOrders = orders.filter((o) => {
-    const q = searchQuery.toLowerCase().trim();
-    return (
-      !q ||
-      o.orderId?.toLowerCase().includes(q) ||
-      o.items?.some((i) => i.name.toLowerCase().includes(q)) ||
-      o.riderInfo?.name?.toLowerCase().includes(q)
-    );
-  });
+  const filteredOrders = useMemo(() => {
+    return orders.filter((o) => {
+      const q = searchQuery.toLowerCase().trim();
+      return (
+        !q ||
+        o.orderId?.toLowerCase().includes(q) ||
+        o.items?.some((i) => i.name.toLowerCase().includes(q)) ||
+        o.riderInfo?.name?.toLowerCase().includes(q) ||
+        o.deliveryAddress?.fullName?.toLowerCase().includes(q)
+      );
+    });
+  }, [orders, searchQuery]);
 
   const dispatched = orders.filter((o) => o.orderStatus === "Out for Delivery").length;
   const delivered = orders.filter((o) => o.orderStatus === "Delivered").length;
@@ -127,15 +170,15 @@ export default function RestaurantDelivery() {
             <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-white/20 backdrop-blur-md text-[11px] font-extrabold uppercase tracking-wider mb-2.5 text-white border border-white/25">
               <Truck className="w-3.5 h-3.5 text-white" /> Outgoing Deliveries
             </div>
-            <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-white">Delivery Tracking</h1>
+            <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-white">Live Delivery Tracking</h1>
             <p className="text-orange-100 text-sm mt-1">
-              Follow dispatched orders and assigned riders from pickup to dropped off.
+              Follow dispatched orders, rider live GPS locations, and delivery handoffs in real-time.
             </p>
           </div>
           <div className="flex items-center gap-3">
             <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white/15 backdrop-blur-md text-[11px] font-extrabold border border-white/20">
               <span className={`w-2 h-2 rounded-full ${socketConnected ? "bg-emerald-400 animate-pulse" : "bg-white/50"}`} />
-              {socketConnected ? "Live" : "Offline"}
+              {socketConnected ? "Live GPS Sync" : "Offline"}
             </span>
             <button
               type="button"
@@ -150,14 +193,18 @@ export default function RestaurantDelivery() {
       </section>
 
       {/* Stats */}
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
         <div className="bg-white rounded-2xl p-4 border border-gray-100 shadow-xs space-y-1">
-          <span className="text-[11px] font-bold text-gray-400 uppercase tracking-wider">Active Deliveries</span>
+          <span className="text-[11px] font-bold text-gray-400 uppercase tracking-wider">Active On Road</span>
           <p className="text-xl sm:text-2xl font-black text-amber-600">{dispatched}</p>
         </div>
         <div className="bg-white rounded-2xl p-4 border border-gray-100 shadow-xs space-y-1">
-          <span className="text-[11px] font-bold text-gray-400 uppercase tracking-wider">Completed Today</span>
+          <span className="text-[11px] font-bold text-gray-400 uppercase tracking-wider">Completed Deliveries</span>
           <p className="text-xl sm:text-2xl font-black text-emerald-600">{delivered}</p>
+        </div>
+        <div className="bg-white rounded-2xl p-4 border border-gray-100 shadow-xs space-y-1 col-span-2 sm:col-span-1">
+          <span className="text-[11px] font-bold text-gray-400 uppercase tracking-wider">Total Handled</span>
+          <p className="text-xl sm:text-2xl font-black text-gray-900">{orders.length}</p>
         </div>
       </div>
 
@@ -169,7 +216,7 @@ export default function RestaurantDelivery() {
             type="text"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Search order, food, or rider..."
+            placeholder="Search order ID, customer, rider..."
             className="w-full pl-9 pr-4 py-2 rounded-xl border border-gray-200 text-xs font-semibold text-gray-800 placeholder-gray-400 focus:outline-hidden focus:border-[#FF6B35] transition"
           />
         </div>
@@ -191,7 +238,7 @@ export default function RestaurantDelivery() {
           <div className="space-y-1">
             <h3 className="text-lg font-extrabold text-gray-900">No Dispatched Orders</h3>
             <p className="text-xs text-gray-500 max-w-sm mx-auto">
-              Orders that are ready for pickup, out for delivery, or delivered will appear here.
+              Orders that are marked ready for pickup, out for delivery, or delivered will appear here.
             </p>
           </div>
         </div>
@@ -222,8 +269,18 @@ export default function RestaurantDelivery() {
                           <Bike className="w-3.5 h-3.5 text-amber-600" /> Out for Delivery
                         </span>
                       )}
+
+                      {order.paymentMethod === "COD" ? (
+                        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-amber-50 text-amber-800 text-[11px] font-extrabold border border-amber-200">
+                          <Banknote className="w-3 h-3 text-amber-600" /> COD
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-800 text-[11px] font-extrabold border border-emerald-200">
+                          <CreditCard className="w-3 h-3 text-emerald-600" /> Paid Online
+                        </span>
+                      )}
                     </div>
-                    <div className="flex items-center gap-3 text-xs text-gray-400 font-medium">
+                    <div className="flex items-center gap-3 text-xs text-gray-400 font-medium flex-wrap">
                       <span className="flex items-center gap-1"><Calendar className="w-3.5 h-3.5" /> {formattedDate}</span>
                       <span>•</span>
                       <span className="text-gray-700 font-bold">{totalItems} items</span>
@@ -232,7 +289,16 @@ export default function RestaurantDelivery() {
                     </div>
                   </div>
 
-                  <span className="text-lg font-black text-[#FF6B35]">${(order.totalAmount || 0).toFixed(2)}</span>
+                  <div className="flex items-center gap-3 self-start sm:self-center">
+                    <span className="text-lg font-black text-[#FF6B35]">${(order.totalAmount || 0).toFixed(2)}</span>
+                    <button
+                      type="button"
+                      onClick={() => setSelectedOrder(order)}
+                      className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-orange-50 hover:bg-orange-100 text-[#FF6B35] text-xs font-extrabold border border-orange-200/60 transition cursor-pointer shrink-0"
+                    >
+                      <Navigation className="w-3.5 h-3.5" /> Live Track
+                    </button>
+                  </div>
                 </div>
 
                 <div className="p-5 sm:p-6 grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -241,7 +307,7 @@ export default function RestaurantDelivery() {
                     <h4 className="text-[11px] font-black text-gray-400 uppercase tracking-wider flex items-center gap-1.5">
                       <MapPin className="w-3.5 h-3.5 text-[#FF6B35]" /> Delivery To
                     </h4>
-                    <p className="text-xs sm:text-sm font-bold text-gray-800">{order.deliveryAddress?.fullName || "Customer"}</p>
+                    <p className="text-xs sm:text-sm font-bold text-gray-800">{order.deliveryAddress?.fullName || order.userName || "Customer"}</p>
                     <p className="text-[11px] text-gray-500 leading-relaxed">
                       {[order.deliveryAddress?.streetAddress, order.deliveryAddress?.building, order.deliveryAddress?.area].filter(Boolean).join(", ")}
                     </p>
@@ -255,21 +321,21 @@ export default function RestaurantDelivery() {
                   {/* Payment */}
                   <div className="space-y-2">
                     <h4 className="text-[11px] font-black text-gray-400 uppercase tracking-wider flex items-center gap-1.5">
-                      <Banknote className="w-3.5 h-3.5 text-emerald-600" /> Payment
+                      <Banknote className="w-3.5 h-3.5 text-emerald-600" /> Payment Status
                     </h4>
                     <p className="text-xs font-bold text-gray-800">
-                      {order.paymentMethod === "STRIPE" ? "Card (Paid Online)" : "Cash on Delivery"}
+                      {order.paymentMethod === "STRIPE" ? "Card (Paid Online)" : "Cash on Delivery (COD)"}
                     </p>
                     <p className={`inline-flex items-center px-2.5 py-1 rounded-full text-[10px] font-extrabold border ${order.paymentStatus === "Paid" || isDelivered ? "bg-emerald-50 text-emerald-700 border-emerald-200" : "bg-amber-50 text-amber-700 border-amber-200"
                       }`}>
-                      {order.paymentStatus === "Paid" || isDelivered ? "Paid" : "Pending"}
+                      {order.paymentStatus === "Paid" || isDelivered ? "Payment Received" : "Pending Cash Collection"}
                     </p>
                   </div>
 
                   {/* Rider */}
                   <div className="space-y-2">
                     <h4 className="text-[11px] font-black text-gray-400 uppercase tracking-wider flex items-center gap-1.5">
-                      <User className="w-3.5 h-3.5 text-[#FF6B35]" /> Rider
+                      <User className="w-3.5 h-3.5 text-[#FF6B35]" /> Assigned Rider
                     </h4>
                     {order.riderInfo?.name ? (
                       <>
@@ -282,7 +348,7 @@ export default function RestaurantDelivery() {
                           )}
                           {order.riderInfo.phone && (
                             <a href={`tel:${order.riderInfo.phone}`} className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-emerald-50 border border-emerald-100 text-emerald-700 hover:bg-emerald-100 transition">
-                              <Phone className="w-3 h-3" /> Call
+                              <Phone className="w-3 h-3" /> Call Rider
                             </a>
                           )}
                         </div>
@@ -295,6 +361,168 @@ export default function RestaurantDelivery() {
               </div>
             );
           })}
+        </div>
+      )}
+
+      {/* Live Order Tracking Modal */}
+      {selectedOrder && (
+        <div
+          className="fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-center justify-center p-3 sm:p-6 overflow-y-auto animate-fadeIn"
+          onClick={() => setSelectedOrder(null)}
+        >
+          <div
+            className="relative w-full max-w-4xl bg-white dark:bg-gray-900 rounded-3xl shadow-2xl border border-gray-100 dark:border-gray-800 overflow-hidden transform transition-all max-h-[90vh] flex flex-col"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Modal Header */}
+            <div className="p-6 bg-gradient-to-r from-orange-500 via-amber-500 to-orange-600 text-white relative shrink-0">
+              <button
+                type="button"
+                onClick={() => setSelectedOrder(null)}
+                className="absolute right-5 top-5 p-2 rounded-full bg-white/15 hover:bg-white/25 text-white transition cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+
+              <div className="space-y-1">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="px-3 py-1 rounded-full bg-white/20 backdrop-blur-md text-[11px] font-extrabold uppercase tracking-wider">
+                    Live Delivery Journey
+                  </span>
+                  <span className="text-sm sm:text-base font-black">
+                    #{selectedOrder.orderId || selectedOrder._id}
+                  </span>
+                </div>
+                <h3 className="text-xl sm:text-2xl font-black tracking-tight text-white">
+                  Trip Tracking & Map View
+                </h3>
+                <p className="text-orange-100 text-xs sm:text-sm">
+                  Real-time rider coordinates and delivery progression.
+                </p>
+              </div>
+            </div>
+
+            {/* Modal Body */}
+            <div className="p-6 overflow-y-auto space-y-6">
+              {/* Stepper */}
+              <div className="bg-gray-50/80 dark:bg-gray-800/40 p-6 rounded-2xl border border-gray-100 dark:border-gray-800">
+                <OrderStatusStepper
+                  currentStatus={selectedOrder.orderStatus}
+                  cancelled={selectedOrder.orderStatus === "Cancelled"}
+                />
+              </div>
+
+              {/* Map */}
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <h4 className="text-xs font-black text-gray-400 uppercase tracking-wider flex items-center gap-1.5">
+                    <Navigation className="w-3.5 h-3.5 text-[#FF6B35]" /> GPS Live View
+                  </h4>
+                  {selectedOrder.orderStatus === "Out for Delivery" && (
+                    <span className="text-[11px] font-bold text-emerald-600 flex items-center gap-1">
+                      <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping" /> Streaming Location
+                    </span>
+                  )}
+                </div>
+                <div className="h-[300px] sm:h-[360px] rounded-2xl overflow-hidden border border-gray-200 dark:border-gray-800 relative shadow-inner">
+                  <OrderTrackingMap
+                    deliveryLat={
+                      selectedOrder.deliveryAddress?.latitude ??
+                      (selectedOrder.deliveryAddress as unknown as { lat?: number })?.lat
+                    }
+                    deliveryLng={
+                      selectedOrder.deliveryAddress?.longitude ??
+                      (selectedOrder.deliveryAddress as unknown as { lng?: number })?.lng
+                    }
+                    riderLat={
+                      riderLiveCoords[selectedOrder.orderId || selectedOrder._id || ""]?.lat ??
+                      selectedOrder.riderInfo?.latitude
+                    }
+                    riderLng={
+                      riderLiveCoords[selectedOrder.orderId || selectedOrder._id || ""]?.lng ??
+                      selectedOrder.riderInfo?.longitude
+                    }
+                    riderName={selectedOrder.riderInfo?.name}
+                    active={selectedOrder.orderStatus === "Out for Delivery"}
+                  />
+                </div>
+              </div>
+
+              {/* Info Grid */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="p-4 rounded-2xl bg-orange-50/60 dark:bg-orange-950/20 border border-orange-100 dark:border-orange-900/40 space-y-2">
+                  <span className="text-[10px] font-black text-[#FF6B35] uppercase tracking-wider flex items-center gap-1">
+                    <User className="w-3.5 h-3.5" /> Customer
+                  </span>
+                  <p className="text-sm font-extrabold text-gray-900 dark:text-white">
+                    {selectedOrder.deliveryAddress?.fullName || selectedOrder.userName || "Customer"}
+                  </p>
+                  <p className="text-xs text-gray-600 dark:text-gray-400">
+                    {selectedOrder.deliveryAddress?.streetAddress}
+                  </p>
+                  {selectedOrder.deliveryAddress?.phoneNumber && (
+                    <a
+                      href={`tel:${selectedOrder.deliveryAddress.phoneNumber}`}
+                      className="inline-flex items-center gap-1.5 text-xs font-bold text-[#FF6B35] hover:underline pt-1"
+                    >
+                      <Phone className="w-3.5 h-3.5" /> Call ({selectedOrder.deliveryAddress.phoneNumber})
+                    </a>
+                  )}
+                </div>
+
+                <div className="p-4 rounded-2xl bg-sky-50/60 dark:bg-sky-950/20 border border-sky-100 dark:border-sky-900/40 space-y-2">
+                  <span className="text-[10px] font-black text-sky-600 uppercase tracking-wider flex items-center gap-1">
+                    <Bike className="w-3.5 h-3.5" /> Rider
+                  </span>
+                  {selectedOrder.riderInfo?.name ? (
+                    <>
+                      <p className="text-sm font-extrabold text-gray-900 dark:text-white">
+                        {selectedOrder.riderInfo.name}
+                      </p>
+                      {selectedOrder.riderInfo.vehicleNumber && (
+                        <p className="text-xs text-gray-600 dark:text-gray-400">
+                          Vehicle: {selectedOrder.riderInfo.vehicleNumber}
+                        </p>
+                      )}
+                      {selectedOrder.riderInfo.phone && (
+                        <a
+                          href={`tel:${selectedOrder.riderInfo.phone}`}
+                          className="inline-flex items-center gap-1.5 text-xs font-bold text-sky-600 hover:underline pt-1"
+                        >
+                          <Phone className="w-3.5 h-3.5" /> Call ({selectedOrder.riderInfo.phone})
+                        </a>
+                      )}
+                    </>
+                  ) : (
+                    <p className="text-xs text-gray-500 font-medium">No rider assigned yet</p>
+                  )}
+                </div>
+
+                <div className="p-4 rounded-2xl bg-emerald-50/60 dark:bg-emerald-950/20 border border-emerald-100 dark:border-emerald-900/40 space-y-2">
+                  <span className="text-[10px] font-black text-emerald-600 uppercase tracking-wider flex items-center gap-1">
+                    <Banknote className="w-3.5 h-3.5" /> Payment
+                  </span>
+                  <p className="text-xs font-bold text-gray-800 dark:text-gray-200">
+                    {selectedOrder.paymentMethod === "COD" ? "Cash on Delivery" : "Paid Online"}
+                  </p>
+                  <p className="text-sm font-black text-emerald-600">
+                    ${(selectedOrder.totalAmount || 0).toFixed(2)}
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div className="p-4 sm:p-5 bg-gray-50 dark:bg-gray-800/80 border-t border-gray-100 dark:border-gray-800 flex justify-end shrink-0">
+              <button
+                type="button"
+                onClick={() => setSelectedOrder(null)}
+                className="px-5 py-2.5 rounded-xl bg-gray-900 text-white text-xs font-bold hover:bg-black transition cursor-pointer"
+              >
+                Close Tracking
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>

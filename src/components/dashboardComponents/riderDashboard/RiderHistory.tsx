@@ -1,11 +1,6 @@
-import React from 'react';
+import React from "react";
+import RiderDeliveryHistory from "./RiderDeliveryHistory";
 
-const RiderHistory = () => {
-    return (
-        <div>
-            Rider History
-        </div>
-    );
-};
-
-export default RiderHistory;
+export default function RiderHistory() {
+  return <RiderDeliveryHistory />;
+}

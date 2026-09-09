@@ -17,6 +17,7 @@ import {
   X,
   Sparkles,
   ShoppingBag,
+  History,
 } from "lucide-react";
 import { useSession, signOut } from "@/lib/auth-client";
 import { useCart } from "@/contexts/CartContext";
@@ -93,8 +94,13 @@ export default function DashboardSideBar() {
           label: "Orders",
           href: "/dashboard/customer/orders",
           icon: ShoppingBag,
-          badge: "History",
-          badgeType: "brand",
+        },
+        {
+          label: "Delivery History",
+          href: "/dashboard/customer/delivery-history",
+          icon: History,
+          badge: "Delivered",
+          badgeType: "success",
         },
         {
           label: "Order Tracking",

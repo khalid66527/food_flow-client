@@ -29,6 +29,7 @@ import {
   XCircle,
   AlertTriangle,
   Layers,
+  Phone,
 } from "lucide-react";
 import { useSession } from "@/lib/auth-client";
 import LoadingSpinner from "@/lib/api/LoadingSpinner";
@@ -626,16 +627,46 @@ export default function CustomerOrders() {
                     ))}
                   </div>
 
-                  {/* Financial Total Footer Bar */}
+                  {/* Financial Total & Delivery Partner Footer Bar */}
                   <div className="pt-4 border-t border-gray-100 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                    <div className="text-xs text-gray-500 space-y-0.5">
+                    <div className="text-xs text-gray-500 space-y-1">
                       <p>
                         Subtotal: <strong className="text-gray-800">Tk {(order.subtotal || order.totalAmount).toFixed(2)}</strong>
                         {order.deliveryFee ? ` | Delivery: Tk ${order.deliveryFee.toFixed(2)}` : " | Free Delivery"}
                       </p>
-                      <p className="text-[11px] text-gray-400">
-                        Delivery Address: {order.deliveryAddress?.streetAddress || "Registered Address"}
+                      <p className="text-[11px] text-gray-400 flex items-center gap-1">
+                        <MapPin className="w-3.5 h-3.5 text-[#FF6B35] shrink-0" />
+                        <span>Delivery Address: {order.deliveryAddress?.streetAddress || "Registered Address"}{order.deliveryAddress?.area ? `, ${order.deliveryAddress.area}` : ""}</span>
                       </p>
+
+                      {/* Delivery Partner (Rider) Details */}
+                      {order.riderInfo?.name ? (
+                        <div className="flex items-center gap-2 pt-1 flex-wrap">
+                          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-emerald-50 border border-emerald-100 text-emerald-800 text-[11px] font-bold">
+                            <Truck className="w-3.5 h-3.5 text-emerald-600" />
+                            <span>Rider: {order.riderInfo.name}</span>
+                            {order.riderInfo.vehicleNumber && <span>({order.riderInfo.vehicleNumber})</span>}
+                          </span>
+                          {order.riderInfo.phone && (
+                            <a
+                              href={`tel:${order.riderInfo.phone}`}
+                              className="inline-flex items-center gap-1 text-[11px] font-bold text-[#FF6B35] hover:underline"
+                            >
+                              <Phone className="w-3 h-3" />
+                              {order.riderInfo.phone}
+                            </a>
+                          )}
+                          {order.riderInfo.deliveredAt && (
+                            <span className="text-[11px] text-emerald-700 font-medium">
+                              • Delivered at {new Date(order.riderInfo.deliveredAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                            </span>
+                          )}
+                        </div>
+                      ) : isDelivered ? (
+                        <span className="text-[11px] text-emerald-700 font-semibold inline-flex items-center gap-1">
+                          <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" /> Completed Delivery
+                        </span>
+                      ) : null}
                     </div>
 
                     <div className="flex items-center justify-between sm:justify-end gap-3">

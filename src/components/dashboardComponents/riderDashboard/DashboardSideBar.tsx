@@ -132,8 +132,8 @@ export default function DashboardSideBar() {
           icon: DollarSign,
         },
         {
-          label: "History",
-          href: "/dashboard/rider/history",
+          label: "Delivery History",
+          href: "/dashboard/rider/delivery-history",
           icon: History,
         },
       ],

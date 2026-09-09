@@ -170,7 +170,7 @@ export async function getRiderOrdersApi(
   userId: string,
   userEmail: string,
   opts?: {
-    mode?: "available" | "assigned" | "active";
+    mode?: "available" | "assigned" | "active" | "history" | "delivered";
     status?: string;
   }
 ): Promise<TOrderApiResponse> {
