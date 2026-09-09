@@ -30,11 +30,13 @@ import {
   AlertTriangle,
   Layers,
   Phone,
+  Receipt,
 } from "lucide-react";
 import { useSession } from "@/lib/auth-client";
 import LoadingSpinner from "@/lib/api/LoadingSpinner";
 import { TOrder, TOrderItem } from "@/types/order";
 import { downloadInvoicePdf } from "@/lib/pdf/generateInvoice";
+import OrderInvoiceModal from "@/components/common/OrderInvoiceModal";
 
 export default function CustomerOrders() {
   const router = useRouter();
@@ -47,6 +49,7 @@ export default function CustomerOrders() {
   const [orders, setOrders] = useState<TOrder[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
+  const [selectedInvoiceOrder, setSelectedInvoiceOrder] = useState<TOrder | null>(null);
 
   // Action Loading States & Confirmation Modals
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
@@ -514,16 +517,18 @@ export default function CustomerOrders() {
             const isDownloading = downloadingId === (order.orderId || order._id);
             const isActionLoading = actionLoadingId === (order.orderId || order._id);
 
-            // Universal Voucher Rule: Enabled ONLY when orderStatus is 'Delivered'
+            // Universal Voucher & Invoice Rule: Enabled ONLY when orderStatus is 'Delivered'
             const isDelivered = (order.orderStatus || "").toLowerCase() === "delivered";
-            const isVoucherEnabled = isDelivered;
             const isStripe =
               order.paymentMethod === "STRIPE" ||
-              (order.paymentMethod as string) === "STRIPE_CARD";
-            const currentStatusLower = (order.orderStatus || "Placed").toLowerCase();
+              (order.paymentMethod as string) === "STRIPE_CARD" ||
+              (order.paymentStatus || "").toLowerCase() === "paid";
+            const currentStatusLower = (order.orderStatus || "placed").toLowerCase();
             const isCancelled = currentStatusLower === "cancelled";
             const isTrackEnabled = !isCancelled;
-            const canCancel = !isStripe && currentStatusLower === "placed";
+            
+            // COD (Cash on Delivery) orders can be cancelled ONLY when order is initial 'placed' state
+            const canCancel = !isStripe && !isCancelled && !isDelivered && currentStatusLower === "placed";
 
             return (
               <div
@@ -702,7 +707,7 @@ export default function CustomerOrders() {
                   </span>
 
                   <div className="flex items-center gap-2 flex-wrap w-full sm:w-auto justify-end">
-                    {/* 🔴 4. Smart Order Cancellation Button */}
+                    {/* 🔴 1. Cancel Order Button (ONLY for COD & Placed status) */}
                     {canCancel && (
                       <button
                         type="button"
@@ -716,7 +721,7 @@ export default function CustomerOrders() {
                       </button>
                     )}
 
-                    {/* Action 1: Track Order / View History */}
+                    {/* 📍 2. Track Order / Delivery History Button */}
                     {isDelivered ? (
                       <Link
                         href="/dashboard/customer/delivery-history"
@@ -746,33 +751,37 @@ export default function CustomerOrders() {
                       </button>
                     )}
 
-                    {/* Action 2: Download Voucher PDF */}
-                    <button
-                      type="button"
-                      onClick={() => isVoucherEnabled && handleDownloadVoucher(order)}
-                      disabled={isDownloading || !isVoucherEnabled}
-                      className={`inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-extrabold transition shadow-xs ${isVoucherEnabled
-                          ? "bg-gradient-to-r from-gray-900 to-black text-white cursor-pointer hover:brightness-125 hover:scale-102 active:scale-98"
-                          : "bg-gray-100 text-gray-400 border border-gray-200 cursor-not-allowed opacity-60"
-                        }`}
-                      title={
-                        isVoucherEnabled
-                          ? "Download Official Invoice Voucher"
-                          : "Voucher download will unlock after successful delivery (Delivered)"
-                      }
-                    >
-                      {isDownloading ? (
-                        <Loader2 className="w-3.5 h-3.5 animate-spin text-amber-400" />
-                      ) : (
-                        <Download
-                          className={`w-3.5 h-3.5 ${isVoucherEnabled ? "text-amber-400" : "text-gray-400"
-                            }`}
-                        />
-                      )}
-                      <span>Download Voucher</span>
-                    </button>
+                    {/* 🧾 3. View Invoice & Download Voucher PDF (ONLY RENDERED WHEN STATUS IS DELIVERED) */}
+                    {isDelivered && (
+                      <>
+                        <button
+                          type="button"
+                          onClick={() => setSelectedInvoiceOrder(order)}
+                          className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-orange-50 hover:bg-orange-100 text-[#FF6B35] text-xs font-bold border border-orange-200/80 transition cursor-pointer shadow-2xs hover:scale-102 active:scale-98"
+                          title="View Official Sales Invoice"
+                        >
+                          <Receipt className="w-3.5 h-3.5 text-[#FF6B35]" />
+                          <span>View Invoice</span>
+                        </button>
 
-                    {/* 🗑️ 3. Delete / Remove Order from History Button */}
+                        <button
+                          type="button"
+                          onClick={() => handleDownloadVoucher(order)}
+                          disabled={isDownloading}
+                          className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-gradient-to-r from-gray-900 to-black text-white text-xs font-extrabold transition shadow-xs cursor-pointer hover:brightness-125 hover:scale-102 active:scale-98 disabled:opacity-50"
+                          title="Download Official Invoice Voucher"
+                        >
+                          {isDownloading ? (
+                            <Loader2 className="w-3.5 h-3.5 animate-spin text-amber-400" />
+                          ) : (
+                            <Download className="w-3.5 h-3.5 text-amber-400" />
+                          )}
+                          <span>Download Voucher</span>
+                        </button>
+                      </>
+                    )}
+
+                    {/* 🗑️ 4. Delete / Remove Order from History Button */}
                     <button
                       type="button"
                       onClick={() => setDeleteModalOrder(order)}
@@ -937,6 +946,12 @@ export default function CustomerOrders() {
           </div>
         </div>
       )}
+
+      {/* 📄 ORDER INVOICE MODAL */}
+      <OrderInvoiceModal
+        order={selectedInvoiceOrder}
+        onClose={() => setSelectedInvoiceOrder(null)}
+      />
 
     </div>
   );

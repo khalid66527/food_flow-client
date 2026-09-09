@@ -23,11 +23,13 @@ import {
   Package,
   Layers,
   UtensilsCrossed,
+  Receipt,
 } from "lucide-react";
 import { useSession } from "@/lib/auth-client";
 import { TOrder, TOrderItem } from "@/types/order";
 import LoadingSpinner from "@/lib/api/LoadingSpinner";
 import { downloadInvoicePdf } from "@/lib/pdf/generateInvoice";
+import OrderInvoiceModal from "@/components/common/OrderInvoiceModal";
 
 export default function CustomerDeliveryHistory() {
   const { data: session, isPending: sessionPending } = useSession();
@@ -39,6 +41,7 @@ export default function CustomerDeliveryHistory() {
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
+  const [selectedInvoiceOrder, setSelectedInvoiceOrder] = useState<TOrder | null>(null);
 
   // Search & Filter
   const [searchQuery, setSearchQuery] = useState<string>("");
@@ -415,22 +418,37 @@ export default function CustomerDeliveryHistory() {
                         {formattedDelivered}
                       </td>
 
-                      {/* 8. Invoice Download */}
+                      {/* 8. Invoice View & Download (ONLY WHEN STATUS IS DELIVERED) */}
                       <td className="py-4 px-5 align-top text-center">
-                        <button
-                          type="button"
-                          onClick={() => handleDownloadInvoice(order)}
-                          disabled={isDownloading}
-                          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-gray-900 hover:bg-black text-white text-xs font-bold transition shadow-2xs cursor-pointer hover:scale-105 active:scale-95 disabled:opacity-50"
-                          title="Download Invoice PDF"
-                        >
-                          {isDownloading ? (
-                            <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                          ) : (
-                            <Download className="w-3.5 h-3.5 text-amber-400" />
-                          )}
-                          <span className="hidden sm:inline">PDF</span>
-                        </button>
+                        {(order.orderStatus || "").toLowerCase() === "delivered" ? (
+                          <div className="inline-flex items-center gap-1.5 justify-center">
+                            <button
+                              type="button"
+                              onClick={() => setSelectedInvoiceOrder(order)}
+                              className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-orange-50 hover:bg-orange-100 text-[#FF6B35] text-xs font-bold transition border border-orange-200 cursor-pointer shadow-2xs hover:scale-105 active:scale-95"
+                              title="View Official Sales Invoice"
+                            >
+                              <Receipt className="w-3.5 h-3.5 text-[#FF6B35]" />
+                              <span>Invoice</span>
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleDownloadInvoice(order)}
+                              disabled={isDownloading}
+                              className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-gray-900 hover:bg-black text-white text-xs font-bold transition shadow-2xs cursor-pointer hover:scale-105 active:scale-95 disabled:opacity-50"
+                              title="Download Invoice PDF"
+                            >
+                              {isDownloading ? (
+                                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                              ) : (
+                                <Download className="w-3.5 h-3.5 text-amber-400" />
+                              )}
+                              <span className="hidden sm:inline">PDF</span>
+                            </button>
+                          </div>
+                        ) : (
+                          <span className="text-[11px] text-gray-400 font-medium italic">N/A</span>
+                        )}
                       </td>
                     </tr>
                   );
@@ -488,6 +506,13 @@ export default function CustomerDeliveryHistory() {
           )}
         </div>
       )}
+
+      {/* 📄 ORDER INVOICE MODAL */}
+      <OrderInvoiceModal
+        order={selectedInvoiceOrder}
+        onClose={() => setSelectedInvoiceOrder(null)}
+      />
+
     </div>
   );
 }

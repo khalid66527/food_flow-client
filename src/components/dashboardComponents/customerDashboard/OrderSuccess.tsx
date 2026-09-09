@@ -20,10 +20,12 @@ import {
   Briefcase,
   Download,
   ExternalLink,
+  Receipt,
 } from "lucide-react";
 import { TOrder } from "@/types/order";
 import { getOrderByIdApi } from "@/lib/api/order";
 import { downloadInvoicePdf } from "@/lib/pdf/generateInvoice";
+import OrderInvoiceModal from "@/components/common/OrderInvoiceModal";
 
 function OrderSuccessContent() {
   const searchParams = useSearchParams();
@@ -35,6 +37,7 @@ function OrderSuccessContent() {
   const [order, setOrder] = useState<TOrder | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [isDownloading, setIsDownloading] = useState<boolean>(false);
+  const [showInvoiceModal, setShowInvoiceModal] = useState<boolean>(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   useEffect(() => {
@@ -181,42 +184,51 @@ function OrderSuccessContent() {
             Order Actions
           </h2>
           <p className="text-xs text-gray-500">
-            {isVoucherEnabled
-              ? "Download your official voucher invoice or track your order in real-time."
-              : "Track your live delivery progress in real-time. Voucher will be unlocked upon delivery."}
+            {isDelivered
+              ? "Download your official voucher invoice or view order details."
+              : "Track your live delivery progress in real-time. Invoice will be unlocked upon delivery."}
           </p>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 max-w-2xl mx-auto">
-          {/* Action 1: Download Voucher / Invoice */}
-          <button
-            type="button"
-            onClick={handleDownloadInvoice}
-            disabled={isDownloading || !isVoucherEnabled}
-            className={`flex items-center justify-center gap-2.5 px-6 py-4 rounded-2xl font-extrabold text-sm shadow-lg transition ${isVoucherEnabled
-                ? "bg-gradient-to-r from-gray-900 to-gray-800 text-white hover:brightness-125 active:scale-98 cursor-pointer"
-                : "bg-gray-100 text-gray-400 border border-gray-200 cursor-not-allowed opacity-60"
-              }`}
-            title={
-              isVoucherEnabled
-                ? "Download Invoice Voucher"
-                : "Voucher download will unlock after successful delivery (Delivered)"
-            }
-          >
-            {isDownloading ? (
-              <>
-                <Loader2 className="w-5 h-5 animate-spin" />
-                Generating PDF...
-              </>
-            ) : (
-              <>
-                <Download className={`w-5 h-5 ${isVoucherEnabled ? "text-[#FF6B35]" : "text-gray-400"}`} />
-                Download Voucher / Invoice
-              </>
-            )}
-          </button>
+        <div className={`grid grid-cols-1 ${isDelivered ? "sm:grid-cols-3" : "sm:grid-cols-1 max-w-md"} gap-4 mx-auto`}>
+          {/* View Invoice & Download PDF: ONLY RENDERED WHEN STATUS IS DELIVERED */}
+          {isDelivered && (
+            <>
+              {/* Action: View Invoice Modal */}
+              <button
+                type="button"
+                onClick={() => setShowInvoiceModal(true)}
+                className="flex items-center justify-center gap-2.5 px-6 py-4 rounded-2xl bg-orange-50 hover:bg-orange-100 text-[#FF6B35] font-extrabold text-sm border border-orange-200 shadow-sm transition cursor-pointer active:scale-98"
+                title="View Official Invoice"
+              >
+                <Receipt className="w-5 h-5 text-[#FF6B35]" />
+                View Invoice
+              </button>
 
-          {/* Action 2: Track Order */}
+              {/* Action: Download Voucher / Invoice PDF */}
+              <button
+                type="button"
+                onClick={handleDownloadInvoice}
+                disabled={isDownloading}
+                className="flex items-center justify-center gap-2.5 px-6 py-4 rounded-2xl bg-gradient-to-r from-gray-900 to-gray-800 text-white font-extrabold text-sm shadow-lg transition hover:brightness-125 active:scale-98 cursor-pointer disabled:opacity-50"
+                title="Download Official Invoice Voucher"
+              >
+                {isDownloading ? (
+                  <>
+                    <Loader2 className="w-5 h-5 animate-spin" />
+                    Generating PDF...
+                  </>
+                ) : (
+                  <>
+                    <Download className="w-5 h-5 text-[#FF6B35]" />
+                    Download PDF
+                  </>
+                )}
+              </button>
+            </>
+          )}
+
+          {/* Action: Track Order */}
           {isTrackEnabled ? (
             <button
               type="button"
@@ -295,6 +307,14 @@ function OrderSuccessContent() {
           </div>
         </div>
       </div>
+
+      {/* 📄 ORDER INVOICE MODAL */}
+      {showInvoiceModal && (
+        <OrderInvoiceModal
+          order={order}
+          onClose={() => setShowInvoiceModal(false)}
+        />
+      )}
     </div>
   );
 }
