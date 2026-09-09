@@ -19,6 +19,7 @@ import { useSession } from "@/lib/auth-client";
 import { getRiderOrdersApi, updateOrderStatusApi } from "@/lib/api/order";
 import { getOrderSocket, joinOrderRoom, disconnectOrderSocket } from "@/lib/socket";
 import OrderTrackingMap from "@/components/tracking/OrderTrackingMap";
+import LoadingSpinner from "@/lib/api/LoadingSpinner";
 import { TOrder } from "@/types/order";
 
 function getRiderProfile() {
@@ -191,9 +192,8 @@ export default function ActiveDelivery() {
 
   if (sessionPending || loading) {
     return (
-      <div className="min-h-[60vh] flex flex-col items-center justify-center gap-3">
-        <Loader2 className="w-10 h-10 text-[#FF6B35] animate-spin" />
-        <p className="text-sm font-bold text-gray-600">Loading active delivery...</p>
+      <div className="min-h-[400px] flex items-center justify-center">
+        <LoadingSpinner size={50} color="#f97316" />
       </div>
     );
   }
@@ -352,11 +352,10 @@ export default function ActiveDelivery() {
               <button
                 type="button"
                 onClick={() => setSharing((s) => !s)}
-                className={`inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-extrabold transition shadow-xs cursor-pointer ${
-                  sharing
+                className={`inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-extrabold transition shadow-xs cursor-pointer ${sharing
                     ? "bg-emerald-500 hover:bg-emerald-600 text-white"
                     : "bg-gradient-to-r from-[#FF6B35] to-amber-500 text-white hover:brightness-110"
-                }`}
+                  }`}
               >
                 {sharing ? (
                   <>

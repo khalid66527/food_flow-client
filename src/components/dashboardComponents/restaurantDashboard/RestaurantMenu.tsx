@@ -50,7 +50,9 @@ import {
   toggleFoodItemAvailabilityAction,
   deleteFoodItemAction,
 } from "@/lib/actions/restaurant";
+import { getGlobalCategories, IGlobalCategory } from "@/lib/api/category";
 import { IMenuItem } from "@/types/restaurant";
+import LoadingSpinner from "@/lib/api/LoadingSpinner";
 
 type CategoryType =
   | "Pizza"
@@ -119,6 +121,23 @@ export default function RestaurantMenu() {
   const [itemsLoading, setItemsLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
+
+  // Global categories state for edit dropdown
+  const [globalCategories, setGlobalCategories] = useState<IGlobalCategory[]>([]);
+
+  useEffect(() => {
+    const loadCategories = async () => {
+      try {
+        const res = await getGlobalCategories();
+        if (res.success && Array.isArray(res.data) && res.data.length > 0) {
+          setGlobalCategories(res.data);
+        }
+      } catch {
+        // fallback
+      }
+    };
+    loadCategories();
+  }, []);
 
   // Filter & Search states
   const [searchQuery, setSearchQuery] = useState("");
@@ -322,7 +341,7 @@ export default function RestaurantMenu() {
   /* ---------------------------------------------------------- */
   const openEditModal = (item: IMenuItem) => {
     setEditItem(item);
-    
+
     // Resolve images
     let resolvedImages: string[] = [];
     if (Array.isArray(item.images) && item.images.length > 0) {
@@ -595,6 +614,7 @@ export default function RestaurantMenu() {
         });
         break;
       case "Burger":
+      case "Burgers":
         setEditDynamicData({
           pattyType: "Double Angus Beef",
           pattyCount: "2x Patties (300g)",
@@ -644,7 +664,11 @@ export default function RestaurantMenu() {
         });
         break;
       default:
-        setEditDynamicData({});
+        setEditDynamicData({
+          portionSize: "Standard Portion",
+          prepStyle: "Chef Special",
+          specialNotes: "",
+        });
         break;
     }
   };
@@ -1088,9 +1112,40 @@ export default function RestaurantMenu() {
 
       default:
         return (
-          <div className="col-span-2 p-4 rounded-xl bg-gray-50 border border-gray-200 text-xs text-gray-500 text-center">
-            Standard dish specification fields
-          </div>
+          <>
+            <div className="space-y-1">
+              <label className="text-xs font-bold text-gray-700">Portion / Serving Size</label>
+              <input
+                type="text"
+                value={editDynamicData.portionSize || ""}
+                onChange={(e) => setEditDynamicData((p) => ({ ...p, portionSize: e.target.value }))}
+                placeholder="e.g. Single Portion / 6 Pieces / 500ml Bowl"
+                className="w-full px-3.5 py-2.5 rounded-xl bg-gray-50 border border-gray-200 text-xs font-semibold focus:bg-white focus:border-[#FF6B35] outline-none"
+              />
+            </div>
+
+            <div className="space-y-1">
+              <label className="text-xs font-bold text-gray-700">Preparation / Flavor Notes</label>
+              <input
+                type="text"
+                value={editDynamicData.prepStyle || ""}
+                onChange={(e) => setEditDynamicData((p) => ({ ...p, prepStyle: e.target.value }))}
+                placeholder="e.g. House Specialty, Authentic Herbs & Spices"
+                className="w-full px-3.5 py-2.5 rounded-xl bg-gray-50 border border-gray-200 text-xs font-semibold focus:bg-white focus:border-[#FF6B35] outline-none"
+              />
+            </div>
+
+            <div className="space-y-1 sm:col-span-2">
+              <label className="text-xs font-bold text-gray-700">Special Serving Options</label>
+              <input
+                type="text"
+                value={editDynamicData.specialNotes || ""}
+                onChange={(e) => setEditDynamicData((p) => ({ ...p, specialNotes: e.target.value }))}
+                placeholder="e.g. Served fresh with dipping sauce and side garnish"
+                className="w-full px-3.5 py-2.5 rounded-xl bg-gray-50 border border-gray-200 text-xs font-semibold focus:bg-white focus:border-[#FF6B35] outline-none"
+              />
+            </div>
+          </>
         );
     }
   };
@@ -1189,7 +1244,7 @@ export default function RestaurantMenu() {
       discountNum !== null &&
       (!Number.isFinite(discountNum) || discountNum >= price || discountNum <= 0)
     ) {
-      setErrorMsg(`Discount price must be greater than 0 and less than regular price ($${price}).`);
+      setErrorMsg(`Discount price must be greater than 0 and less than regular price (Tk ${price}).`);
       return;
     }
 
@@ -1202,7 +1257,7 @@ export default function RestaurantMenu() {
       if (res.success) {
         setSuccessMsg(
           discountNum
-            ? `🎉 Special offer set at $${discountNum.toFixed(2)} for "${offerItem.name}"!`
+            ? `🎉 Special offer set at Tk ${discountNum.toFixed(2)} for "${offerItem.name}"!`
             : `✓ Special discount removed for "${offerItem.name}".`
         );
         setOfferItem(null);
@@ -1318,12 +1373,7 @@ export default function RestaurantMenu() {
   /* Loading state                                              */
   /* ---------------------------------------------------------- */
   if (profileLoading) {
-    return (
-      <div className="w-full max-w-7xl mx-auto flex flex-col items-center justify-center py-28 gap-4">
-        <Loader2 className="w-10 h-10 text-[#FF6B35] animate-spin" />
-        <p className="text-sm font-semibold text-gray-500">Loading your menu table...</p>
-      </div>
-    );
+    return <LoadingSpinner size={50} minHeight="60vh" />;
   }
 
   /* ---------------------------------------------------------- */
@@ -1354,7 +1404,7 @@ export default function RestaurantMenu() {
 
   return (
     <div className="w-full max-w-7xl mx-auto pb-16 space-y-8">
-      
+
       {/* 🌟 HERO BANNER */}
       <div className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-orange-600 via-[#FF6B35] to-amber-500 text-white p-7 sm:p-9 shadow-xl">
         <div className="relative z-10 flex flex-col sm:flex-row sm:items-center justify-between gap-6">
@@ -1384,7 +1434,7 @@ export default function RestaurantMenu() {
 
       {/* 📊 SUMMARY METRICS CARDS */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
-        
+
         <div className="bg-white rounded-3xl border border-gray-200/90 shadow-sm p-5 flex items-center justify-between">
           <div className="space-y-1">
             <span className="text-[11px] font-bold text-gray-400 uppercase tracking-wider">Total Dishes</span>
@@ -1444,9 +1494,9 @@ export default function RestaurantMenu() {
 
       {/* 🔍 FILTER & SEARCH CONTROLS */}
       <div className="bg-white rounded-3xl border border-gray-200/90 shadow-sm p-5 space-y-4">
-        
+
         <div className="flex flex-col md:flex-row items-center justify-between gap-4">
-          
+
           {/* Search Input */}
           <div className="relative w-full md:w-80">
             <Search className="w-4 h-4 text-gray-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
@@ -1461,7 +1511,7 @@ export default function RestaurantMenu() {
 
           {/* Quick Filters */}
           <div className="flex flex-wrap items-center gap-3 w-full md:w-auto justify-start md:justify-end">
-            
+
             {/* Status Filter */}
             <select
               value={selectedStatus}
@@ -1505,11 +1555,10 @@ export default function RestaurantMenu() {
           <button
             type="button"
             onClick={() => setSelectedCategory("all")}
-            className={`px-3.5 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition cursor-pointer ${
-              selectedCategory === "all"
+            className={`px-3.5 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition cursor-pointer ${selectedCategory === "all"
                 ? "bg-[#FF6B35] text-white shadow-sm shadow-orange-500/20"
                 : "bg-gray-100 text-gray-600 hover:bg-gray-200"
-            }`}
+              }`}
           >
             All Categories ({items.length})
           </button>
@@ -1522,11 +1571,10 @@ export default function RestaurantMenu() {
                 key={cat}
                 type="button"
                 onClick={() => setSelectedCategory(cat)}
-                className={`px-3.5 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition flex items-center gap-1.5 cursor-pointer ${
-                  selectedCategory === cat
+                className={`px-3.5 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition flex items-center gap-1.5 cursor-pointer ${selectedCategory === cat
                     ? "bg-[#FF6B35] text-white shadow-sm shadow-orange-500/20"
                     : "bg-gray-100 text-gray-600 hover:bg-gray-200"
-                }`}
+                  }`}
               >
                 {getCategoryIcon(cat)}
                 <span>{cat}</span>
@@ -1540,11 +1588,10 @@ export default function RestaurantMenu() {
 
       {/* 📋 TABLE: RESTAURANT MENU ITEMS */}
       <div className="bg-white rounded-3xl border border-gray-200/90 shadow-sm overflow-hidden">
-        
+
         {itemsLoading ? (
-          <div className="py-24 flex flex-col items-center justify-center gap-3">
-            <Loader2 className="w-8 h-8 text-[#FF6B35] animate-spin" />
-            <p className="text-xs font-bold text-gray-400">Loading menu table...</p>
+          <div className="py-24 flex flex-col items-center justify-center">
+            <LoadingSpinner size={50} color="#f97316" />
           </div>
         ) : filteredItems.length === 0 ? (
           <div className="py-20 px-6 flex flex-col items-center justify-center text-center gap-4">
@@ -1587,28 +1634,28 @@ export default function RestaurantMenu() {
                     item.discountPrice && Number(item.discountPrice) < Number(item.price);
                   const discountPercent = isDiscounted
                     ? Math.round(
-                        ((Number(item.price) - Number(item.discountPrice)) /
-                          Number(item.price)) *
-                          100
-                      )
+                      ((Number(item.price) - Number(item.discountPrice)) /
+                        Number(item.price)) *
+                      100
+                    )
                     : 0;
 
                   const photoCount = Array.isArray(item.images)
                     ? item.images.length
                     : item.image
-                    ? 1
-                    : 0;
+                      ? 1
+                      : 0;
 
                   return (
                     <tr
                       key={itemId}
                       className="hover:bg-orange-50/20 transition-colors group"
                     >
-                      
+
                       {/* 1. DISH & IMAGE INFO */}
                       <td className="py-4 px-5">
                         <div className="flex items-center gap-3.5">
-                          
+
                           {/* Image with photo count badge */}
                           <div className="relative w-14 h-14 rounded-2xl overflow-hidden bg-gray-100 border border-gray-200 shrink-0 shadow-xs">
                             {item.image || (item.images && item.images[0]) ? (
@@ -1689,10 +1736,10 @@ export default function RestaurantMenu() {
                             <>
                               <div className="flex items-center gap-1.5">
                                 <span className="text-base font-black text-[#FF6B35]">
-                                  ${Number(item.discountPrice).toFixed(2)}
+                                  Tk {Number(item.discountPrice).toFixed(2)}
                                 </span>
                                 <span className="text-xs font-bold text-gray-400 line-through">
-                                  ${Number(item.price).toFixed(2)}
+                                  Tk {Number(item.price).toFixed(2)}
                                 </span>
                               </div>
                               <span className="inline-block bg-rose-100 text-rose-700 text-[10px] font-black px-1.5 py-0.2 rounded">
@@ -1701,7 +1748,7 @@ export default function RestaurantMenu() {
                             </>
                           ) : (
                             <span className="text-base font-black text-gray-900">
-                              ${Number(item.price || 0).toFixed(2)}
+                              Tk {Number(item.price || 0).toFixed(2)}
                             </span>
                           )}
                         </div>
@@ -1716,11 +1763,10 @@ export default function RestaurantMenu() {
                             onChange={(e) =>
                               handleToggleAvailability(item, e.target.value === "available")
                             }
-                            className={`appearance-none pl-7 pr-7 py-1.5 rounded-xl text-xs font-black border transition cursor-pointer outline-none ${
-                              item.isAvailable
+                            className={`appearance-none pl-7 pr-7 py-1.5 rounded-xl text-xs font-black border transition cursor-pointer outline-none ${item.isAvailable
                                 ? "bg-emerald-50 border-emerald-200 text-emerald-800 hover:bg-emerald-100"
                                 : "bg-rose-50 border-rose-200 text-rose-800 hover:bg-rose-100"
-                            } ${statusUpdatingId === itemId ? "opacity-50 cursor-wait" : ""}`}
+                              } ${statusUpdatingId === itemId ? "opacity-50 cursor-wait" : ""}`}
                           >
                             <option value="available">Available</option>
                             <option value="unavailable">Unavailable</option>
@@ -1728,9 +1774,8 @@ export default function RestaurantMenu() {
 
                           {/* Status Dot */}
                           <span
-                            className={`absolute left-2.5 top-1/2 -translate-y-1/2 w-2 h-2 rounded-full ${
-                              item.isAvailable ? "bg-emerald-500 animate-pulse" : "bg-rose-500"
-                            }`}
+                            className={`absolute left-2.5 top-1/2 -translate-y-1/2 w-2 h-2 rounded-full ${item.isAvailable ? "bg-emerald-500 animate-pulse" : "bg-rose-500"
+                              }`}
                           />
 
                           {/* Dropdown Chevron */}
@@ -1741,7 +1786,7 @@ export default function RestaurantMenu() {
                       {/* 5. ACTIONS BUTTONS */}
                       <td className="py-4 px-5 whitespace-nowrap text-right">
                         <div className="inline-flex items-center gap-1.5 justify-end">
-                          
+
                           {/* View Modal CTA */}
                           <button
                             type="button"
@@ -1769,11 +1814,10 @@ export default function RestaurantMenu() {
                           <button
                             type="button"
                             onClick={() => openOfferModal(item)}
-                            className={`p-2 rounded-xl transition cursor-pointer ${
-                              isDiscounted
+                            className={`p-2 rounded-xl transition cursor-pointer ${isDiscounted
                                 ? "bg-amber-100 text-amber-800 hover:bg-amber-200"
                                 : "bg-gray-100 text-gray-600 hover:bg-amber-50 hover:text-amber-600"
-                            }`}
+                              }`}
                             title="Set Discount Offer"
                           >
                             <Percent className="w-4 h-4" />
@@ -1808,7 +1852,7 @@ export default function RestaurantMenu() {
       {viewItem && (
         <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
           <div className="bg-white rounded-3xl max-w-xl w-full max-h-[90vh] overflow-y-auto shadow-2xl p-6 sm:p-7 space-y-5 animate-in fade-in zoom-in duration-150">
-            
+
             <div className="flex items-center justify-between border-b border-gray-100 pb-3">
               <div className="flex items-center gap-2 text-sm font-black text-gray-900">
                 <UtensilsCrossed className="w-4 h-4 text-[#FF6B35]" />
@@ -1844,11 +1888,10 @@ export default function RestaurantMenu() {
                         key={idx}
                         type="button"
                         onClick={() => setViewImageIndex(idx)}
-                        className={`w-16 h-12 rounded-xl overflow-hidden border-2 shrink-0 transition cursor-pointer ${
-                          viewImageIndex === idx
+                        className={`w-16 h-12 rounded-xl overflow-hidden border-2 shrink-0 transition cursor-pointer ${viewImageIndex === idx
                             ? "border-[#FF6B35] ring-2 ring-orange-500/20"
                             : "border-gray-200 opacity-60 hover:opacity-100"
-                        }`}
+                          }`}
                       >
                         <img src={imgUrl} alt="Thumbnail" className="w-full h-full object-cover" />
                       </button>
@@ -1876,15 +1919,15 @@ export default function RestaurantMenu() {
                   {viewItem.discountPrice ? (
                     <>
                       <span className="text-xl font-black text-[#FF6B35]">
-                        ${Number(viewItem.discountPrice).toFixed(2)}
+                        Tk {Number(viewItem.discountPrice).toFixed(2)}
                       </span>
                       <span className="block text-xs text-gray-400 line-through">
-                        ${Number(viewItem.price).toFixed(2)}
+                        Tk {Number(viewItem.price).toFixed(2)}
                       </span>
                     </>
                   ) : (
                     <span className="text-xl font-black text-gray-900">
-                      ${Number(viewItem.price || 0).toFixed(2)}
+                      Tk {Number(viewItem.price || 0).toFixed(2)}
                     </span>
                   )}
                 </div>
@@ -1946,7 +1989,7 @@ export default function RestaurantMenu() {
       {editItem && (
         <div className="fixed inset-0 z-50 bg-black/65 backdrop-blur-xs flex items-center justify-center p-3 sm:p-5 overflow-y-auto">
           <div className="bg-white rounded-3xl max-w-5xl w-full max-h-[92vh] overflow-y-auto shadow-2xl p-5 sm:p-8 space-y-6 animate-in fade-in zoom-in duration-150 my-auto">
-            
+
             {/* Modal Header */}
             <div className="flex items-center justify-between border-b border-gray-100 pb-4">
               <div className="flex items-center gap-3">
@@ -1975,12 +2018,12 @@ export default function RestaurantMenu() {
             </div>
 
             <form onSubmit={handleEditSubmit} className="space-y-6">
-              
+
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
-                
+
                 {/* 👈 LEFT COLUMN: GENERAL INFO & PRICING */}
                 <div className="space-y-5">
-                  
+
                   <div className="bg-white rounded-2xl border border-gray-200/90 p-5 sm:p-6 space-y-4 shadow-xs">
                     <div className="flex items-center gap-2 text-xs font-black text-gray-900 border-b border-gray-100 pb-2.5">
                       <UtensilsCrossed className="w-4 h-4 text-[#FF6B35]" />
@@ -2010,15 +2053,32 @@ export default function RestaurantMenu() {
                       <select
                         value={editFormData.category}
                         onChange={handleEditCategoryChange}
-                        className="w-full px-4 py-2.5 rounded-xl bg-gray-50/80 border border-gray-200 text-xs font-bold text-gray-900 focus:bg-white focus:border-[#FF6B35] outline-none"
+                        className="w-full px-4 py-2.5 rounded-xl bg-gray-50/80 border border-gray-200 text-xs font-bold text-gray-900 focus:bg-white focus:border-[#FF6B35] outline-none cursor-pointer"
                       >
-                        <option value="Pizza">🍕 Pizza & Calzones</option>
-                        <option value="Burger">🍔 Burgers & Sandwiches</option>
-                        <option value="Biryani">🍛 Biryani & Rice Platters</option>
-                        <option value="Pasta">🍝 Pasta & Noodles</option>
-                        <option value="BBQ & Grill">🍖 BBQ & Grilled Platters</option>
-                        <option value="Desserts">🍰 Desserts & Bakery</option>
-                        <option value="Drinks">🥤 Drinks & Beverages</option>
+                        {globalCategories.length > 0
+                          ? globalCategories.map((cat) => (
+                            <option key={cat._id} value={cat.name}>
+                              {cat.emoji || "🏷️"} {cat.name}
+                            </option>
+                          ))
+                          : [
+                            { name: "Pizza", emoji: "🍕" },
+                            { name: "Burger", emoji: "🍔" },
+                            { name: "Burgers", emoji: "🍔" },
+                            { name: "Biryani", emoji: "🍛" },
+                            { name: "Pasta", emoji: "🍝" },
+                            { name: "BBQ & Grill", emoji: "🍖" },
+                            { name: "Desserts", emoji: "🍰" },
+                            { name: "Drinks", emoji: "🥤" },
+                            { name: "Sushi", emoji: "🍣" },
+                            { name: "Chinese", emoji: "🍲" },
+                            { name: "Thai", emoji: "🌿" },
+                            { name: "Healthy", emoji: "🥗" },
+                          ].map((cat) => (
+                            <option key={cat.name} value={cat.name}>
+                              {cat.emoji} {cat.name}
+                            </option>
+                          ))}
                       </select>
                     </div>
 
@@ -2026,10 +2086,12 @@ export default function RestaurantMenu() {
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
                       <div className="space-y-1">
                         <label className="text-xs font-bold text-gray-700 uppercase tracking-wider">
-                          Price ($ USD) <span className="text-rose-500">*</span>
+                          Price (Tk) <span className="text-rose-500">*</span>
                         </label>
                         <div className="relative">
-                          <DollarSign className="w-3.5 h-3.5 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                          <span className="text-xs font-bold text-gray-400 absolute left-3 top-1/2 -translate-y-1/2">
+                            Tk
+                          </span>
                           <input
                             type="number"
                             step="0.01"
@@ -2037,8 +2099,8 @@ export default function RestaurantMenu() {
                             required
                             value={editFormData.price}
                             onChange={(e) => setEditFormData((p) => ({ ...p, price: e.target.value }))}
-                            placeholder="12.99"
-                            className="w-full pl-8 pr-3 py-2.5 rounded-xl bg-gray-50/80 border border-gray-200 text-xs font-bold text-gray-900 focus:bg-white focus:border-[#FF6B35] outline-none"
+                            placeholder="150"
+                            className="w-full pl-9 pr-3 py-2.5 rounded-xl bg-gray-50/80 border border-gray-200 text-xs font-bold text-gray-900 focus:bg-white focus:border-[#FF6B35] outline-none"
                           />
                         </div>
                       </div>
@@ -2067,9 +2129,8 @@ export default function RestaurantMenu() {
                     <div className="space-y-1.5 pt-1">
                       <label className="text-xs font-bold text-gray-700 uppercase tracking-wider flex items-center justify-between">
                         <span>Food Availability / Stock Status <span className="text-rose-500">*</span></span>
-                        <span className={`text-[10px] font-black px-2 py-0.5 rounded-md ${
-                          editFormData.status === "available" ? "bg-emerald-100 text-emerald-800" : "bg-rose-100 text-rose-800"
-                        }`}>
+                        <span className={`text-[10px] font-black px-2 py-0.5 rounded-md ${editFormData.status === "available" ? "bg-emerald-100 text-emerald-800" : "bg-rose-100 text-rose-800"
+                          }`}>
                           {editFormData.status === "available" ? "● In Stock" : "● Out of Stock"}
                         </span>
                       </label>
@@ -2077,11 +2138,10 @@ export default function RestaurantMenu() {
                         <button
                           type="button"
                           onClick={() => setEditFormData((p) => ({ ...p, status: "available" }))}
-                          className={`py-2 px-3 rounded-lg text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer ${
-                            editFormData.status === "available"
+                          className={`py-2 px-3 rounded-lg text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer ${editFormData.status === "available"
                               ? "bg-emerald-500 text-white shadow-xs"
                               : "text-gray-600 hover:text-gray-900 bg-transparent"
-                          }`}
+                            }`}
                         >
                           <CheckCircle className="w-3.5 h-3.5" />
                           <span>Available (In Stock)</span>
@@ -2089,11 +2149,10 @@ export default function RestaurantMenu() {
                         <button
                           type="button"
                           onClick={() => setEditFormData((p) => ({ ...p, status: "unavailable" }))}
-                          className={`py-2 px-3 rounded-lg text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer ${
-                            editFormData.status === "unavailable"
+                          className={`py-2 px-3 rounded-lg text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer ${editFormData.status === "unavailable"
                               ? "bg-rose-500 text-white shadow-xs"
                               : "text-gray-600 hover:text-gray-900 bg-transparent"
-                          }`}
+                            }`}
                         >
                           <XCircle className="w-3.5 h-3.5" />
                           <span>Unavailable (Out of Stock)</span>
@@ -2148,11 +2207,10 @@ export default function RestaurantMenu() {
                       <button
                         type="button"
                         onClick={() => setEditFormData((p) => ({ ...p, isVegetarian: !p.isVegetarian }))}
-                        className={`py-2.5 px-3 rounded-xl border text-xs font-bold transition flex items-center justify-center gap-2 cursor-pointer ${
-                          editFormData.isVegetarian
+                        className={`py-2.5 px-3 rounded-xl border text-xs font-bold transition flex items-center justify-center gap-2 cursor-pointer ${editFormData.isVegetarian
                             ? "bg-emerald-50 border-emerald-300 text-emerald-700 shadow-2xs"
                             : "bg-gray-50 border-gray-200 text-gray-600 hover:bg-gray-100"
-                        }`}
+                          }`}
                       >
                         <Leaf className="w-4 h-4" />
                         <span>Vegetarian</span>
@@ -2161,11 +2219,10 @@ export default function RestaurantMenu() {
                       <button
                         type="button"
                         onClick={() => setEditFormData((p) => ({ ...p, isSpicy: !p.isSpicy }))}
-                        className={`py-2.5 px-3 rounded-xl border text-xs font-bold transition flex items-center justify-center gap-2 cursor-pointer ${
-                          editFormData.isSpicy
+                        className={`py-2.5 px-3 rounded-xl border text-xs font-bold transition flex items-center justify-center gap-2 cursor-pointer ${editFormData.isSpicy
                             ? "bg-rose-50 border-rose-300 text-rose-700 shadow-2xs"
                             : "bg-gray-50 border-gray-200 text-gray-600 hover:bg-gray-100"
-                        }`}
+                          }`}
                       >
                         <Flame className="w-4 h-4" />
                         <span>Spicy Hot 🔥</span>
@@ -2178,7 +2235,7 @@ export default function RestaurantMenu() {
 
                 {/* 👉 RIGHT COLUMN: DYNAMIC SPECS, MULTI-IMAGE GALLERY & LIVE PREVIEW */}
                 <div className="space-y-5">
-                  
+
                   {/* 1. DYNAMIC CATEGORY SPECIFICATIONS CARD */}
                   <div className="bg-white rounded-2xl border border-gray-200/90 p-5 sm:p-6 space-y-4 shadow-xs">
                     <div className="flex items-center justify-between border-b border-gray-100 pb-2.5">
@@ -2208,18 +2265,16 @@ export default function RestaurantMenu() {
                         <button
                           type="button"
                           onClick={() => setEditImageInputMode("upload")}
-                          className={`px-2.5 py-1 rounded-lg transition cursor-pointer ${
-                            editImageInputMode === "upload" ? "bg-white text-[#FF6B35] shadow-xs" : "text-gray-500"
-                          }`}
+                          className={`px-2.5 py-1 rounded-lg transition cursor-pointer ${editImageInputMode === "upload" ? "bg-white text-[#FF6B35] shadow-xs" : "text-gray-500"
+                            }`}
                         >
                           Upload Files
                         </button>
                         <button
                           type="button"
                           onClick={() => setEditImageInputMode("url")}
-                          className={`px-2.5 py-1 rounded-lg transition cursor-pointer ${
-                            editImageInputMode === "url" ? "bg-white text-[#FF6B35] shadow-xs" : "text-gray-500"
-                          }`}
+                          className={`px-2.5 py-1 rounded-lg transition cursor-pointer ${editImageInputMode === "url" ? "bg-white text-[#FF6B35] shadow-xs" : "text-gray-500"
+                            }`}
                         >
                           Paste URL
                         </button>
@@ -2325,13 +2380,12 @@ export default function RestaurantMenu() {
                             <div
                               key={idx}
                               onClick={() => setEditActivePreviewIndex(idx)}
-                              className={`relative rounded-xl overflow-hidden border-2 aspect-square group bg-gray-100 shadow-2xs cursor-pointer ${
-                                idx === 0
+                              className={`relative rounded-xl overflow-hidden border-2 aspect-square group bg-gray-100 shadow-2xs cursor-pointer ${idx === 0
                                   ? "border-[#FF6B35] ring-2 ring-orange-500/20"
                                   : idx === editActivePreviewIndex
-                                  ? "border-blue-500 ring-2 ring-blue-500/20"
-                                  : "border-gray-200"
-                              }`}
+                                    ? "border-blue-500 ring-2 ring-blue-500/20"
+                                    : "border-gray-200"
+                                }`}
                             >
                               <img src={imgUrl} alt={`Photo ${idx + 1}`} className="w-full h-full object-cover" />
                               {idx === 0 && (
@@ -2415,7 +2469,7 @@ export default function RestaurantMenu() {
                             {Math.round(
                               ((Number(editFormData.price) - Number(editFormData.discountPrice)) /
                                 Number(editFormData.price)) *
-                                100
+                              100
                             )}
                             % OFF
                           </span>
@@ -2424,11 +2478,10 @@ export default function RestaurantMenu() {
 
                       <div className="absolute top-2.5 right-2.5 z-10">
                         <span
-                          className={`text-[9px] font-black px-2 py-0.5 rounded-md backdrop-blur-md shadow-xs ${
-                            editFormData.status === "available"
+                          className={`text-[9px] font-black px-2 py-0.5 rounded-md backdrop-blur-md shadow-xs ${editFormData.status === "available"
                               ? "bg-emerald-500/90 text-white"
                               : "bg-rose-500/90 text-white"
-                          }`}
+                            }`}
                         >
                           {editFormData.status === "available" ? "● In Stock" : "● Out of Stock"}
                         </span>
@@ -2449,11 +2502,10 @@ export default function RestaurantMenu() {
                             key={idx}
                             type="button"
                             onClick={() => setEditActivePreviewIndex(idx)}
-                            className={`relative w-14 h-10 rounded-xl overflow-hidden shrink-0 border-2 transition cursor-pointer ${
-                              editActivePreviewIndex === idx
+                            className={`relative w-14 h-10 rounded-xl overflow-hidden shrink-0 border-2 transition cursor-pointer ${editActivePreviewIndex === idx
                                 ? "border-[#FF6B35] ring-2 ring-orange-500/30 scale-105"
                                 : "border-gray-200 opacity-70 hover:opacity-100"
-                            }`}
+                              }`}
                           >
                             <img src={thumbUrl} alt={`Thumbnail ${idx + 1}`} className="w-full h-full object-cover" />
                           </button>
@@ -2477,15 +2529,15 @@ export default function RestaurantMenu() {
                           {editFormData.discountPrice ? (
                             <>
                               <span className="text-sm font-black text-[#FF6B35]">
-                                ${Number(editFormData.discountPrice).toFixed(2)}
+                                Tk {Number(editFormData.discountPrice).toFixed(2)}
                               </span>
                               <span className="block text-[10px] text-gray-400 line-through">
-                                ${Number(editFormData.price || 0).toFixed(2)}
+                                Tk {Number(editFormData.price || 0).toFixed(2)}
                               </span>
                             </>
                           ) : (
                             <span className="text-sm font-black text-gray-900">
-                              ${Number(editFormData.price || 0).toFixed(2)}
+                              Tk {Number(editFormData.price || 0).toFixed(2)}
                             </span>
                           )}
                         </div>
@@ -2575,7 +2627,7 @@ export default function RestaurantMenu() {
       {offerItem && (
         <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
           <div className="bg-white rounded-3xl max-w-md w-full shadow-2xl p-6 sm:p-7 space-y-5 animate-in fade-in zoom-in duration-150">
-            
+
             <div className="flex items-center justify-between border-b border-gray-100 pb-3">
               <div className="flex items-center gap-2 text-sm font-black text-gray-900">
                 <Percent className="w-4 h-4 text-amber-600" />
@@ -2591,20 +2643,20 @@ export default function RestaurantMenu() {
             </div>
 
             <form onSubmit={handleOfferSubmit} className="space-y-4">
-              
+
               <div className="p-3.5 rounded-2xl bg-orange-50/70 border border-orange-100 flex items-center justify-between">
                 <div>
                   <h4 className="text-xs font-black text-gray-900">{offerItem.name}</h4>
                   <span className="text-[11px] text-gray-500">Regular Price:</span>
                 </div>
                 <span className="text-base font-black text-gray-900">
-                  ${Number(offerItem.price || 0).toFixed(2)}
+                  Tk {Number(offerItem.price || 0).toFixed(2)}
                 </span>
               </div>
 
               <div className="space-y-1">
                 <label className="text-xs font-bold text-gray-700 uppercase tracking-wider">
-                  Promotional Offer Price ($ USD)
+                  Promotional Offer Price (Tk)
                 </label>
                 <input
                   type="number"
@@ -2674,7 +2726,7 @@ export default function RestaurantMenu() {
       {deleteItem && (
         <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
           <div className="bg-white rounded-3xl max-w-md w-full shadow-2xl p-6 sm:p-7 space-y-4 animate-in fade-in zoom-in duration-150">
-            
+
             <div className="w-12 h-12 rounded-2xl bg-rose-50 border border-rose-100 flex items-center justify-center text-rose-600">
               <Trash2 className="w-6 h-6" />
             </div>

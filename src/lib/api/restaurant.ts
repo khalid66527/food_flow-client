@@ -20,6 +20,9 @@ export type TAddress = {
   street: string;
   city: string;
   state?: string;
+  division?: string;
+  district?: string;
+  upazila?: string;
   postalCode?: string;
   country?: string;
   latitude?: number;
@@ -177,6 +180,38 @@ export async function getMyRestaurantProfile(
     return {
       success: false,
       message: err.message || "Could not connect to restaurant server.",
+    };
+  }
+}
+
+/**
+ * Fetch all active restaurants for top-bar filter dropdown
+ */
+export async function getAllRestaurants(
+  query: Record<string, string> = {}
+): Promise<ApiResponse<IRestaurant[]>> {
+  try {
+    const url = new URL(`${API_BASE_URL}/restaurants`);
+    url.searchParams.append("limit", "100");
+    Object.entries(query).forEach(([key, val]) => {
+      if (val) url.searchParams.append(key, val);
+    });
+
+    const res = await fetch(url.toString(), {
+      method: "GET",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      cache: "no-store",
+    });
+
+    const data = await res.json();
+    return { ...data, data: Array.isArray(data?.data) ? data.data : [] };
+  } catch (err: any) {
+    return {
+      success: false,
+      message: err.message || "Failed to fetch restaurants.",
+      data: [],
     };
   }
 }

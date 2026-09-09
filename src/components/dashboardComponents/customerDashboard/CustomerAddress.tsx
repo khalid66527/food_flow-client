@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
+import LoadingSpinner from "@/lib/api/LoadingSpinner";
 import {
   MapPin,
   Loader2,
@@ -91,7 +92,7 @@ const parseAddressToForm = (addr: TAddress): AddressFormValues => {
   let instructionsStr = addr.deliveryInstructions || "";
 
   const landmarkMatch = instructionsStr.match(
-    /^Landmark:\s*([^.\n]+)(?:\.\s*Note:\s*(.*))?$/s
+    /^Landmark:\s*([^.\n]+)(?:\.\s*Note:\s*([\s\S]*))?$/
   );
   if (landmarkMatch) {
     landmarkStr = landmarkMatch[1].trim();
@@ -160,7 +161,7 @@ const getAddressCardDetails = (addr: TAddress) => {
   let landmark = "";
   let instructions = addr.deliveryInstructions || "";
   const landmarkMatch = instructions.match(
-    /^Landmark:\s*([^.\n]+)(?:\.\s*Note:\s*(.*))?$/s
+    /^Landmark:\s*([^.\n]+)(?:\.\s*Note:\s*([\s\S]*))?$/
   );
   if (landmarkMatch) {
     landmark = landmarkMatch[1].trim();
@@ -355,8 +356,7 @@ export default function CustomerAddress() {
   );
 
   const inputClass = (hasError?: boolean) =>
-    `w-full px-4 py-3 rounded-xl bg-gray-50/80 border ${
-      hasError ? "border-red-300 focus:border-red-500 ring-1 ring-red-300" : "border-gray-200 focus:border-[#FF6B35]"
+    `w-full px-4 py-3 rounded-xl bg-gray-50/80 border ${hasError ? "border-red-300 focus:border-red-500 ring-1 ring-red-300" : "border-gray-200 focus:border-[#FF6B35]"
     } focus:bg-white outline-none text-sm font-medium transition text-gray-800 placeholder-gray-400 shadow-sm`;
 
   return (
@@ -435,11 +435,10 @@ export default function CustomerAddress() {
                 <button
                   type="button"
                   onClick={() => setValue("addressType", "Home")}
-                  className={`flex items-center justify-center gap-2 py-3 px-4 rounded-2xl border text-sm font-bold transition cursor-pointer ${
-                    selectedAddressType === "Home"
+                  className={`flex items-center justify-center gap-2 py-3 px-4 rounded-2xl border text-sm font-bold transition cursor-pointer ${selectedAddressType === "Home"
                       ? "border-[#FF6B35] bg-orange-50 text-[#FF6B35] shadow-sm"
                       : "border-gray-200 bg-gray-50/70 text-gray-600 hover:bg-gray-100"
-                  }`}
+                    }`}
                 >
                   <Home className="w-4 h-4" />
                   Home
@@ -448,11 +447,10 @@ export default function CustomerAddress() {
                 <button
                   type="button"
                   onClick={() => setValue("addressType", "Work")}
-                  className={`flex items-center justify-center gap-2 py-3 px-4 rounded-2xl border text-sm font-bold transition cursor-pointer ${
-                    selectedAddressType === "Work"
+                  className={`flex items-center justify-center gap-2 py-3 px-4 rounded-2xl border text-sm font-bold transition cursor-pointer ${selectedAddressType === "Work"
                       ? "border-[#FF6B35] bg-orange-50 text-[#FF6B35] shadow-sm"
                       : "border-gray-200 bg-gray-50/70 text-gray-600 hover:bg-gray-100"
-                  }`}
+                    }`}
                 >
                   <Briefcase className="w-4 h-4" />
                   Work
@@ -461,11 +459,10 @@ export default function CustomerAddress() {
                 <button
                   type="button"
                   onClick={() => setValue("addressType", "Other")}
-                  className={`flex items-center justify-center gap-2 py-3 px-4 rounded-2xl border text-sm font-bold transition cursor-pointer ${
-                    selectedAddressType === "Other"
+                  className={`flex items-center justify-center gap-2 py-3 px-4 rounded-2xl border text-sm font-bold transition cursor-pointer ${selectedAddressType === "Other"
                       ? "border-[#FF6B35] bg-orange-50 text-[#FF6B35] shadow-sm"
                       : "border-gray-200 bg-gray-50/70 text-gray-600 hover:bg-gray-100"
-                  }`}
+                    }`}
                 >
                   <MapPin className="w-4 h-4" />
                   Other
@@ -676,10 +673,7 @@ export default function CustomerAddress() {
 
       {/* Loading Skeleton */}
       {isLoading ? (
-        <div className="flex flex-col items-center justify-center py-28 space-y-4">
-          <Loader2 className="w-10 h-10 text-[#FF6B35] animate-spin" />
-          <p className="text-sm font-semibold text-gray-500">Loading delivery addresses...</p>
-        </div>
+        <LoadingSpinner size={50} minHeight="300px" />
       ) : sortedAddresses.length === 0 ? (
         /* Empty State */
         <div className="flex flex-col items-center justify-center py-20 text-center bg-white rounded-3xl border border-gray-100 shadow-sm px-6">
@@ -710,24 +704,22 @@ export default function CustomerAddress() {
             return (
               <div
                 key={addr._id}
-                className={`bg-white rounded-3xl border transition-all duration-200 p-6 flex flex-col justify-between relative shadow-sm hover:shadow-md ${
-                  addr.isDefault
+                className={`bg-white rounded-3xl border transition-all duration-200 p-6 flex flex-col justify-between relative shadow-sm hover:shadow-md ${addr.isDefault
                     ? "border-[#FF6B35]/40 ring-2 ring-[#FF6B35]/15"
                     : "border-gray-100 hover:border-gray-200"
-                }`}
+                  }`}
               >
                 <div>
                   {/* Card Header: Category & Default Badge */}
                   <div className="flex items-center justify-between gap-2 mb-4 pb-3 border-b border-gray-100">
                     <div className="flex items-center gap-2">
                       <span
-                        className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-extrabold border ${
-                          addressType === "Home"
+                        className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-extrabold border ${addressType === "Home"
                             ? "bg-blue-50 text-blue-700 border-blue-200"
                             : addressType === "Work"
-                            ? "bg-purple-50 text-purple-700 border-purple-200"
-                            : "bg-amber-50 text-amber-700 border-amber-200"
-                        }`}
+                              ? "bg-purple-50 text-purple-700 border-purple-200"
+                              : "bg-amber-50 text-amber-700 border-amber-200"
+                          }`}
                       >
                         {addressType === "Home" ? (
                           <Home className="w-3.5 h-3.5" />

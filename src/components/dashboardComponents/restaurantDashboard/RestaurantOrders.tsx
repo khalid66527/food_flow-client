@@ -19,6 +19,7 @@ import { useSession } from "@/lib/auth-client";
 import { getRestaurantOrdersApi, updateOrderStatusApi } from "@/lib/api/order";
 import { getOrderSocket, joinOrderRoom, disconnectOrderSocket } from "@/lib/socket";
 import { TOrder, TOrderItem } from "@/types/order";
+import LoadingSpinner from "@/lib/api/LoadingSpinner";
 
 type TTab = "ALL" | "PLACED" | "CONFIRMED" | "PREPARING" | "READY" | "OUT FOR DELIVERY" | "DELIVERED";
 
@@ -190,9 +191,8 @@ export default function RestaurantOrders() {
 
   if (sessionPending || loading) {
     return (
-      <div className="min-h-[60vh] flex flex-col items-center justify-center gap-3">
-        <Loader2 className="w-10 h-10 text-[#FF6B35] animate-spin" />
-        <p className="text-sm font-bold text-gray-600">Loading restaurant orders...</p>
+      <div className="min-h-[400px] flex items-center justify-center">
+        <LoadingSpinner size={50} color="#f97316" />
       </div>
     );
   }
@@ -270,9 +270,8 @@ export default function RestaurantOrders() {
                 key={tab.key}
                 type="button"
                 onClick={() => setActiveTab(tab.key)}
-                className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[11px] font-extrabold transition cursor-pointer shrink-0 ${
-                  activeTab === tab.key ? "bg-[#FF6B35] text-white shadow-xs" : "bg-gray-100 text-gray-600 hover:bg-gray-200"
-                }`}
+                className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[11px] font-extrabold transition cursor-pointer shrink-0 ${activeTab === tab.key ? "bg-[#FF6B35] text-white shadow-xs" : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                  }`}
               >
                 <Icon className="w-3.5 h-3.5" />
                 {tab.label}

@@ -2,12 +2,12 @@
 
 import React, { useState, useMemo } from "react";
 import Link from "next/link";
+import LoadingSpinner from "@/lib/api/LoadingSpinner";
 import {
   Minus,
   Plus,
   Trash2,
   ShoppingCart,
-  Loader2,
   ArrowRight,
   ChevronLeft,
   ChevronRight,
@@ -91,9 +91,7 @@ export default function CustomerCart() {
 
       {/* Loading */}
       {isLoading ? (
-        <div className="flex items-center justify-center py-32">
-          <Loader2 className="w-8 h-8 text-orange-500 animate-spin" />
-        </div>
+        <LoadingSpinner size={50} minHeight="300px" />
       ) : items.length === 0 ? (
         /* Empty state */
         <div className="flex flex-col items-center justify-center py-24 text-center bg-white rounded-3xl border border-gray-100 shadow-sm">
@@ -144,11 +142,11 @@ export default function CustomerCart() {
                           {item.foodItem.restaurantName || "Food Flow"}
                         </p>
                         <p className="text-sm text-gray-600 mt-1 font-medium">
-                          ${unitPrice.toFixed(2)}
+                          Tk {unitPrice.toFixed(2)}
                           {item.foodItem.discountPrice &&
                             item.foodItem.discountPrice < item.foodItem.price && (
                               <span className="ml-2 line-through text-gray-400 font-normal">
-                                ${item.foodItem.price.toFixed(2)}
+                                Tk {item.foodItem.price.toFixed(2)}
                               </span>
                             )}
                         </p>
@@ -191,7 +189,7 @@ export default function CustomerCart() {
                       </div>
 
                       <p className="text-base font-bold text-gray-900">
-                        ${lineTotal.toFixed(2)}
+                        Tk {lineTotal.toFixed(2)}
                       </p>
                     </div>
                   </div>
@@ -247,7 +245,7 @@ export default function CustomerCart() {
                     Subtotal ({totalItems} item{totalItems > 1 ? "s" : ""})
                   </span>
                   <span className="font-semibold text-gray-900">
-                    ${totalPrice.toFixed(2)}
+                    Tk {totalPrice.toFixed(2)}
                   </span>
                 </div>
                 <div className="flex items-center justify-between">
@@ -256,7 +254,7 @@ export default function CustomerCart() {
                     {deliveryFee === 0 ? (
                       <span className="text-emerald-600">FREE</span>
                     ) : (
-                      `$${deliveryFee.toFixed(2)}`
+                      `Tk ${deliveryFee.toFixed(2)}`
                     )}
                   </span>
                 </div>
@@ -264,8 +262,7 @@ export default function CustomerCart() {
                 {deliveryFee > 0 && (
                   <div className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-orange-50 border border-orange-100 text-xs text-orange-600">
                     <Sparkles className="w-3.5 h-3.5 shrink-0" />
-                    Add $
-                    {(FREE_DELIVERY_THRESHOLD - totalPrice).toFixed(2)} more for free
+                    Add Tk {(FREE_DELIVERY_THRESHOLD - totalPrice).toFixed(2)} more for free
                     delivery!
                   </div>
                 )}
@@ -275,7 +272,7 @@ export default function CustomerCart() {
                     Estimated Total
                   </span>
                   <span className="text-xl font-extrabold text-gray-900">
-                    ${estimatedTotal.toFixed(2)}
+                    Tk {estimatedTotal.toFixed(2)}
                   </span>
                 </div>
               </div>

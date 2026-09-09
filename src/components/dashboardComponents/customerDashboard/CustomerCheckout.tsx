@@ -3,6 +3,7 @@
 import React, { useEffect, useState, useCallback } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
+import LoadingSpinner from "@/lib/api/LoadingSpinner";
 import {
   MapPin,
   CreditCard,
@@ -200,7 +201,7 @@ export default function CustomerCheckout() {
     }
 
     // Stripe Flow: Redirect browser directly to Stripe Checkout URL
-    const stripeTargetUrl = res.url || res.checkoutUrl;
+    const stripeTargetUrl = (res as any).url || res.checkoutUrl;
     if (paymentMethod === "STRIPE" && stripeTargetUrl) {
       window.location.href = stripeTargetUrl;
       return;
@@ -223,14 +224,7 @@ export default function CustomerCheckout() {
   };
 
   if (isCheckingAddress || sessionPending) {
-    return (
-      <div className="flex flex-col items-center justify-center py-32 space-y-4">
-        <Loader2 className="w-10 h-10 text-[#FF6B35] animate-spin" />
-        <p className="text-sm font-semibold text-gray-600">
-          Verifying default delivery address...
-        </p>
-      </div>
-    );
+    return <LoadingSpinner size={50} minHeight="60vh" />;
   }
 
   if (items.length === 0) {
@@ -325,13 +319,12 @@ export default function CustomerCheckout() {
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2">
                         <span
-                          className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-extrabold border ${
-                            category === "Home"
+                          className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-extrabold border ${category === "Home"
                               ? "bg-blue-50 text-blue-700 border-blue-200"
                               : category === "Work"
-                              ? "bg-purple-50 text-purple-700 border-purple-200"
-                              : "bg-amber-50 text-amber-700 border-amber-200"
-                          }`}
+                                ? "bg-purple-50 text-purple-700 border-purple-200"
+                                : "bg-amber-50 text-amber-700 border-amber-200"
+                            }`}
                         >
                           {category === "Home" ? (
                             <Home className="w-3.5 h-3.5" />
@@ -416,22 +409,20 @@ export default function CustomerCheckout() {
               {/* COD Method Option Card */}
               <div
                 onClick={() => setPaymentMethod("COD")}
-                className={`p-5 rounded-2xl border-2 transition-all cursor-pointer relative ${
-                  paymentMethod === "COD"
+                className={`p-5 rounded-2xl border-2 transition-all cursor-pointer relative ${paymentMethod === "COD"
                     ? "border-[#FF6B35] bg-orange-50/40 ring-2 ring-[#FF6B35]/20 shadow-md"
                     : "border-gray-200 hover:border-gray-300 bg-white"
-                }`}
+                  }`}
               >
                 <div className="flex items-start justify-between">
                   <div className="w-10 h-10 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center mb-3 font-bold">
                     <Banknote className="w-6 h-6" />
                   </div>
                   <div
-                    className={`w-5 h-5 rounded-full border flex items-center justify-center ${
-                      paymentMethod === "COD"
+                    className={`w-5 h-5 rounded-full border flex items-center justify-center ${paymentMethod === "COD"
                         ? "border-[#FF6B35] bg-[#FF6B35] text-white"
                         : "border-gray-300"
-                    }`}
+                      }`}
                   >
                     {paymentMethod === "COD" && <CheckCircle2 className="w-4 h-4" />}
                   </div>
@@ -449,22 +440,20 @@ export default function CustomerCheckout() {
               {/* Stripe Online Payment Method Option Card */}
               <div
                 onClick={() => setPaymentMethod("STRIPE")}
-                className={`p-5 rounded-2xl border-2 transition-all cursor-pointer relative ${
-                  paymentMethod === "STRIPE"
+                className={`p-5 rounded-2xl border-2 transition-all cursor-pointer relative ${paymentMethod === "STRIPE"
                     ? "border-[#FF6B35] bg-orange-50/40 ring-2 ring-[#FF6B35]/20 shadow-md"
                     : "border-gray-200 hover:border-gray-300 bg-white"
-                }`}
+                  }`}
               >
                 <div className="flex items-start justify-between">
                   <div className="w-10 h-10 rounded-xl bg-blue-100 text-blue-700 flex items-center justify-center mb-3 font-bold">
                     <CreditCard className="w-6 h-6" />
                   </div>
                   <div
-                    className={`w-5 h-5 rounded-full border flex items-center justify-center ${
-                      paymentMethod === "STRIPE"
+                    className={`w-5 h-5 rounded-full border flex items-center justify-center ${paymentMethod === "STRIPE"
                         ? "border-[#FF6B35] bg-[#FF6B35] text-white"
                         : "border-gray-300"
-                    }`}
+                      }`}
                   >
                     {paymentMethod === "STRIPE" && <CheckCircle2 className="w-4 h-4" />}
                   </div>
@@ -516,11 +505,11 @@ export default function CustomerCheckout() {
                         {item.foodItem.name}
                       </p>
                       <p className="text-[11px] text-gray-400">
-                        Qty: {item.quantity} x ${unitPrice.toFixed(2)}
+                        Qty: {item.quantity} x Tk {unitPrice.toFixed(2)}
                       </p>
                     </div>
                     <span className="text-xs font-extrabold text-gray-900 shrink-0">
-                      ${lineTotal.toFixed(2)}
+                      Tk {lineTotal.toFixed(2)}
                     </span>
                   </div>
                 );
@@ -531,7 +520,7 @@ export default function CustomerCheckout() {
             <div className="pt-3 border-t border-gray-100 space-y-2.5 text-xs">
               <div className="flex items-center justify-between text-gray-600">
                 <span>Subtotal</span>
-                <span className="font-bold text-gray-900">${activeSubtotal.toFixed(2)}</span>
+                <span className="font-bold text-gray-900">Tk {activeSubtotal.toFixed(2)}</span>
               </div>
 
               <div className="flex items-center justify-between text-gray-600">
@@ -540,7 +529,7 @@ export default function CustomerCheckout() {
                   {deliveryFee === 0 ? (
                     <span className="text-emerald-600 font-extrabold">FREE</span>
                   ) : (
-                    `$${deliveryFee.toFixed(2)}`
+                    `Tk ${deliveryFee.toFixed(2)}`
                   )}
                 </span>
               </div>
@@ -548,14 +537,14 @@ export default function CustomerCheckout() {
               {deliveryFee > 0 && (
                 <div className="p-2.5 rounded-xl bg-orange-50 text-[11px] text-orange-700 flex items-center gap-1.5 font-medium border border-orange-100">
                   <Sparkles className="w-3.5 h-3.5 shrink-0 text-[#FF6B35]" />
-                  Add ${(FREE_DELIVERY_THRESHOLD - activeSubtotal).toFixed(2)} more for free delivery!
+                  Add Tk {(FREE_DELIVERY_THRESHOLD - activeSubtotal).toFixed(2)} more for free delivery!
                 </div>
               )}
 
               <div className="pt-3 border-t border-gray-200 flex items-center justify-between text-sm">
                 <span className="font-extrabold text-gray-900">Grand Total</span>
                 <span className="text-xl font-black text-[#FF6B35]">
-                  ${grandTotal.toFixed(2)}
+                  Tk {grandTotal.toFixed(2)}
                 </span>
               </div>
             </div>

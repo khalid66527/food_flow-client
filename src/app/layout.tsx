@@ -11,6 +11,7 @@ import AOSInit from "@/components/common/AOSInit";
 import AIChatbot from "@/components/ai/AIChatbot";
 import CartSidebar from "@/components/cart/CartSidebar";
 import { CartProvider } from "@/contexts/CartContext";
+import LocationGuard from "@/components/common/LocationGuard";
 
 const inter = Inter({
   variable: "--font-inter",
@@ -26,6 +27,11 @@ export const metadata: Metadata = {
   title: "Food Flow — Online Food Delivery System",
   description:
     "Order your favorite food from the best restaurants near you with Food Flow.",
+  icons: {
+    icon: "/foodNav.png",
+    shortcut: "/foodNav.png",
+    apple: "/foodNav.png",
+  },
 };
 
 export default function RootLayout({
@@ -45,13 +51,15 @@ export default function RootLayout({
       >
         <AOSInit />
         <ScrollToHash />
-        <CartProvider>
-          <Navbar session={null} cartItemCount={0} />
-          <main className="flex-grow">{children}</main>
-          <Footer></Footer>
-          <CartSidebar />
-          <AIChatbot />
-        </CartProvider>
+        <LocationGuard>
+          <CartProvider>
+            <Navbar session={null} cartItemCount={0} />
+            <main className="flex-grow">{children}</main>
+            <Footer></Footer>
+            <CartSidebar />
+            <AIChatbot />
+          </CartProvider>
+        </LocationGuard>
       </body>
     </html>
   );

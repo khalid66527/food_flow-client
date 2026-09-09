@@ -45,6 +45,7 @@ import {
   updateRiderStatusAdmin,
   deleteRiderAdmin,
 } from "@/lib/actions/admin";
+import LoadingSpinner from "@/lib/api/LoadingSpinner";
 
 type TActiveTab = "all" | "restaurants" | "riders" | "pending";
 
@@ -275,11 +276,10 @@ export default function AdminRestaurantAndRider() {
       {toast && (
         <div className="fixed top-6 right-6 z-50 animate-bounce duration-300">
           <div
-            className={`flex items-center gap-3 px-5 py-3.5 rounded-2xl shadow-xl border text-sm font-bold ${
-              toast.type === "success"
+            className={`flex items-center gap-3 px-5 py-3.5 rounded-2xl shadow-xl border text-sm font-bold ${toast.type === "success"
                 ? "bg-white border-emerald-200 text-emerald-800 shadow-emerald-500/10"
                 : "bg-white border-rose-200 text-rose-800 shadow-rose-500/10"
-            }`}
+              }`}
           >
             {toast.type === "success" ? (
               <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0" />
@@ -407,11 +407,10 @@ export default function AdminRestaurantAndRider() {
           <div className="flex items-center gap-2 p-1.5 rounded-2xl bg-gray-100/80 overflow-x-auto">
             <button
               onClick={() => setActiveTab("pending")}
-              className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition-all shrink-0 ${
-                activeTab === "pending"
+              className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition-all shrink-0 ${activeTab === "pending"
                   ? "bg-white text-orange-600 shadow-sm"
                   : "text-gray-600 hover:text-gray-900"
-              }`}
+                }`}
             >
               <Clock className="w-3.5 h-3.5" />
               <span>Pending Approvals</span>
@@ -424,11 +423,10 @@ export default function AdminRestaurantAndRider() {
 
             <button
               onClick={() => setActiveTab("restaurants")}
-              className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition-all shrink-0 ${
-                activeTab === "restaurants"
+              className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition-all shrink-0 ${activeTab === "restaurants"
                   ? "bg-white text-orange-600 shadow-sm"
                   : "text-gray-600 hover:text-gray-900"
-              }`}
+                }`}
             >
               <Store className="w-3.5 h-3.5" />
               <span>Restaurants ({restaurants.length})</span>
@@ -436,11 +434,10 @@ export default function AdminRestaurantAndRider() {
 
             <button
               onClick={() => setActiveTab("riders")}
-              className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition-all shrink-0 ${
-                activeTab === "riders"
+              className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition-all shrink-0 ${activeTab === "riders"
                   ? "bg-white text-orange-600 shadow-sm"
                   : "text-gray-600 hover:text-gray-900"
-              }`}
+                }`}
             >
               <Bike className="w-3.5 h-3.5" />
               <span>Riders ({riders.length})</span>
@@ -448,11 +445,10 @@ export default function AdminRestaurantAndRider() {
 
             <button
               onClick={() => setActiveTab("all")}
-              className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition-all shrink-0 ${
-                activeTab === "all"
+              className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition-all shrink-0 ${activeTab === "all"
                   ? "bg-white text-orange-600 shadow-sm"
                   : "text-gray-600 hover:text-gray-900"
-              }`}
+                }`}
             >
               <span>All Partners</span>
             </button>
@@ -498,9 +494,8 @@ export default function AdminRestaurantAndRider() {
 
       {/* Main Content Area */}
       {loading ? (
-        <div className="min-h-[40vh] flex flex-col items-center justify-center space-y-3 bg-white rounded-3xl border border-gray-100 p-12">
-          <Loader2 className="w-8 h-8 text-[#FF6B35] animate-spin" />
-          <p className="text-xs font-bold text-gray-400">Loading partner applications...</p>
+        <div className="min-h-[400px] flex items-center justify-center bg-white rounded-3xl border border-gray-100 p-12">
+          <LoadingSpinner size={50} color="#f97316" />
         </div>
       ) : (
         <div className="space-y-8">

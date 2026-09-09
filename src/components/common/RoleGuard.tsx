@@ -15,6 +15,8 @@ import {
 } from "lucide-react";
 import { useSession, signOut } from "@/lib/auth-client";
 
+import LoadingSpinner from "@/lib/api/LoadingSpinner";
+
 interface RoleGuardProps {
   children: React.ReactNode;
   allowedRoles: string[];
@@ -83,15 +85,8 @@ export default function RoleGuard({
   // 1. Loading State
   if (!isClient || isPending) {
     return (
-      <div className="min-h-[60vh] flex flex-col items-center justify-center p-8 space-y-4">
-        <div className="relative">
-          <div className="w-12 h-12 rounded-2xl bg-orange-100 flex items-center justify-center text-[#FF6B35]">
-            <Loader2 className="w-6 h-6 animate-spin" />
-          </div>
-        </div>
-        <p className="text-sm font-semibold text-gray-500 animate-pulse">
-          Verifying security &amp; permissions...
-        </p>
+      <div className="min-h-[70vh] flex flex-col items-center justify-center p-8">
+        <LoadingSpinner size={50} color="#f97316" />
       </div>
     );
   }

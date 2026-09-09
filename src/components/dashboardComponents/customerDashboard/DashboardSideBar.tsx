@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
@@ -19,6 +19,7 @@ import {
   ShoppingBag,
 } from "lucide-react";
 import { useSession, signOut } from "@/lib/auth-client";
+import { useCart } from "@/contexts/CartContext";
 
 interface NavItem {
   label: string;
@@ -37,9 +38,15 @@ export default function DashboardSideBar() {
   const pathname = usePathname();
   const router = useRouter();
   const { data: session } = useSession();
+  const { totalItems } = useCart();
 
+  const [isMounted, setIsMounted] = useState(false);
   const [isMobileOpen, setIsMobileOpen] = useState(false);
   const [isCollapsed, setIsCollapsed] = useState(false);
+
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
 
   const handleLogout = async () => {
     try {
@@ -66,8 +73,8 @@ export default function DashboardSideBar() {
           icon: Home,
         },
         {
-          label: "Restaurants",
-          href: "/dashboard/customer/restaurants",
+          label: "Dishes",
+          href: "/restaurants",
           icon: Store,
         },
       ],
@@ -79,7 +86,7 @@ export default function DashboardSideBar() {
           label: "Cart",
           href: "/dashboard/customer/cart",
           icon: ShoppingCart,
-          badge: "2 Items",
+          badge: isMounted ? (totalItems === 1 ? "1 Item" : `${totalItems} Items`) : "0 Items",
           badgeType: "brand",
         },
         {

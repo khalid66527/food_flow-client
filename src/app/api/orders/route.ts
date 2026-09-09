@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { getOrdersCollection, getCartCollection } from "@/lib/db";
 import Stripe from "stripe";
+import { sendOrderConfirmationEmail } from "@/lib/email";
 
 // Helper to check if STRIPE_SECRET_KEY is a real, valid secret key format
 function isValidStripeSecretKey(key: string): boolean {
@@ -117,13 +118,18 @@ export async function POST(req: NextRequest) {
       // Clear Cart on COD success
       await cartCol.deleteOne({ userId });
 
+      // Trigger instant Order Confirmation Email
+      sendOrderConfirmationEmail({ ...orderDoc, _id: mongoId } as any)
+        .then(() => ordersCol.updateOne({ _id: insertResult.insertedId }, { $set: { confirmationEmailSent: true } }))
+        .catch((e) => console.warn("Background order confirmation email trigger error:", e));
+
       return NextResponse.json({
         success: true,
         message: "Order placed successfully with Cash on Delivery!",
         orderId,
         mongoId,
         redirectUrl: `/order-tracking/${orderId}`,
-        data: { ...orderDoc, _id: mongoId },
+        data: { ...orderDoc, _id: mongoId, confirmationEmailSent: true },
       });
     }
 
@@ -161,6 +167,7 @@ export async function POST(req: NextRequest) {
                 currency: "usd",
                 product_data: {
                   name: "Delivery Fee",
+                  images: [],
                   description: "Standard Delivery Charge",
                 },
                 unit_amount: Math.round(deliveryFee * 100),

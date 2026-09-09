@@ -95,6 +95,11 @@ export default function DashboardSideBar() {
           icon: Utensils,
         },
         {
+          label: "Global Category Control",
+          href: "/dashboard/admin/categories",
+          icon: FolderTree,
+        },
+        {
           label: "Review & Rating Moderation",
           href: "/dashboard/admin/reviews",
           icon: Star,

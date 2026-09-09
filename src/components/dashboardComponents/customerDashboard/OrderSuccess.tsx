@@ -3,6 +3,7 @@
 import React, { useEffect, useState, Suspense } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import Link from "next/link";
+import LoadingSpinner from "@/lib/api/LoadingSpinner";
 import {
   CheckCircle2,
   FileText,
@@ -93,22 +94,16 @@ function OrderSuccessContent() {
   };
 
   const handleTrackOrder = () => {
-    if (order?.orderId) {
-      router.push(`/dashboard/customer/order-tracking?orderId=${order.orderId}`);
+    const targetId = order?.orderId || order?._id || order?.id;
+    if (targetId) {
+      router.push(`/dashboard/customer/order-tracking?orderId=${targetId}`);
     } else {
       router.push("/dashboard/customer/order-tracking");
     }
   };
 
   if (isLoading) {
-    return (
-      <div className="flex flex-col items-center justify-center py-32 space-y-4">
-        <Loader2 className="w-10 h-10 text-[#FF6B35] animate-spin" />
-        <p className="text-sm font-semibold text-gray-600">
-          Retrieving real-time order status from database...
-        </p>
-      </div>
-    );
+    return <LoadingSpinner size={50} minHeight="60vh" />;
   }
 
   if (errorMsg || !order) {
@@ -147,7 +142,7 @@ function OrderSuccessContent() {
       {/* Top Banner Celebration Card (Signature Bright Orange Gradient Theme) */}
       <div className="bg-gradient-to-r from-[#FF6B35] via-[#FF7843] to-[#FF8C42] rounded-3xl p-8 sm:p-10 text-white shadow-xl relative overflow-hidden text-center">
         <div className="absolute right-0 top-0 translate-x-8 -translate-y-8 w-56 h-56 rounded-full bg-white/10 blur-3xl pointer-events-none" />
-        
+
         <div className="w-20 h-20 rounded-full bg-white/20 backdrop-blur-md flex items-center justify-center mx-auto mb-4 border border-white/30 shadow-inner">
           <CheckCircle2 className="w-10 h-10 text-white" />
         </div>
@@ -169,11 +164,10 @@ function OrderSuccessContent() {
             Method: {isStripe ? "Stripe Online Payment" : "Cash on Delivery (COD)"}
           </span>
           <span
-            className={`px-4 py-1.5 rounded-full border backdrop-blur-md ${
-              isPaid
+            className={`px-4 py-1.5 rounded-full border backdrop-blur-md ${isPaid
                 ? "bg-emerald-500/20 text-emerald-300 border-emerald-500/40"
                 : "bg-amber-500/20 text-amber-300 border-amber-500/40"
-            }`}
+              }`}
           >
             Payment Status: {isPaid ? "Paid" : "Cash on Delivery (Unpaid)"}
           </span>
@@ -199,11 +193,10 @@ function OrderSuccessContent() {
             type="button"
             onClick={handleDownloadInvoice}
             disabled={isDownloading || !isVoucherEnabled}
-            className={`flex items-center justify-center gap-2.5 px-6 py-4 rounded-2xl font-extrabold text-sm shadow-lg transition ${
-              isVoucherEnabled
+            className={`flex items-center justify-center gap-2.5 px-6 py-4 rounded-2xl font-extrabold text-sm shadow-lg transition ${isVoucherEnabled
                 ? "bg-gradient-to-r from-gray-900 to-gray-800 text-white hover:brightness-125 active:scale-98 cursor-pointer"
                 : "bg-gray-100 text-gray-400 border border-gray-200 cursor-not-allowed opacity-60"
-            }`}
+              }`}
             title={
               isVoucherEnabled
                 ? "Download Invoice Voucher"
@@ -289,7 +282,7 @@ function OrderSuccessContent() {
                     {item.quantity}x {item.name}
                   </span>
                   <span className="font-extrabold text-gray-900">
-                    ${(unitPrice * item.quantity).toFixed(2)}
+                    Tk {(unitPrice * item.quantity).toFixed(2)}
                   </span>
                 </div>
               );
@@ -298,7 +291,7 @@ function OrderSuccessContent() {
 
           <div className="pt-3 border-t border-gray-100 flex items-center justify-between text-sm font-extrabold text-gray-900">
             <span>Total Paid</span>
-            <span className="text-[#FF6B35] text-lg">${(order.totalAmount || 0).toFixed(2)}</span>
+            <span className="text-[#FF6B35] text-lg">Tk {(order.totalAmount || 0).toFixed(2)}</span>
           </div>
         </div>
       </div>
@@ -308,13 +301,7 @@ function OrderSuccessContent() {
 
 export default function OrderSuccess() {
   return (
-    <Suspense
-      fallback={
-        <div className="flex items-center justify-center py-32">
-          <Loader2 className="w-8 h-8 text-[#FF6B35] animate-spin" />
-        </div>
-      }
-    >
+    <Suspense fallback={<LoadingSpinner size={50} minHeight="60vh" />}>
       <OrderSuccessContent />
     </Suspense>
   );

@@ -103,9 +103,9 @@ export async function downloadInvoicePdf(order: TOrder) {
         (idx + 1).toString(),
         item.name,
         item.restaurantName || primaryRestaurant,
-        `$${unitPrice.toFixed(2)}`,
+        `Tk ${unitPrice.toFixed(2)}`,
         item.quantity.toString(),
-        `$${lineTotal.toFixed(2)}`,
+        `Tk ${lineTotal.toFixed(2)}`,
       ];
     });
 
@@ -143,6 +143,7 @@ export async function downloadInvoicePdf(order: TOrder) {
     const deliveryFee = order.deliveryFee || 0;
     const discount = order.discount || 0;
     const grandTotal = order.totalAmount || subtotal + deliveryFee - discount;
+    const isPaid = (order.paymentStatus || "").toLowerCase() === "paid" || order.paymentMethod === "STRIPE";
 
     doc.setFillColor(248, 250, 252);
     doc.roundedRect(120, finalY + 8, 76, 38, 2, 2, "F");
@@ -154,23 +155,23 @@ export async function downloadInvoicePdf(order: TOrder) {
     doc.setTextColor(71, 85, 105);
 
     doc.text("Subtotal:", 125, finalY + 16);
-    doc.text(`$${subtotal.toFixed(2)}`, 190, finalY + 16, { align: "right" });
+    doc.text(`Tk ${subtotal.toFixed(2)}`, 190, finalY + 16, { align: "right" });
 
     doc.text("Delivery Fee:", 125, finalY + 22);
-    doc.text(deliveryFee === 0 ? "FREE" : `$${deliveryFee.toFixed(2)}`, 190, finalY + 22, {
+    doc.text(deliveryFee === 0 ? "FREE" : `Tk ${deliveryFee.toFixed(2)}`, 190, finalY + 22, {
       align: "right",
     });
 
     if (discount > 0) {
       doc.text("Discount:", 125, finalY + 28);
-      doc.text(`-$${discount.toFixed(2)}`, 190, finalY + 28, { align: "right" });
+      doc.text(`-Tk ${discount.toFixed(2)}`, 190, finalY + 28, { align: "right" });
     }
 
     doc.setFont("helvetica", "bold");
     doc.setFontSize(11);
     doc.setTextColor(primaryColor[0], primaryColor[1], primaryColor[2]);
     doc.text("Grand Total:", 125, finalY + 38);
-    doc.text(`$${grandTotal.toFixed(2)}`, 190, finalY + 38, { align: "right" });
+    doc.text(`Tk ${grandTotal.toFixed(2)}`, 190, finalY + 38, { align: "right" });
 
     // Note for COD / Payment
     doc.setFont("helvetica", "italic");

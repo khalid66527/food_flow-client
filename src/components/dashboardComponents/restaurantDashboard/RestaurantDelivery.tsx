@@ -1,8 +1,8 @@
 "use client";
 
 import React, { useEffect, useState, useCallback } from "react";
+import LoadingSpinner from "@/lib/api/LoadingSpinner";
 import {
-  Loader2,
   RefreshCw,
   Bike,
   CheckCircle2,
@@ -114,12 +114,7 @@ export default function RestaurantDelivery() {
   const delivered = orders.filter((o) => o.orderStatus === "Delivered").length;
 
   if (sessionPending || loading) {
-    return (
-      <div className="min-h-[60vh] flex flex-col items-center justify-center gap-3">
-        <Loader2 className="w-10 h-10 text-[#FF6B35] animate-spin" />
-        <p className="text-sm font-bold text-gray-600">Loading delivery status...</p>
-      </div>
-    );
+    return <LoadingSpinner size={50} minHeight="60vh" />;
   }
 
   return (
@@ -265,9 +260,8 @@ export default function RestaurantDelivery() {
                     <p className="text-xs font-bold text-gray-800">
                       {order.paymentMethod === "STRIPE" ? "Card (Paid Online)" : "Cash on Delivery"}
                     </p>
-                    <p className={`inline-flex items-center px-2.5 py-1 rounded-full text-[10px] font-extrabold border ${
-                      order.paymentStatus === "Paid" || isDelivered ? "bg-emerald-50 text-emerald-700 border-emerald-200" : "bg-amber-50 text-amber-700 border-amber-200"
-                    }`}>
+                    <p className={`inline-flex items-center px-2.5 py-1 rounded-full text-[10px] font-extrabold border ${order.paymentStatus === "Paid" || isDelivered ? "bg-emerald-50 text-emerald-700 border-emerald-200" : "bg-amber-50 text-amber-700 border-amber-200"
+                      }`}>
                       {order.paymentStatus === "Paid" || isDelivered ? "Paid" : "Pending"}
                     </p>
                   </div>

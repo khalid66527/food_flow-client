@@ -34,6 +34,7 @@ import {
   getContactMessages,
   getContactStats,
 } from "@/lib/api/contact";
+import LoadingSpinner from "@/lib/api/LoadingSpinner";
 import {
   replyToContactMessageAction,
   updateContactStatusAction,
@@ -244,11 +245,10 @@ export default function AdminContactMessages() {
       {/* Toast Notification */}
       {toast && (
         <div
-          className={`fixed bottom-6 right-6 z-50 flex items-center gap-2.5 px-4 py-3 rounded-2xl shadow-xl border text-sm font-bold animate-fade-in-up ${
-            toast.type === "success"
+          className={`fixed bottom-6 right-6 z-50 flex items-center gap-2.5 px-4 py-3 rounded-2xl shadow-xl border text-sm font-bold animate-fade-in-up ${toast.type === "success"
               ? "bg-emerald-900 text-white border-emerald-700"
               : "bg-rose-900 text-white border-rose-700"
-          }`}
+            }`}
         >
           {toast.type === "success" ? (
             <CheckCircle2 className="w-4 h-4 text-emerald-300" />
@@ -364,11 +364,10 @@ export default function AdminContactMessages() {
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
-                className={`px-4 py-2 rounded-2xl text-xs font-bold whitespace-nowrap transition-all cursor-pointer ${
-                  isActive
+                className={`px-4 py-2 rounded-2xl text-xs font-bold whitespace-nowrap transition-all cursor-pointer ${isActive
                     ? "bg-[#FF6B35] text-white shadow-md shadow-orange-500/20"
                     : "bg-gray-50 text-gray-600 hover:bg-gray-100"
-                }`}
+                  }`}
               >
                 {tab.label}
               </button>
@@ -408,9 +407,8 @@ export default function AdminContactMessages() {
       {/* Messages List Table */}
       <div className="bg-white rounded-3xl border border-gray-100 shadow-xs overflow-hidden">
         {loading ? (
-          <div className="p-16 flex flex-col items-center justify-center gap-3">
-            <Loader2 className="w-8 h-8 animate-spin text-[#FF6B35]" />
-            <p className="text-xs font-bold text-gray-500 animate-pulse">Loading inquiries...</p>
+          <div className="p-16 flex items-center justify-center">
+            <LoadingSpinner size={50} color="#f97316" />
           </div>
         ) : messages.length === 0 ? (
           <div className="p-16 text-center space-y-3">
@@ -660,9 +658,8 @@ export default function AdminContactMessages() {
                     #{viewMessage.ticketId}
                   </span>
                   <div
-                    className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full border text-[11px] font-bold ${
-                      getStatusBadge(viewMessage.status).color
-                    }`}
+                    className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full border text-[11px] font-bold ${getStatusBadge(viewMessage.status).color
+                      }`}
                   >
                     <span>{getStatusBadge(viewMessage.status).label}</span>
                   </div>

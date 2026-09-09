@@ -20,6 +20,7 @@ import {
   clearCartAction,
 } from '@/lib/actions/cart';
 import { CartToast } from '@/components/cart/CartToast';
+import { CartConflictModal } from '@/components/cart/CartConflictModal';
 
 export interface CartItem {
   foodItem: IGlobalFoodItem;
@@ -204,19 +205,15 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
   // Not logged in (will redirect to login) or logged in as a customer may add items.
   const canAddToCart = !userId || isCustomer;
 
-  const guardedAddItem = useCallback(
+  const [conflictData, setConflictData] = useState<{
+    foodItem: IGlobalFoodItem;
+    quantity: number;
+    existingRestaurantName: string;
+    newRestaurantName: string;
+  } | null>(null);
+
+  const performAddItem = useCallback(
     (foodItem: IGlobalFoodItem, quantity: number = 1) => {
-      if (!userId) {
-        router.push(`/auth/login?callbackUrl=${encodeURIComponent(pathname)}`);
-        return;
-      }
-
-      // Only customer accounts may add items to the cart.
-      if (!isCustomer) {
-        setCartError('Only customer accounts can add items to the cart.');
-        return;
-      }
-
       const payload = toCartPayload(foodItem, quantity);
 
       // Optimistic local update
@@ -237,16 +234,75 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
         .then((res) => {
           if (!res.success) {
             setCartError(res.message || 'Failed to add item to cart.');
+          } else {
+            showToast(`Added ${foodItem.name} to cart.`);
           }
-          // Re-sync with the authoritative server state on every mutation.
           return refreshCart();
         })
         .catch(() => {
           setCartError('Failed to add item to cart.');
         });
     },
-    [userId, userEmail, pathname, router, isCustomer, refreshCart]
+    [userId, userEmail, refreshCart, showToast]
   );
+
+  const guardedAddItem = useCallback(
+    (foodItem: IGlobalFoodItem, quantity: number = 1) => {
+      if (!userId) {
+        router.push(`/auth/login?callbackUrl=${encodeURIComponent(pathname)}`);
+        return;
+      }
+
+      // Only customer accounts may add items to the cart.
+      if (!isCustomer) {
+        setCartError('Only customer accounts can add items to the cart.');
+        return;
+      }
+
+      // Single-restaurant cart policy check:
+      // If the cart already contains items from a DIFFERENT restaurant, prompt for confirmation.
+      if (items.length > 0) {
+        const firstItem = items[0]?.foodItem;
+        const existingRestId = firstItem?.restaurantId;
+        const newRestId = foodItem.restaurantId;
+
+        if (existingRestId && newRestId && existingRestId !== newRestId) {
+          const existingRestName = firstItem?.restaurantName || 'another restaurant';
+          const newRestName = foodItem.restaurantName || 'this restaurant';
+
+          setConflictData({
+            foodItem,
+            quantity,
+            existingRestaurantName: existingRestName,
+            newRestaurantName: newRestName,
+          });
+          return;
+        }
+      }
+
+      performAddItem(foodItem, quantity);
+    },
+    [userId, isCustomer, items, pathname, router, performAddItem]
+  );
+
+  const handleConfirmConflict = useCallback(async () => {
+    if (!conflictData || !userId) return;
+    const { foodItem, quantity, newRestaurantName } = conflictData;
+    setConflictData(null);
+
+    // Clear existing cart
+    setItems([]);
+    itemsRef.current = [];
+    await clearCartAction(userId, userEmail);
+
+    // Add new item
+    performAddItem(foodItem, quantity);
+    showToast(`Cart cleared & item added from ${newRestaurantName}.`);
+  }, [conflictData, userId, userEmail, performAddItem, showToast]);
+
+  const handleCancelConflict = useCallback(() => {
+    setConflictData(null);
+  }, []);
 
   const removeItem = useCallback(
     (foodId: string) => {
@@ -379,6 +435,13 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     >
       {children}
       <CartToast toast={toast} />
+      <CartConflictModal
+        isOpen={Boolean(conflictData)}
+        existingRestaurantName={conflictData?.existingRestaurantName || ''}
+        newRestaurantName={conflictData?.newRestaurantName || ''}
+        onConfirm={handleConfirmConflict}
+        onCancel={handleCancelConflict}
+      />
     </CartContext.Provider>
   );
 }

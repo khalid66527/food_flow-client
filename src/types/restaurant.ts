@@ -2,6 +2,7 @@ export type PriceRange = '$' | '$$' | '$$$' | '$$$$';
 
 export type SortOption =
   | 'relevance'
+  | 'distance'
   | 'rating_desc'
   | 'delivery_time_asc'
   | 'delivery_fee_asc'
@@ -56,6 +57,7 @@ export interface IMenuItem {
 
 export type FoodSortOption =
   | 'relevance'
+  | 'distance'
   | 'price_asc'
   | 'price_desc'
   | 'newest';
