@@ -3,7 +3,7 @@ import { getOrdersCollection, getCartCollection } from "@/lib/db";
 import { auth } from "@/lib/auth";
 import { ObjectId } from "mongodb";
 import Stripe from "stripe";
-import { sendOrderConfirmationEmail, sendOrderCancellationEmail } from "@/lib/email";
+import { sendOrderConfirmationEmail, sendOrderCancellationEmail, sendDeliveryOtpEmail } from "@/lib/email";
 
 export async function GET(
   req: NextRequest,
@@ -242,11 +242,89 @@ export async function PATCH(
       });
     }
 
+    // 🔑 3. Send / Resend Delivery Verification OTP to Customer (Email & Dashboard)
+    if (action === "send_otp" || action === "resend_otp") {
+      const generatedOtp = Math.floor(100000 + Math.random() * 900000).toString();
+      await ordersCol.updateOne(
+        { _id: order._id },
+        {
+          $set: {
+            deliveryOtp: generatedOtp,
+            deliveryOtpCreatedAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+          },
+        }
+      );
+
+      const rName =
+        [...new Set((order.items || []).map((i: any) => i.restaurantName).filter(Boolean))].join(", ") ||
+        "FoodFlow Kitchen";
+
+      if (order.userEmail) {
+        sendDeliveryOtpEmail({
+          orderId: order.orderId,
+          userEmail: order.userEmail,
+          userName: order.userName || order.deliveryAddress?.fullName,
+          otp: generatedOtp,
+          restaurantName: rName,
+          totalAmount: order.totalAmount,
+        }).catch((e) => console.warn("Background OTP email dispatch error:", e));
+      }
+
+      const updatedOrder = await ordersCol.findOne({ _id: order._id });
+
+      return NextResponse.json({
+        success: true,
+        message: "Delivery OTP sent to customer successfully via email and dashboard.",
+        data: updatedOrder,
+      });
+    }
+
+    // 🔒 4. OTP Validation on Delivery Completion
+    if (orderStatus === "Delivered") {
+      if (order.deliveryOtp) {
+        const inputOtp = (body.otp || body.deliveryOtp || "").toString().trim();
+        if (!inputOtp || inputOtp !== order.deliveryOtp.trim()) {
+          return NextResponse.json(
+            {
+              success: false,
+              message: "Invalid OTP code. Please ask the customer for the 6-digit delivery verification OTP.",
+            },
+            { status: 400 }
+          );
+        }
+      }
+    }
+
     // Generic Update
     const updateFields: any = { updatedAt: new Date().toISOString() };
     if (paymentStatus) updateFields.paymentStatus = paymentStatus;
     if (orderStatus) {
       updateFields.orderStatus = orderStatus;
+
+      // Auto-generate OTP when status changes to 'Out for Delivery' if not already generated
+      if (orderStatus === "Out for Delivery") {
+        const otp = order.deliveryOtp || Math.floor(100000 + Math.random() * 900000).toString();
+        updateFields.deliveryOtp = otp;
+        updateFields.deliveryOtpCreatedAt = order.deliveryOtpCreatedAt || new Date().toISOString();
+
+        // Send OTP email to customer
+        const rName =
+          [...new Set((order.items || []).map((i: any) => i.restaurantName).filter(Boolean))].join(", ") ||
+          "FoodFlow Kitchen";
+
+        if (order.userEmail && (!order.deliveryOtp || body.resendOtp)) {
+          sendDeliveryOtpEmail({
+            orderId: order.orderId,
+            userEmail: order.userEmail,
+            userName: order.userName || order.deliveryAddress?.fullName,
+            otp,
+            restaurantName: rName,
+            totalAmount: order.totalAmount,
+          }).catch((e) => console.warn("Background OTP email dispatch error on status change:", e));
+        }
+      }
+
       if (orderStatus === "Delivered") {
         updateFields.deliveryStatus = "Delivered";
         updateFields.deliveredAt = new Date().toISOString();
@@ -305,7 +383,7 @@ export async function PATCH(
 
     return NextResponse.json({
       success: true,
-      message: "Order updated successfully.",
+      message: orderStatus === "Delivered" ? "Order delivered successfully with OTP validation!" : "Order updated successfully.",
       data: updatedOrder,
     });
   } catch (error: any) {

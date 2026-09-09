@@ -22,7 +22,12 @@ import {
   Layers,
   ChevronRight,
   Navigation,
-  ArrowRight
+  ArrowRight,
+  Copy,
+  Check,
+  ShieldCheck,
+  Key,
+  Lock,
 } from "lucide-react";
 import { useSession } from "@/lib/auth-client";
 import { getOrderByIdApi, getUserOrdersApi } from "@/lib/api/order";
@@ -135,6 +140,7 @@ export default function OrderTracking() {
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const [connected, setConnected] = useState<boolean>(false);
+  const [copiedOtp, setCopiedOtp] = useState<boolean>(false);
 
   // Derive active view mode and target tracking ID
   const isListView = viewMode === "list" || (!explicitOrderId && !selectedOrderId);
@@ -586,6 +592,58 @@ export default function OrderTracking() {
             </div>
             <OrderStatusStepper currentStatus={currentStatus} />
           </div>
+
+          {/* 🔑 Delivery Verification OTP Card (When Out for Delivery or OTP exists) */}
+          {order?.deliveryOtp && !completed && (
+            <div className="bg-gradient-to-r from-orange-50 via-amber-50 to-orange-50 rounded-3xl border-2 border-dashed border-orange-300 p-5 sm:p-7 shadow-xs">
+              <div className="flex flex-col md:flex-row items-center justify-between gap-5">
+                <div className="flex items-center gap-4 text-center md:text-left">
+                  <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-orange-500 to-amber-500 text-white flex items-center justify-center shadow-lg shadow-orange-500/25 shrink-0">
+                    <Key className="w-7 h-7" />
+                  </div>
+                  <div>
+                    <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md bg-orange-100/80 text-orange-700 text-[10px] font-extrabold uppercase tracking-wider mb-1">
+                      <ShieldCheck className="w-3 h-3" /> Secure Handover OTP
+                    </div>
+                    <h3 className="text-base sm:text-lg font-black text-gray-900">
+                      Your Delivery Verification OTP Code
+                    </h3>
+                    <p className="text-xs text-gray-600 font-medium max-w-md">
+                      Provide this 6-digit OTP to your delivery partner when you receive your food to finalize the delivery.
+                    </p>
+                  </div>
+                </div>
+
+                {/* OTP Digits & Copy Button */}
+                <div className="flex items-center gap-2.5 shrink-0">
+                  <div className="bg-white border-2 border-orange-200 px-5 py-2.5 rounded-2xl shadow-sm text-center">
+                    <span className="font-mono text-2xl sm:text-3xl font-black text-orange-600 tracking-[6px]">
+                      {order.deliveryOtp}
+                    </span>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (order.deliveryOtp) {
+                        navigator.clipboard.writeText(order.deliveryOtp);
+                        setCopiedOtp(true);
+                        setTimeout(() => setCopiedOtp(false), 2500);
+                      }
+                    }}
+                    className="p-3.5 rounded-2xl bg-white hover:bg-orange-500 hover:text-white border border-orange-200 text-orange-600 transition shadow-xs cursor-pointer group"
+                    title="Copy OTP Code"
+                  >
+                    {copiedOtp ? (
+                      <Check className="w-5 h-5 text-emerald-600" />
+                    ) : (
+                      <Copy className="w-5 h-5" />
+                    )}
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* 3. Live Rider Location Map */}
           <div className="bg-white rounded-3xl border border-gray-100 shadow-sm overflow-hidden">

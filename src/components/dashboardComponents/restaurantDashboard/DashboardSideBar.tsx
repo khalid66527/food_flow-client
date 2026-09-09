@@ -131,8 +131,6 @@ export default function DashboardSideBar() {
           label: "Orders",
           href: "/dashboard/restaurant/orders",
           icon: ClipboardList,
-          badge: "8 Active",
-          badgeType: "brand",
         },
         {
           label: "Delivery",

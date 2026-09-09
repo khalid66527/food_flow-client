@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useEffect, useState, useCallback, useMemo } from "react";
+import Link from "next/link";
 import LoadingSpinner from "@/lib/api/LoadingSpinner";
 import {
   RefreshCw,
@@ -18,6 +19,8 @@ import {
   Eye,
   X,
   CreditCard,
+  ArrowRight,
+  Sparkles,
 } from "lucide-react";
 import { useSession } from "@/lib/auth-client";
 import { getRestaurantOrdersApi } from "@/lib/api/order";
@@ -59,10 +62,14 @@ export default function RestaurantDelivery() {
     const res = await getRestaurantOrdersApi(user.id, user.email, {
       restaurantId: profile?._id,
       restaurantName: profile?.restaurantName,
-      status: "Ready,Ready for Pickup,Out for Delivery,Delivered",
+      status: "Ready,Ready for Pickup,Out for Delivery",
     });
     if (res.success && Array.isArray(res.data)) {
-      setOrders(res.data as TOrder[]);
+      // Exclude any already delivered or cancelled orders from active delivery tracking
+      const activeOnly = (res.data as TOrder[]).filter(
+        (o) => o.orderStatus !== "Delivered" && o.orderStatus !== "Cancelled"
+      );
+      setOrders(activeOnly);
     } else {
       setOrders([]);
       if (res.message) setError(res.message);
@@ -80,7 +87,12 @@ export default function RestaurantDelivery() {
       const match = orders.find(
         (o) => (o.orderId && o.orderId === selectedOrder.orderId) || (o._id && o._id === selectedOrder._id)
       );
-      if (match) setSelectedOrder(match);
+      if (match) {
+        setSelectedOrder(match);
+      } else {
+        // If order was delivered or removed, close modal
+        setSelectedOrder(null);
+      }
     }
   }, [orders, selectedOrder]);
 
@@ -102,9 +114,21 @@ export default function RestaurantDelivery() {
       const orderId = payload?.orderId;
       const newStatus = payload?.orderStatus || payload?.status;
       if (!orderId || !newStatus) return;
-      setOrders((prev) =>
-        prev.map((o) => (o.orderId === orderId || o._id === orderId ? { ...o, orderStatus: newStatus as TOrder["orderStatus"] } : o))
-      );
+
+      if (newStatus === "Delivered" || newStatus === "Cancelled") {
+        // Immediately remove delivered or cancelled order from live delivery tracking
+        setOrders((prev) => prev.filter((o) => o.orderId !== orderId && o._id !== orderId));
+        setSelectedOrder((prevSelected) => {
+          if (prevSelected && (prevSelected.orderId === orderId || prevSelected._id === orderId)) {
+            return null;
+          }
+          return prevSelected;
+        });
+      } else {
+        setOrders((prev) =>
+          prev.map((o) => (o.orderId === orderId || o._id === orderId ? { ...o, orderStatus: newStatus as TOrder["orderStatus"] } : o))
+        );
+      }
     };
 
     const onRiderLocation = (payload: {
@@ -154,7 +178,7 @@ export default function RestaurantDelivery() {
   }, [orders, searchQuery]);
 
   const dispatched = orders.filter((o) => o.orderStatus === "Out for Delivery").length;
-  const delivered = orders.filter((o) => o.orderStatus === "Delivered").length;
+  const readyForPickup = orders.filter((o) => (o.orderStatus as string) === "Ready" || (o.orderStatus as string) === "Ready for Pickup" || o.orderStatus === "Preparing").length;
 
   if (sessionPending || loading) {
     return <LoadingSpinner size={50} minHeight="60vh" />;
@@ -172,7 +196,7 @@ export default function RestaurantDelivery() {
             </div>
             <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-white">Live Delivery Tracking</h1>
             <p className="text-orange-100 text-sm mt-1">
-              Follow dispatched orders, rider live GPS locations, and delivery handoffs in real-time.
+              Follow dispatched orders, rider live GPS locations, and active delivery handoffs in real-time.
             </p>
           </div>
           <div className="flex items-center gap-3">
@@ -192,20 +216,26 @@ export default function RestaurantDelivery() {
         </div>
       </section>
 
-      {/* Stats */}
+      {/* Stats & Quick Link to Sell History */}
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
         <div className="bg-white rounded-2xl p-4 border border-gray-100 shadow-xs space-y-1">
           <span className="text-[11px] font-bold text-gray-400 uppercase tracking-wider">Active On Road</span>
           <p className="text-xl sm:text-2xl font-black text-amber-600">{dispatched}</p>
         </div>
         <div className="bg-white rounded-2xl p-4 border border-gray-100 shadow-xs space-y-1">
-          <span className="text-[11px] font-bold text-gray-400 uppercase tracking-wider">Completed Deliveries</span>
-          <p className="text-xl sm:text-2xl font-black text-emerald-600">{delivered}</p>
+          <span className="text-[11px] font-bold text-gray-400 uppercase tracking-wider">Ready for Pickup</span>
+          <p className="text-xl sm:text-2xl font-black text-orange-600">{readyForPickup}</p>
         </div>
-        <div className="bg-white rounded-2xl p-4 border border-gray-100 shadow-xs space-y-1 col-span-2 sm:col-span-1">
-          <span className="text-[11px] font-bold text-gray-400 uppercase tracking-wider">Total Handled</span>
-          <p className="text-xl sm:text-2xl font-black text-gray-900">{orders.length}</p>
-        </div>
+        <Link
+          href="/dashboard/restaurant/sell-history"
+          className="bg-gradient-to-br from-emerald-500 to-teal-600 rounded-2xl p-4 text-white shadow-md shadow-emerald-500/10 space-y-1 col-span-2 sm:col-span-1 hover:brightness-105 transition flex flex-col justify-between cursor-pointer"
+        >
+          <div className="flex items-center justify-between">
+            <span className="text-[11px] font-extrabold uppercase tracking-wider text-emerald-100">Sell History</span>
+            <ArrowRight className="w-4 h-4 text-white" />
+          </div>
+          <p className="text-xs sm:text-sm font-black text-white">View Delivered Orders →</p>
+        </Link>
       </div>
 
       {/* Search */}
@@ -232,15 +262,22 @@ export default function RestaurantDelivery() {
 
       {filteredOrders.length === 0 ? (
         <div className="bg-white rounded-3xl border border-gray-100 shadow-sm p-12 text-center space-y-4">
-          <div className="w-16 h-16 rounded-full bg-orange-50 text-[#FF6B35] flex items-center justify-center mx-auto">
+          <div className="w-16 h-16 rounded-full bg-orange-50 text-[#FF6B35] flex items-center justify-center mx-auto shadow-xs">
             <Truck className="w-8 h-8" />
           </div>
           <div className="space-y-1">
-            <h3 className="text-lg font-extrabold text-gray-900">No Dispatched Orders</h3>
+            <h3 className="text-lg font-extrabold text-gray-900">No Active Dispatched Orders</h3>
             <p className="text-xs text-gray-500 max-w-sm mx-auto">
-              Orders that are marked ready for pickup, out for delivery, or delivered will appear here.
+              All ongoing deliveries will show here in real-time. Once delivered by the rider, orders move automatically to Sell History.
             </p>
           </div>
+          <Link
+            href="/dashboard/restaurant/sell-history"
+            className="inline-flex items-center gap-2 px-5 py-2.5 rounded-2xl bg-gray-900 hover:bg-black text-white text-xs font-bold transition"
+          >
+            <span>Check Sell History</span>
+            <ArrowRight className="w-3.5 h-3.5" />
+          </Link>
         </div>
       ) : (
         <div className="space-y-4">

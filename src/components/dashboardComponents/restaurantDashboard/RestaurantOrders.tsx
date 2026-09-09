@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useEffect, useState, useCallback, useMemo } from "react";
+import Link from "next/link";
 import {
   Loader2,
   RefreshCw,
@@ -35,16 +36,15 @@ import LoadingSpinner from "@/lib/api/LoadingSpinner";
 import OrderStatusStepper, { resolveStepIndex } from "@/components/tracking/OrderStatusStepper";
 import OrderTrackingMap from "@/components/tracking/OrderTrackingMap";
 
-type TTab = "ALL" | "PLACED" | "CONFIRMED" | "PREPARING" | "READY" | "OUT FOR DELIVERY" | "DELIVERED";
+type TTab = "ALL" | "PLACED" | "CONFIRMED" | "PREPARING" | "READY" | "OUT FOR DELIVERY";
 
 const TABS: { key: TTab; label: string; icon: React.ElementType }[] = [
-  { key: "ALL", label: "All Orders", icon: Receipt },
+  { key: "ALL", label: "Active Orders", icon: Receipt },
   { key: "PLACED", label: "New", icon: Clock },
   { key: "CONFIRMED", label: "Confirmed", icon: CheckCircle2 },
   { key: "PREPARING", label: "Preparing", icon: ChefHat },
   { key: "READY", label: "Ready", icon: PackageCheck },
   { key: "OUT FOR DELIVERY", label: "Dispatched", icon: Bike },
-  { key: "DELIVERED", label: "Completed", icon: CheckCircle2 },
 ];
 
 function getRestaurantProfile() {
@@ -116,7 +116,13 @@ export default function RestaurantOrders() {
       restaurantName: profile?.restaurantName,
     });
     if (res.success && Array.isArray(res.data)) {
-      setOrders(res.data as TOrder[]);
+      const activeList = (res.data as TOrder[]).filter(
+        (o) =>
+          !["delivered", "completed", "cancelled", "canceled", "rejected", "failed"].includes(
+            (o.orderStatus || "").toLowerCase()
+          )
+      );
+      setOrders(activeList);
     } else {
       setOrders([]);
       if (res.message) setError(res.message);
@@ -161,6 +167,21 @@ export default function RestaurantOrders() {
       const orderId = payload?.orderId;
       const newStatus = payload?.orderStatus || payload?.status;
       if (!orderId) return;
+
+      if (
+        newStatus &&
+        ["delivered", "completed", "cancelled", "canceled", "rejected", "failed"].includes(
+          newStatus.toLowerCase()
+        )
+      ) {
+        // Delivered order moves to Sell History immediately
+        setOrders((prev) => prev.filter((o) => o.orderId !== orderId && o._id !== orderId));
+        if (selectedOrder && (selectedOrder.orderId === orderId || selectedOrder._id === orderId)) {
+          setSelectedOrder(null);
+        }
+        return;
+      }
+
       setOrders((prev) =>
         prev.map((o) => {
           if (o.orderId === orderId || o._id === orderId) {
@@ -385,13 +406,20 @@ export default function RestaurantOrders() {
             <Store className="w-8 h-8" />
           </div>
           <div className="space-y-1">
-            <h3 className="text-lg font-extrabold text-gray-900">No Orders Found</h3>
+            <h3 className="text-lg font-extrabold text-gray-900">No Active Kitchen Orders</h3>
             <p className="text-xs text-gray-500 max-w-sm mx-auto">
               {searchQuery || activeTab !== "ALL"
-                ? "No orders match your current search or filter tab."
-                : "No orders received yet. Orders placed by customers will appear here automatically."}
+                ? "No active orders match your current search or filter tab."
+                : "Active incoming orders will appear here automatically. Completed and delivered orders are moved to Sell History."}
             </p>
           </div>
+          <Link
+            href="/dashboard/restaurant/sell-history"
+            className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-gradient-to-r from-[#FF6B35] to-amber-500 text-white text-xs font-extrabold shadow-md shadow-orange-500/20 hover:brightness-105 transition cursor-pointer"
+          >
+            <span>View Completed Sell History</span>
+            <ArrowRight className="w-3.5 h-3.5" />
+          </Link>
         </div>
       ) : (
         <div className="space-y-4">
