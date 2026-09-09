@@ -96,60 +96,6 @@ const DEFAULT_FOOD_DATA = {
   updatedAt: "2026-08-26T15:45:31.384Z",
 };
 
-// Fallback high-quality restaurant data matching user schema
-const DEFAULT_RESTAURANT_DATA = {
-  _id: "6a8e9fe3df21c67ff05b84f2",
-  id: "6a8e9fe3df21c67ff05b84f2",
-  ownerId: "6a8c44db038d591680702d46",
-  ownerEmail: "khalidhasan678954321@gmail.com",
-  ownerName: "Md Khalid Hasan",
-  restaurantName: "Tamjid Gourmet Kitchen",
-  tagline: "Authentic wood-fired recipes & gourmet culinary perfection",
-  description:
-    "Welcome to Tamjid Gourmet Kitchen. We specialize in handcrafted stone-oven pizzas, slow-cooked biryanis, and artisan burgers crafted from the freshest premium ingredients.",
-  cuisineTypes: ["Pizza", "Fast Food", "Italian", "Grill"],
-  cuisines: ["Pizza", "Fast Food", "Italian", "Grill"],
-  logo: "https://images.unsplash.com/photo-1555396273-367ea4eb4db5?auto=format&fit=crop&w=300&q=80",
-  bannerImage: "https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?auto=format&fit=crop&w=1200&q=80",
-  contactNumber: "+1 (217) 504-1313",
-  contactEmail: "contact@tamjidkitchen.com",
-  website: "https://foodflow-kitchen.com",
-  address: {
-    street: "Tenetur do maiores i",
-    city: "Sunt in magni laboru",
-    state: "Aspernatur illo ut e",
-    postalCode: "Et odio corporis con",
-    country: "United States",
-    fullAddress: "Tenetur do maiores i, Sunt in magni laboru",
-  },
-  generalOpenTime: "10:00 AM",
-  generalCloseTime: "11:30 PM",
-  pricing: {
-    minOrderAmount: 20,
-    deliveryFee: 4,
-    estimatedDeliveryTime: "25 - 35 mins",
-    costForTwo: 35,
-  },
-  features: {
-    hasDelivery: true,
-    hasTakeaway: true,
-    hasDineIn: true,
-    isPureVeg: false,
-    isHalal: true,
-  },
-  socialLinks: {
-    facebook: "https://facebook.com",
-    instagram: "https://instagram.com",
-    twitter: "https://twitter.com",
-    website: "https://foodflow-kitchen.com",
-  },
-  isOpen: true,
-  status: "active",
-  rating: 4.8,
-  reviewCount: 142,
-  totalReviews: 142,
-};
-
 export default function FoodDetails({ foodId }: FoodDetailsProps) {
   const router = useRouter();
   const params = useParams();
@@ -165,7 +111,7 @@ export default function FoodDetails({ foodId }: FoodDetailsProps) {
 
   const [loading, setLoading] = useState<boolean>(true);
   const [food, setFood] = useState<any>(DEFAULT_FOOD_DATA);
-  const [restaurant, setRestaurant] = useState<any>(DEFAULT_RESTAURANT_DATA);
+  const [restaurant, setRestaurant] = useState<any>(null);
   const [activeImageIndex, setActiveImageIndex] = useState<number>(0);
   const [isAutoPlayPaused, setIsAutoPlayPaused] = useState<boolean>(false);
   const [quantity, setQuantity] = useState<number>(1);
@@ -269,6 +215,12 @@ export default function FoodDetails({ foodId }: FoodDetailsProps) {
     };
   }, [targetId]);
 
+  // Restaurant name: the single-food endpoint returns the joined restaurant doc,
+  // while the listing endpoint puts the name directly on the food item. Use
+  // whichever we actually have — never a stand-in for a different restaurant.
+  const restaurantName: string =
+    restaurant?.restaurantName || restaurant?.name || food?.restaurantName || "";
+
   // Gallery Photos Resolution
   const photosList: string[] =
     food?.images && Array.isArray(food.images) && food.images.length > 0
@@ -335,7 +287,7 @@ export default function FoodDetails({ foodId }: FoodDetailsProps) {
     return {
       _id: String(food._id || food.id || targetId),
       restaurantId: String(food.restaurantId || restaurant?._id || ""),
-      restaurantName: restaurant?.restaurantName || restaurant?.name || "Restaurant",
+      restaurantName: restaurantName || "Restaurant",
       restaurantSlug: restaurant?.slug || "restaurant",
       restaurantLogo: restaurant?.logo || "",
       restaurantIsOpen: restaurant?.isOpen !== false,
@@ -478,7 +430,7 @@ export default function FoodDetails({ foodId }: FoodDetailsProps) {
                 </span>
               </h1>
               <p className="text-orange-100 text-xs sm:text-sm max-w-xl line-clamp-1 font-medium">
-                Prepared with culinary excellence by {restaurant?.restaurantName || restaurant?.name || "Kitchen"}
+                Prepared with culinary excellence by {restaurantName || "Kitchen"}
               </p>
             </div>
 
@@ -714,7 +666,7 @@ export default function FoodDetails({ foodId }: FoodDetailsProps) {
                   className="inline-flex items-center gap-1.5 text-xs font-bold text-[#FF6B35] hover:underline bg-orange-50/80 px-2.5 py-1 rounded-lg border border-orange-200/60 transition-all hover:bg-orange-100"
                 >
                   <Store className="w-3.5 h-3.5" />
-                  <span>{restaurant?.restaurantName || restaurant?.name || "Kitchen"}</span>
+                  <span>{restaurantName || "Kitchen"}</span>
                 </Link>
 
                 <div className="flex items-center gap-1.5">
@@ -935,7 +887,7 @@ export default function FoodDetails({ foodId }: FoodDetailsProps) {
                 restaurant?.bannerImage ||
                 "https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?auto=format&fit=crop&w=1200&q=80"
               }
-              alt={restaurant?.restaurantName || "Restaurant Banner"}
+              alt={restaurantName || "Restaurant Banner"}
               className="w-full h-full object-cover opacity-80"
             />
             <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/40 to-transparent" />
@@ -948,13 +900,13 @@ export default function FoodDetails({ foodId }: FoodDetailsProps) {
                       restaurant?.logo ||
                       "https://images.unsplash.com/photo-1555396273-367ea4eb4db5?auto=format&fit=crop&w=300&q=80"
                     }
-                    alt={restaurant?.restaurantName || "Logo"}
+                    alt={restaurantName || "Logo"}
                     className="w-full h-full object-cover"
                   />
                 </div>
                 <div>
                   <h3 className="text-lg sm:text-2xl font-extrabold tracking-tight text-white">
-                    {restaurant?.restaurantName || restaurant?.name || "Kitchen"}
+                    {restaurantName || "Kitchen"}
                   </h3>
                   <p className="text-xs text-orange-100 line-clamp-1 font-medium">
                     {restaurant?.tagline || "Authentic culinary perfection prepared fresh daily"}
