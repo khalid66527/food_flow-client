@@ -1738,29 +1738,42 @@ export default function RestaurantMenu() {
                         </span>
                       </td>
 
-                      {/* 3. PRICING & OFFER */}
+                      {/* 3. PRICING & OFFER WITH NET PAYOUT DISPLAY */}
                       <td className="py-4 px-4 whitespace-nowrap">
-                        <div className="space-y-0.5">
-                          {isDiscounted ? (
-                            <>
-                              <div className="flex items-center gap-1.5">
-                                <span className="text-base font-black text-[#FF6B35]">
-                                  Tk {Number(item.discountPrice).toFixed(2)}
+                        {(() => {
+                          const effectivePrice = isDiscounted ? Number(item.discountPrice) : Number(item.price || 0);
+                          const commissionVal = Math.round((effectivePrice * (commissionPercentage / 100)) * 100) / 100;
+                          const netPayoutVal = Math.max(0, Math.round((effectivePrice - commissionVal) * 100) / 100);
+
+                          return (
+                            <div className="space-y-1">
+                              {isDiscounted ? (
+                                <div className="flex items-center gap-1.5">
+                                  <span className="text-base font-black text-[#FF6B35]">
+                                    Tk {Number(item.discountPrice).toFixed(2)}
+                                  </span>
+                                  <span className="text-xs font-bold text-gray-400 line-through">
+                                    Tk {Number(item.price).toFixed(2)}
+                                  </span>
+                                  <span className="bg-rose-100 text-rose-700 text-[10px] font-black px-1.5 py-0.5 rounded">
+                                    {discountPercent}% OFF
+                                  </span>
+                                </div>
+                              ) : (
+                                <span className="text-base font-black text-gray-900">
+                                  Tk {Number(item.price || 0).toFixed(2)}
                                 </span>
-                                <span className="text-xs font-bold text-gray-400 line-through">
-                                  Tk {Number(item.price).toFixed(2)}
-                                </span>
+                              )}
+
+                              {/* 💰 REAL-TIME NET PAYOUT */}
+                              <div className="flex items-center gap-1.5 text-xs font-bold text-emerald-700 bg-emerald-50/90 border border-emerald-200/80 px-2 py-0.5 rounded-lg w-fit shadow-2xs">
+                                <span className="text-[10px] text-gray-500 font-semibold">Net Payout:</span>
+                                <span className="font-black text-emerald-700">Tk {netPayoutVal.toFixed(2)}</span>
+                                <span className="text-[9px] text-gray-400 font-normal">({commissionPercentage}% comm.)</span>
                               </div>
-                              <span className="inline-block bg-rose-100 text-rose-700 text-[10px] font-black px-1.5 py-0.2 rounded">
-                                {discountPercent}% OFF
-                              </span>
-                            </>
-                          ) : (
-                            <span className="text-base font-black text-gray-900">
-                              Tk {Number(item.price || 0).toFixed(2)}
-                            </span>
-                          )}
-                        </div>
+                            </div>
+                          );
+                        })()}
                       </td>
 
                       {/* 4. AVAILABILITY DROPDOWN SELECTOR */}
@@ -1939,6 +1952,16 @@ export default function RestaurantMenu() {
                       Tk {Number(viewItem.price || 0).toFixed(2)}
                     </span>
                   )}
+                  {(() => {
+                    const priceVal = Number(viewItem.discountPrice || viewItem.price || 0);
+                    const commVal = Math.round((priceVal * (commissionPercentage / 100)) * 100) / 100;
+                    const payoutVal = Math.max(0, Math.round((priceVal - commVal) * 100) / 100);
+                    return (
+                      <div className="mt-1 text-[11px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200/80 px-2 py-0.5 rounded-lg inline-block">
+                        Net Payout: ৳{payoutVal.toFixed(2)}
+                      </div>
+                    );
+                  })()}
                 </div>
               </div>
 
