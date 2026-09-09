@@ -25,13 +25,20 @@ import {
   ArrowRight,
   LocateFixed,
   Loader2,
-  Banknote,
   Route,
   User,
   Package,
+  Key,
+  Lock,
+  ShieldCheck,
+  ChevronDown,
+  Send,
+  X,
+  Banknote,
+  Sparkles,
 } from "lucide-react";
 import { useSession } from "@/lib/auth-client";
-import { getOrderByIdApi, getRiderOrdersApi, updateOrderStatusApi } from "@/lib/api/order";
+import { getOrderByIdApi, getRiderOrdersApi, updateOrderStatusApi, sendDeliveryOtpApi } from "@/lib/api/order";
 import { getOrderSocket, joinOrderRoom, disconnectOrderSocket } from "@/lib/socket";
 import OrderStatusStepper, { resolveStepIndex } from "@/components/tracking/OrderStatusStepper";
 import OrderTrackingMap from "@/components/tracking/OrderTrackingMap";
@@ -128,23 +135,33 @@ export default function ActiveDelivery() {
   const [sharing, setSharing] = useState<boolean>(false);
   const [riderLocation, setRiderLocation] = useState<{ lat: number; lng: number } | null>(null);
 
+  // OTP Verification Modal State
+  const [isOtpModalOpen, setIsOtpModalOpen] = useState<boolean>(false);
+  const [otpInput, setOtpInput] = useState<string>("");
+  const [otpError, setOtpError] = useState<string | null>(null);
+  const [isVerifyingOtp, setIsVerifyingOtp] = useState<boolean>(false);
+  const [isResendingOtp, setIsResendingOtp] = useState<boolean>(false);
+  const [resendSuccess, setResendSuccess] = useState<string | null>(null);
+
   const riderProfile = getRiderProfile();
 
-  // Derive active view mode and target tracking ID
-  const isListView = viewMode === "list" || (!explicitOrderId && !selectedOrderId);
-  const activeTrackId = isListView ? null : (selectedOrderId || explicitOrderId);
+  // Derive active status & cancel states
+  const currentStatus = liveStatus || order?.orderStatus || "Pending";
+  const completed = currentStatus.toLowerCase() === "delivered";
+  const isCancelled = ["cancelled", "canceled", "rejected", "failed"].includes(
+    currentStatus.toLowerCase()
+  );
 
-  // Sync selectedOrderId and viewMode when explicitOrderId changes in URL
+  const activeTrackId = selectedOrderId || explicitOrderId;
+
+  // Sync selectedOrderId when explicitOrderId changes in URL
   useEffect(() => {
     if (explicitOrderId) {
       setSelectedOrderId(explicitOrderId);
-      setViewMode("detail");
-    } else if (!selectedOrderId) {
-      setViewMode("list");
     }
-  }, [explicitOrderId, selectedOrderId]);
+  }, [explicitOrderId]);
 
-  // Fetch active deliveries assigned to this rider or single order details
+  // Fetch active deliveries assigned to this rider and auto-load details
   const fetchDeliveryData = useCallback(async () => {
     if (sessionPending || !userId || !userEmail) return;
     setLoading(true);
@@ -160,9 +177,17 @@ export default function ActiveDelivery() {
         setActiveOrders(liveList);
       }
 
-      // 2. Fetch specific order details if tracking a target ID (Step 2)
-      if (activeTrackId) {
-        const res = await getOrderByIdApi(activeTrackId, userId, userEmail);
+      // Auto-target: explicit url param OR current selected OR first active order
+      const targetId =
+        explicitOrderId ||
+        selectedOrderId ||
+        (liveList.length > 0
+          ? liveList[0]._id || liveList[0].id || liveList[0].orderId
+          : null);
+
+      if (targetId) {
+        setSelectedOrderId(targetId);
+        const res = await getOrderByIdApi(targetId, userId, userEmail);
         if (res.success && res.data) {
           setOrder(res.data as TOrder);
         } else {
@@ -171,6 +196,7 @@ export default function ActiveDelivery() {
         }
       } else {
         setOrder(null);
+        setSelectedOrderId(null);
       }
     } catch (err: any) {
       console.error("Failed to load rider delivery data:", err);
@@ -179,30 +205,26 @@ export default function ActiveDelivery() {
     } finally {
       setLoading(false);
     }
-  }, [activeTrackId, userId, userEmail, sessionPending]);
+  }, [explicitOrderId, selectedOrderId, userId, userEmail, sessionPending]);
 
   useEffect(() => {
     fetchDeliveryData();
   }, [fetchDeliveryData]);
 
-  // Transition from Step 1 (Card List View) -> Step 2 (Detailed Tracking View)
-  const handleTrackOrderClick = (targetId: string) => {
-    setViewMode("detail");
+  // Switch between multiple active orders directly
+  const handleSwitchOrder = async (targetId: string) => {
     setSelectedOrderId(targetId);
+    setLiveStatus(null);
+    setError(null);
     setLoading(true);
-    setLiveStatus(null);
-    setError(null);
-    router.push(`/dashboard/rider/active-delivery?orderId=${targetId}`);
-  };
-
-  // Transition from Step 2 (Detailed View) -> Step 1 (Active Deliveries List View)
-  const handleBackToCardList = () => {
-    setViewMode("list");
-    setSelectedOrderId(null);
-    setOrder(null);
-    setLiveStatus(null);
-    setError(null);
-    router.replace("/dashboard/rider/active-delivery");
+    try {
+      const res = await getOrderByIdApi(targetId, userId, userEmail);
+      if (res.success && res.data) {
+        setOrder(res.data as TOrder);
+      }
+    } finally {
+      setLoading(false);
+    }
   };
 
   // Socket.IO real-time delivery tracking & status syncing
@@ -231,6 +253,7 @@ export default function ActiveDelivery() {
         setLiveStatus(newStatus);
         if (newStatus.toLowerCase() === "delivered") {
           setSharing(false);
+          setIsOtpModalOpen(false);
         }
         if (!isDeliveryActive(newStatus)) {
           const updatedId = payload.orderId || payload.order?._id || payload.order?.orderId;
@@ -332,9 +355,17 @@ export default function ActiveDelivery() {
   }, [sharing, activeTrackId, emitLocation]);
 
   // ─── Status Update Handler ──────────────────────────────────────────
-  const updateStatus = async (targetOrder: TOrder, newStatus: string) => {
+  const updateStatus = async (targetOrder: TOrder, newStatus: string, otpCode?: string) => {
     const oId = targetOrder.orderId || targetOrder._id || "";
     if (!oId || !userId) return;
+
+    // If attempting to mark Delivered and no OTP provided yet, open modal
+    if (newStatus === "Delivered" && !otpCode) {
+      setIsOtpModalOpen(true);
+      setOtpError(null);
+      setResendSuccess(null);
+      return;
+    }
 
     try {
       setActionLoadingId(oId);
@@ -348,11 +379,16 @@ export default function ActiveDelivery() {
         },
       };
 
+      if (otpCode) {
+        payload.otp = otpCode.trim();
+        payload.deliveryOtp = otpCode.trim();
+      }
+
       if (newStatus === "Delivered" && (targetOrder.paymentMethod === "COD" || targetOrder.paymentStatus === "Pending")) {
         payload.paymentStatus = "Paid";
       }
 
-      const res = await updateOrderStatusApi(oId, payload, userId, userEmail || "");
+      const res = await updateOrderStatusApi(oId, payload as any, userId, userEmail || "");
       if (res.success) {
         setLiveStatus(newStatus);
         setOrder((prev) =>
@@ -386,22 +422,83 @@ export default function ActiveDelivery() {
 
         if (newStatus === "Delivered") {
           setSharing(false);
+          setIsOtpModalOpen(false);
+          setOtpInput("");
+          setOtpError(null);
         }
       } else {
-        alert(res.message || "Failed to update delivery status.");
+        if (newStatus === "Delivered") {
+          setOtpError(res.message || "Invalid OTP code. Please ask customer for correct code.");
+        } else {
+          alert(res.message || "Failed to update delivery status.");
+        }
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error("Failed to update status:", err);
+      if (newStatus === "Delivered") {
+        setOtpError(err.message || "Failed to verify OTP.");
+      }
     } finally {
       setActionLoadingId(null);
     }
   };
 
-  const currentStatus = liveStatus || order?.orderStatus || "Pending";
-  const isCancelled = currentStatus.toLowerCase() === "cancelled";
+  // ─── OTP Verification Submission ─────────────────────────────────────
+  const handleVerifyOtpSubmit = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    if (!order) return;
+    const cleanOtp = otpInput.trim();
+    if (cleanOtp.length !== 6) {
+      setOtpError("Please enter the full 6-digit OTP code.");
+      return;
+    }
+    setIsVerifyingOtp(true);
+    setOtpError(null);
+    try {
+      await updateStatus(order, "Delivered", cleanOtp);
+    } finally {
+      setIsVerifyingOtp(false);
+    }
+  };
+
+  // ─── Resend OTP to Customer ──────────────────────────────────────────
+  const handleResendOtp = async () => {
+    if (!order) return;
+    const oId = order.orderId || order._id || "";
+    if (!oId) return;
+
+    setIsResendingOtp(true);
+    setResendSuccess(null);
+    setOtpError(null);
+
+    try {
+      const res = await sendDeliveryOtpApi(oId, userId, userEmail || "");
+      if (res.success) {
+        setResendSuccess("Delivery OTP resent to customer's email and dashboard!");
+        if (res.data) {
+          setOrder(res.data as TOrder);
+        }
+      } else {
+        setOtpError(res.message || "Failed to resend OTP.");
+      }
+    } catch (err: any) {
+      setOtpError(err.message || "Failed to resend OTP.");
+    } finally {
+      setIsResendingOtp(false);
+    }
+  };
+
+  // Auto-start live location streaming when tracking an active delivery
+  useEffect(() => {
+    if (activeTrackId && !completed) {
+      setSharing(true);
+    } else if (completed) {
+      setSharing(false);
+    }
+  }, [activeTrackId, completed]);
 
   // Loading state
-  if (loading && !order && activeTrackId) {
+  if (loading && !order && activeOrders.length === 0) {
     return (
       <div className="max-w-4xl mx-auto min-h-[400px] flex items-center justify-center">
         <LoadingSpinner size={50} color="#f97316" />
@@ -409,11 +506,8 @@ export default function ActiveDelivery() {
     );
   }
 
-  // ===========================================================================
-  // STEP 1: INITIAL STATE — ACTIVE DELIVERIES CARD LIST VIEW
-  // (Rendered when rider visits /dashboard/rider/active-delivery with no query ID)
-  // ===========================================================================
-  if (!activeTrackId) {
+  // Empty State: No active deliveries in progress
+  if (!loading && activeOrders.length === 0 && !order) {
     return (
       <div className="max-w-4xl mx-auto py-8 px-4 space-y-6">
         {/* Navigation Bar */}
@@ -433,118 +527,44 @@ export default function ActiveDelivery() {
           </button>
         </div>
 
-        {/* Initial Loading Spinner */}
-        {loading ? (
-          <div className="py-16 flex justify-center">
-            <LoadingSpinner size={50} color="#f97316" />
+        <div className="bg-white border border-gray-100 rounded-3xl p-8 sm:p-12 text-center space-y-5 shadow-xs">
+          <div className="w-16 h-16 rounded-3xl bg-orange-100 text-[#FF6B35] flex items-center justify-center mx-auto shadow-md">
+            <Bike className="w-8 h-8" />
           </div>
-        ) : activeOrders.length === 0 ? (
-          /* EMPTY STATE: NO ACTIVE DELIVERIES */
-          <div className="bg-white border border-gray-100 rounded-3xl p-8 sm:p-12 text-center space-y-5 shadow-xs">
-            <div className="w-16 h-16 rounded-3xl bg-orange-100 text-[#FF6B35] flex items-center justify-center mx-auto shadow-md">
-              <Bike className="w-8 h-8" />
-            </div>
-            <div className="space-y-2 max-w-md mx-auto">
-              <h2 className="text-2xl font-black text-gray-900">No Active Deliveries Found</h2>
-              <p className="text-xs sm:text-sm text-gray-500 font-medium leading-relaxed">
-                You don&apos;t have any active deliveries assigned right now. Check available delivery requests to accept a new order.
-              </p>
-            </div>
-            <div className="flex flex-wrap items-center justify-center gap-3 pt-2">
-              <Link
-                href="/dashboard/rider/delivery-details"
-                className="inline-flex items-center gap-2 px-6 py-3 rounded-2xl bg-orange-600 text-white font-extrabold text-xs shadow-md hover:bg-orange-700 hover:scale-105 active:scale-95 transition-all cursor-pointer"
-              >
-                <Route className="w-4 h-4" /> Browse Available Deliveries
-              </Link>
-              <Link
-                href="/dashboard/rider/history"
-                className="inline-flex items-center gap-2 px-5 py-3 rounded-2xl bg-gray-100 text-gray-700 font-extrabold text-xs hover:bg-gray-200 transition cursor-pointer"
-              >
-                View Delivery History
-              </Link>
-            </div>
+          <div className="space-y-2 max-w-md mx-auto">
+            <h2 className="text-2xl font-black text-gray-900">No Active Deliveries in Progress</h2>
+            <p className="text-xs sm:text-sm text-gray-500 font-medium leading-relaxed">
+              You do not have any active delivery orders right now. Check available requests to accept a new delivery.
+            </p>
           </div>
-        ) : (
-          /* ACTIVE DELIVERIES CARD CONTAINER */
-          <section className="space-y-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <h1 className="text-xl sm:text-2xl font-black text-gray-900 flex items-center gap-2">
-                  <Layers className="w-6 h-6 text-orange-600" /> Active Deliveries in Progress ({activeOrders.length})
-                </h1>
-                <p className="text-xs font-medium text-gray-500 mt-1">
-                  Select an active delivery card below to view its live progress bar, map route, and update status.
-                </p>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
-              {activeOrders.map((o) => {
-                const oId = o._id || o.id || o.orderId || "";
-                const displayId = o.orderId || oId;
-                const statusStr = o.orderStatus || "Pending";
-                const rNames =
-                  [...new Set((o.items || []).map((i) => i.restaurantName).filter(Boolean))].join(", ") ||
-                  "FoodFlow Kitchen";
-                const itemCount = (o.items || []).reduce((sum, i) => sum + (i.quantity || 1), 0);
-
-                return (
-                  <div
-                    key={oId}
-                    className="bg-white p-5 rounded-3xl border border-gray-100 shadow-sm hover:shadow-md hover:border-orange-200 transition flex flex-col justify-between space-y-4"
-                  >
-                    <div className="space-y-2">
-                      <div className="flex items-center justify-between gap-2">
-                        <span className="text-sm font-black text-gray-900">
-                          Delivery #{displayId.slice(-6).toUpperCase()}
-                        </span>
-                        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-amber-50 text-amber-700 border border-amber-200 shrink-0">
-                          <span className="w-2 h-2 rounded-full bg-amber-500 animate-ping" />
-                          {statusStr}
-                        </span>
-                      </div>
-
-                      <p className="text-xs font-bold text-gray-800 line-clamp-1">{rNames}</p>
-                      <p className="text-xs font-medium text-gray-500">
-                        {itemCount} item{itemCount === 1 ? "" : "s"} • Tk {o.totalAmount?.toFixed(2)}
-                      </p>
-                    </div>
-
-                    <button
-                      type="button"
-                      onClick={() => handleTrackOrderClick(oId)}
-                      className="w-full py-3 rounded-2xl bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white text-xs font-extrabold flex items-center justify-center gap-2 shadow-md shadow-orange-500/20 transition cursor-pointer"
-                    >
-                      <Bike className="w-4 h-4 text-white" />
-                      Track & Deliver
-                      <ArrowRight className="w-3.5 h-3.5 ml-1" />
-                    </button>
-                  </div>
-                );
-              })}
-            </div>
-          </section>
-        )}
+          <div className="flex flex-wrap items-center justify-center gap-3 pt-2">
+            <Link
+              href="/dashboard/rider/delivery-details"
+              className="inline-flex items-center gap-2 px-6 py-3 rounded-2xl bg-orange-600 text-white font-extrabold text-xs shadow-md hover:bg-orange-700 hover:scale-105 active:scale-95 transition-all cursor-pointer"
+            >
+              <Route className="w-4 h-4" /> Browse Available Deliveries
+            </Link>
+            <Link
+              href="/dashboard/rider/delivery-history"
+              className="inline-flex items-center gap-2 px-5 py-3 rounded-2xl bg-gray-100 text-gray-700 font-extrabold text-xs hover:bg-gray-200 transition cursor-pointer"
+            >
+              View Delivery History
+            </Link>
+          </div>
+        </div>
       </div>
     );
   }
 
-  // ===========================================================================
-  // STEP 2: DETAILED DELIVERY VIEW & CONTROLS
-  // (Rendered when specific orderId is selected or provided via ?orderId=...)
-  // ===========================================================================
-
   if (error && !order) {
     return (
       <div className="max-w-4xl mx-auto py-8 px-4 space-y-6">
-        <button
-          type="button"
-          onClick={handleBackToCardList}
+        <Link
+          href="/dashboard/rider/delivery-details"
           className="inline-flex items-center gap-2 text-xs font-bold text-gray-600 hover:text-[#FF6B35] transition cursor-pointer"
         >
-          <ArrowLeft className="w-4 h-4" /> Back to Active Deliveries
-        </button>
+          <ArrowLeft className="w-4 h-4" /> Back to Available Deliveries
+        </Link>
 
         <div className="bg-rose-50 border border-rose-200 rounded-3xl p-8 text-center space-y-4 shadow-xs">
           <div className="w-12 h-12 rounded-full bg-rose-100 flex items-center justify-center mx-auto text-rose-600">
@@ -552,13 +572,12 @@ export default function ActiveDelivery() {
           </div>
           <h2 className="text-xl font-black text-rose-900">Delivery Not Found</h2>
           <p className="text-xs sm:text-sm text-rose-700 max-w-md mx-auto">{error}</p>
-          <button
-            type="button"
-            onClick={handleBackToCardList}
+          <Link
+            href="/dashboard/rider/delivery-details"
             className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-rose-600 text-white font-extrabold text-xs shadow-md hover:bg-rose-700 transition cursor-pointer"
           >
-            Return to Active Deliveries
-          </button>
+            Return to Available Deliveries
+          </Link>
         </div>
       </div>
     );
@@ -586,7 +605,6 @@ export default function ActiveDelivery() {
   const riderLng = riderLocation?.lng;
 
   const statusIndex = resolveStepIndex(currentStatus);
-  const completed = currentStatus.toLowerCase() === "delivered";
   const hasCoordinates = Boolean(
     deliveryLat || deliveryLng || restaurantLat || restaurantLng || riderLat || riderLng
   );
@@ -598,20 +616,38 @@ export default function ActiveDelivery() {
 
   return (
     <div className="max-w-4xl mx-auto py-8 px-4 space-y-6">
-      {/* Back Button to Card List View */}
-      <div className="flex items-center justify-between">
-        <button
-          type="button"
-          onClick={handleBackToCardList}
-          className="inline-flex items-center gap-2 text-xs font-extrabold text-gray-700 hover:text-orange-600 transition bg-white px-3.5 py-2 rounded-2xl border border-gray-200 shadow-2xs cursor-pointer hover:shadow-xs"
+      {/* Top Navigation & Multi-Order Switcher Bar */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <Link
+          href="/dashboard/rider/delivery-details"
+          className="inline-flex items-center gap-2 text-xs font-extrabold text-gray-700 hover:text-orange-600 transition bg-white px-3.5 py-2 rounded-2xl border border-gray-200 shadow-2xs cursor-pointer hover:shadow-xs w-fit"
         >
-          <ArrowLeft className="w-4 h-4 text-orange-600" /> Back to Active Deliveries List
-        </button>
+          <ArrowLeft className="w-4 h-4 text-orange-600" /> Back to Available Deliveries
+        </Link>
 
         {activeOrders.length > 1 && (
-          <span className="text-xs font-bold text-gray-500">
-            Tracking 1 of {activeOrders.length} active deliveries
-          </span>
+          <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-none bg-white p-1.5 rounded-2xl border border-gray-200 shadow-2xs">
+            <span className="text-[11px] font-bold text-gray-400 px-2 shrink-0">Trips ({activeOrders.length}):</span>
+            {activeOrders.map((o) => {
+              const oId = o._id || o.id || o.orderId || "";
+              const isCurr = (order?._id || order?.orderId || order?.id) === oId || activeTrackId === oId;
+              return (
+                <button
+                  key={oId}
+                  type="button"
+                  onClick={() => handleSwitchOrder(oId)}
+                  className={`inline-flex items-center gap-1 px-3 py-1.5 rounded-xl text-xs font-black transition cursor-pointer shrink-0 ${
+                    isCurr
+                      ? "bg-[#FF6B35] text-white shadow-xs"
+                      : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                  }`}
+                >
+                  <Bike className="w-3.5 h-3.5" />
+                  #{o.orderId?.slice(-6).toUpperCase() || oId.slice(-6).toUpperCase()}
+                </button>
+              );
+            })}
+          </div>
         )}
       </div>
 
@@ -626,13 +662,12 @@ export default function ActiveDelivery() {
           <p className="text-xs sm:text-sm text-rose-700 max-w-md mx-auto">
             This delivery was cancelled by the customer or restaurant. No further action is required.
           </p>
-          <button
-            type="button"
-            onClick={handleBackToCardList}
+          <Link
+            href="/dashboard/rider/delivery-details"
             className="inline-block px-5 py-2.5 rounded-xl bg-rose-600 text-white font-extrabold text-xs shadow-md hover:bg-rose-700 transition cursor-pointer"
           >
-            Return to Active Deliveries
-          </button>
+            Return to Available Deliveries
+          </Link>
         </div>
       ) : (
         <>
@@ -685,26 +720,79 @@ export default function ActiveDelivery() {
             </div>
           </section>
 
-          {/* 2. Step-by-Step Delivery Progress Stepper */}
-          <div className="bg-white rounded-3xl border border-gray-100 shadow-sm p-5 sm:p-8">
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-6">
-              <h2 className="text-sm sm:text-base font-black text-gray-900">Delivery Progress</h2>
-              <div className="flex items-center gap-2">
-                {completed ? (
-                  <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-50 text-emerald-700 text-xs font-black border border-emerald-200">
-                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" /> Delivered
-                  </span>
-                ) : (
-                  <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-orange-50 text-[#FF6B35] text-xs font-black border border-orange-100">
+          {/* 2. Step-by-Step Delivery Progress Stepper & Top Action Bar */}
+          <div className="bg-white rounded-3xl border border-gray-100 shadow-sm p-5 sm:p-7 space-y-6">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-gray-100 pb-5">
+              <div className="space-y-1">
+                <div className="flex items-center gap-2.5 flex-wrap">
+                  <h2 className="text-base font-black text-gray-900">Delivery Progress</h2>
+                  <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 text-[10px] font-extrabold border border-emerald-200">
                     <span className="relative flex h-2 w-2">
-                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#FF6B35] opacity-75" />
-                      <span className="relative inline-flex rounded-full h-2 w-2 bg-[#FF6B35]" />
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-500 opacity-75" />
+                      <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
                     </span>
-                    {currentStatus}
+                    Live GPS Auto-Sharing
                   </span>
-                )}
+                </div>
+                <p className="text-xs text-gray-500 font-medium">
+                  Current Status: <span className="font-bold text-orange-600">{currentStatus}</span>
+                </p>
               </div>
+
+              {/* Status Change Dropdown & OTP Verify Button placed directly in Progress Header */}
+              {currentStatus !== "Delivered" ? (
+                <div className="flex items-center gap-2.5 flex-wrap">
+                  <div className="relative">
+                    <select
+                      value={currentStatus}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        if (val === currentStatus) return;
+                        if (val === "Delivered") {
+                          setIsOtpModalOpen(true);
+                          setOtpError(null);
+                          setResendSuccess(null);
+                        } else if (order) {
+                          updateStatus(order, val);
+                        }
+                      }}
+                      disabled={actionLoadingId === (order?.orderId || order?._id)}
+                      className="appearance-none bg-gray-50 hover:bg-gray-100 border border-gray-200 rounded-2xl pl-3.5 pr-9 py-2.5 text-xs font-black text-gray-800 focus:outline-hidden focus:ring-2 focus:ring-orange-500 cursor-pointer shadow-xs transition"
+                    >
+                      <option value="Preparing" disabled={currentStatus === "Out for Delivery"}>
+                        Preparing (Kitchen)
+                      </option>
+                      <option value="Out for Delivery">
+                        🚴 Out for Delivery
+                      </option>
+                      <option value="Delivered">
+                        ✅ Delivered (Requires OTP)
+                      </option>
+                    </select>
+                    <ChevronDown className="w-3.5 h-3.5 text-gray-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                  </div>
+
+                  <button
+                    type="button"
+                    disabled={actionLoadingId === (order?.orderId || order?._id)}
+                    onClick={() => {
+                      setIsOtpModalOpen(true);
+                      setOtpError(null);
+                      setResendSuccess(null);
+                    }}
+                    className="py-2.5 px-4 rounded-2xl bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 text-white text-xs font-black flex items-center justify-center gap-2 shadow-md shadow-emerald-500/20 transition cursor-pointer disabled:opacity-50"
+                  >
+                    <Key className="w-4 h-4" />
+                    Verify OTP & Deliver
+                  </button>
+                </div>
+              ) : (
+                <div className="inline-flex items-center gap-1.5 px-4 py-2 rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs font-black shadow-2xs">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-600" /> Delivery Completed Successfully
+                </div>
+              )}
             </div>
+
             <OrderStatusStepper currentStatus={currentStatus} />
           </div>
 
@@ -718,23 +806,19 @@ export default function ActiveDelivery() {
                 <div>
                   <h3 className="text-sm font-black text-gray-900">Live Delivery Route & Location</h3>
                   <p className="text-[11px] font-medium text-gray-400">
-                    {sharing
-                      ? "Streaming live coordinates to customer in real-time"
-                      : completed
-                        ? "Delivery completed successfully"
-                        : "Turn on live location sharing to guide your customer"}
+                    {completed
+                      ? "Delivery completed successfully"
+                      : "Broadcasting your live GPS position to the customer"}
                   </p>
                 </div>
               </div>
-              {sharing && (
-                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-50 text-emerald-700 text-[11px] font-extrabold border border-emerald-200">
-                  <span className="relative flex h-2 w-2">
-                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-500 opacity-75" />
-                    <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
-                  </span>
-                  Sharing Active
+              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-50 text-emerald-700 text-[11px] font-extrabold border border-emerald-200">
+                <span className="relative flex h-2 w-2">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-500 opacity-75" />
+                  <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
                 </span>
-              )}
+                GPS Broadcasting Live
+              </span>
             </div>
 
             <div className="p-4 sm:p-5">
@@ -758,7 +842,7 @@ export default function ActiveDelivery() {
             </div>
           </div>
 
-          {/* 4. Details Grid: Customer Destination, Pickup, and Location Sharing */}
+          {/* 4. Details Grid: Customer Destination, Pickup, and Payment */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
             {/* Delivery Destination (Customer) */}
             <div className="bg-white rounded-3xl border border-gray-100 shadow-sm p-5 sm:p-6 space-y-4">
@@ -815,88 +899,6 @@ export default function ActiveDelivery() {
               </div>
             </div>
 
-            {/* Location Sharing Controller */}
-            <div className="bg-white rounded-3xl border border-gray-100 shadow-sm p-5 sm:p-6 space-y-4">
-              <h3 className="text-sm font-black text-gray-900 flex items-center gap-2">
-                <Navigation className="w-4 h-4 text-[#FF6B35]" /> Live Location Streaming
-              </h3>
-              <p className="text-xs text-gray-500 font-medium leading-relaxed">
-                {sharing
-                  ? "Broadcasting your live location to the customer's map every 3 seconds."
-                  : "Turn on live location sharing so the customer can track your route in real-time."}
-              </p>
-              <button
-                type="button"
-                disabled={completed}
-                onClick={() => setSharing((s) => !s)}
-                className={`w-full py-3 rounded-2xl text-xs font-extrabold flex items-center justify-center gap-2 transition shadow-md cursor-pointer ${
-                  completed
-                    ? "bg-gray-100 text-gray-400 cursor-not-allowed"
-                    : sharing
-                      ? "bg-emerald-500 hover:bg-emerald-600 text-white shadow-emerald-500/20"
-                      : "bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white shadow-orange-500/20"
-                }`}
-              >
-                {sharing ? (
-                  <>
-                    <LocateFixed className="w-4 h-4" /> Stop Sharing Location
-                  </>
-                ) : (
-                  <>
-                    <Navigation className="w-4 h-4" /> Share Live Location
-                  </>
-                )}
-              </button>
-            </div>
-
-            {/* Rider Status Action Buttons */}
-            <div className="bg-white rounded-3xl border border-gray-100 shadow-sm p-5 sm:p-6 space-y-4">
-              <h3 className="text-sm font-black text-gray-900 flex items-center gap-2">
-                <Bike className="w-4 h-4 text-[#FF6B35]" /> Delivery Actions
-              </h3>
-              <p className="text-xs text-gray-500 font-medium">
-                Update the delivery state to keep the customer and restaurant synchronized.
-              </p>
-
-              <div className="flex flex-col sm:flex-row gap-2 pt-1">
-                {currentStatus !== "Delivered" && currentStatus !== "Out for Delivery" && (
-                  <button
-                    type="button"
-                    disabled={actionLoadingId === (order?.orderId || order?._id)}
-                    onClick={() => order && updateStatus(order, "Out for Delivery")}
-                    className="flex-1 py-3 px-4 rounded-2xl bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white text-xs font-extrabold flex items-center justify-center gap-2 shadow-md transition cursor-pointer disabled:opacity-50"
-                  >
-                    {actionLoadingId === (order?.orderId || order?._id) ? (
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                    ) : (
-                      <Bike className="w-4 h-4" />
-                    )}
-                    Out for Delivery
-                  </button>
-                )}
-
-                {currentStatus !== "Delivered" ? (
-                  <button
-                    type="button"
-                    disabled={actionLoadingId === (order?.orderId || order?._id)}
-                    onClick={() => order && updateStatus(order, "Delivered")}
-                    className="flex-1 py-3 px-4 rounded-2xl bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 text-white text-xs font-extrabold flex items-center justify-center gap-2 shadow-md shadow-emerald-500/20 transition cursor-pointer disabled:opacity-50"
-                  >
-                    {actionLoadingId === (order?.orderId || order?._id) ? (
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                    ) : (
-                      <CheckCircle2 className="w-4 h-4" />
-                    )}
-                    Mark Delivered
-                  </button>
-                ) : (
-                  <div className="w-full py-3 px-4 rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs font-black flex items-center justify-center gap-2">
-                    <CheckCircle2 className="w-4 h-4" /> Delivery Completed
-                  </div>
-                )}
-              </div>
-            </div>
-
             {/* Cash on Delivery (COD) Notice */}
             {order?.paymentMethod === "COD" && currentStatus !== "Delivered" && (
               <div className="md:col-span-2 bg-amber-50 border border-amber-200 rounded-3xl p-5 flex items-center justify-between gap-4 flex-wrap">
@@ -933,6 +935,126 @@ export default function ActiveDelivery() {
             </div>
           </div>
         </>
+      )}
+
+      {/* ========================================================================= */}
+      {/* 🔐 INTERACTIVE OTP VERIFICATION MODAL FOR RIDER */}
+      {/* ========================================================================= */}
+      {isOtpModalOpen && order && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-200">
+          <div className="bg-white border border-gray-100 w-full max-w-md rounded-3xl p-6 sm:p-8 shadow-2xl space-y-6 relative">
+            {/* Modal Close Button */}
+            <button
+              type="button"
+              onClick={() => {
+                setIsOtpModalOpen(false);
+                setOtpError(null);
+                setResendSuccess(null);
+              }}
+              className="absolute top-5 right-5 p-1.5 rounded-full bg-gray-100 hover:bg-gray-200 text-gray-600 transition cursor-pointer"
+            >
+              <X className="w-4 h-4" />
+            </button>
+
+            {/* Header */}
+            <div className="text-center space-y-2">
+              <div className="w-14 h-14 rounded-2xl bg-orange-50 text-orange-600 flex items-center justify-center mx-auto shadow-md shadow-orange-500/10 border border-orange-100">
+                <ShieldCheck className="w-7 h-7" />
+              </div>
+              <h3 className="text-xl font-black text-gray-900">
+                Delivery OTP Verification
+              </h3>
+              <p className="text-xs text-gray-500 max-w-xs mx-auto">
+                Ask the customer for the <span className="font-bold text-gray-800">6-digit OTP code</span> sent to their email and dashboard.
+              </p>
+            </div>
+
+            {/* Form */}
+            <form onSubmit={handleVerifyOtpSubmit} className="space-y-4">
+              <div>
+                <label className="block text-center text-xs font-bold text-gray-600 mb-2">
+                  Enter 6-Digit Delivery OTP:
+                </label>
+                <input
+                  type="text"
+                  maxLength={6}
+                  autoFocus
+                  placeholder="• • • • • •"
+                  value={otpInput}
+                  onChange={(e) => {
+                    const clean = e.target.value.replace(/\D/g, "");
+                    setOtpInput(clean);
+                    if (otpError) setOtpError(null);
+                  }}
+                  className="w-full text-center tracking-[12px] font-mono text-2xl font-black py-3.5 px-4 bg-gray-50 border-2 border-orange-200 rounded-2xl focus:border-orange-500 focus:bg-white focus:outline-hidden transition"
+                />
+              </div>
+
+              {/* Error Message */}
+              {otpError && (
+                <div className="p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs font-bold flex items-center gap-2 animate-shake">
+                  <AlertTriangle className="w-4 h-4 shrink-0 text-rose-500" />
+                  <span>{otpError}</span>
+                </div>
+              )}
+
+              {/* Resend Success Message */}
+              {resendSuccess && (
+                <div className="p-3 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs font-bold flex items-center gap-2">
+                  <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-500" />
+                  <span>{resendSuccess}</span>
+                </div>
+              )}
+
+              {/* Action Buttons */}
+              <div className="space-y-2 pt-2">
+                <button
+                  type="submit"
+                  disabled={otpInput.trim().length !== 6 || isVerifyingOtp}
+                  className="w-full py-3.5 rounded-2xl bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 text-white font-black text-xs flex items-center justify-center gap-2 shadow-lg shadow-emerald-500/25 transition cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {isVerifyingOtp ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" /> Verifying OTP...
+                    </>
+                  ) : (
+                    <>
+                      <CheckCircle2 className="w-4 h-4" /> Verify & Complete Delivery
+                    </>
+                  )}
+                </button>
+
+                <div className="flex items-center justify-between pt-2">
+                  <button
+                    type="button"
+                    disabled={isResendingOtp}
+                    onClick={handleResendOtp}
+                    className="inline-flex items-center gap-1.5 text-xs font-bold text-orange-600 hover:text-orange-700 hover:underline cursor-pointer disabled:opacity-50"
+                  >
+                    {isResendingOtp ? (
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    ) : (
+                      <Send className="w-3.5 h-3.5" />
+                    )}
+                    Resend OTP to Customer
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsOtpModalOpen(false);
+                      setOtpError(null);
+                      setResendSuccess(null);
+                    }}
+                    className="text-xs font-bold text-gray-400 hover:text-gray-600 cursor-pointer"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            </form>
+          </div>
+        </div>
       )}
     </div>
   );

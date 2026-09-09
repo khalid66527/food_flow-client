@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import LoadingSpinner from "@/lib/api/LoadingSpinner";
 import {
   Loader2,
@@ -35,6 +36,7 @@ function getRiderProfile() {
 }
 
 export default function DeliveryDetails() {
+  const router = useRouter();
   const { data: session, isPending: sessionPending } = useSession();
   const user = session?.user as { id?: string; email?: string; name?: string } | undefined;
 
@@ -137,6 +139,7 @@ export default function DeliveryDetails() {
         );
         const socket = getOrderSocket(orderId);
         socket.emit("order_status_updated", { orderId, orderStatus: "Out for Delivery" });
+        router.push(`/dashboard/rider/active-delivery?orderId=${orderId}`);
       } else {
         alert(res.message || "Could not accept order.");
       }
@@ -149,10 +152,18 @@ export default function DeliveryDetails() {
 
   const availableOrders = orders.filter((o) => {
     const s = (o.orderStatus || "").toLowerCase();
-    return ["ready", "ready for pickup", "out for delivery"].includes(s) && !o.riderInfo?.riderId;
+    return (
+      ["ready", "ready for pickup", "out for delivery"].includes(s) &&
+      !o.riderInfo?.riderId
+    );
   });
-  const myOrders = orders.filter((o) => o.riderInfo?.riderId === user?.id && o.orderStatus !== "Delivered");
-  const deliveredOrders = orders.filter((o) => o.orderStatus === "Delivered" && o.riderInfo?.riderId === user?.id);
+  const myOrders = orders.filter(
+    (o) =>
+      o.riderInfo?.riderId === user?.id &&
+      !["delivered", "completed", "cancelled", "canceled", "rejected", "failed"].includes(
+        (o.orderStatus || "").toLowerCase()
+      )
+  );
 
   if (sessionPending || loading) {
     return <LoadingSpinner size={50} minHeight="60vh" />;
@@ -243,7 +254,7 @@ export default function DeliveryDetails() {
             </button>
           ) : (
             <Link
-              href="/dashboard/rider/active-delivery"
+              href={`/dashboard/rider/active-delivery?orderId=${orderId}`}
               className="inline-flex items-center gap-1.5 px-5 py-2.5 rounded-xl bg-gradient-to-r from-gray-900 to-black text-white text-xs font-extrabold transition shadow-xs cursor-pointer hover:brightness-125"
             >
               <ArrowRight className="w-3.5 h-3.5" /> Go to Active Delivery
@@ -326,26 +337,6 @@ export default function DeliveryDetails() {
           availableOrders.map((o) => renderOrderCard(o, "available"))
         )}
       </section>
-
-      {/* Delivered history (from this session) */}
-      {deliveredOrders.length > 0 && (
-        <section className="space-y-3">
-          <h2 className="text-sm font-black text-gray-900 flex items-center gap-2">
-            <CheckCircle2 className="w-4 h-4 text-emerald-600" /> Recently Completed ({deliveredOrders.length})
-          </h2>
-          {deliveredOrders.map((o) => (
-            <div key={o.orderId || o._id} className="bg-white rounded-2xl border border-gray-100 px-5 py-4 flex items-center justify-between gap-3">
-              <div>
-                <p className="text-sm font-extrabold text-gray-900">#{o.orderId}</p>
-                <p className="text-[11px] text-gray-400">{o.items?.length} items • {o.items?.[0]?.name}{o.items && o.items.length > 1 ? " +" + (o.items.length - 1) : ""}</p>
-              </div>
-              <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-emerald-50 text-emerald-700 text-[11px] font-extrabold border border-emerald-200">
-                <CheckCircle2 className="w-3 h-3" /> Delivered
-              </span>
-            </div>
-          ))}
-        </section>
-      )}
     </div>
   );
 }

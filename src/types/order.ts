@@ -51,6 +51,8 @@ export interface TOrder {
   };
   deliveryStatus?: string;
   deliveredAt?: string;
+  deliveryOtp?: string;
+  deliveryOtpCreatedAt?: string;
   createdAt?: string;
   updatedAt?: string;
 }

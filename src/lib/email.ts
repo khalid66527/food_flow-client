@@ -670,3 +670,186 @@ If you have questions, please contact support.foodflow@gmail.com
     return false;
   }
 }
+
+/**
+ * Send Delivery Verification OTP email to customer when order is out for delivery.
+ */
+export async function sendDeliveryOtpEmail(params: {
+  orderId: string;
+  userEmail: string;
+  userName?: string;
+  otp: string;
+  restaurantName?: string;
+  totalAmount?: number;
+}): Promise<boolean> {
+  try {
+    const { orderId, userEmail, userName, otp, restaurantName, totalAmount } = params;
+    if (!userEmail || !otp) {
+      console.warn("⚠️ Cannot send delivery OTP email: Missing userEmail or otp.");
+      return false;
+    }
+
+    const normalizedEmail = userEmail.trim().toLowerCase();
+    const formattedDate = new Date().toLocaleString("en-US", {
+      dateStyle: "medium",
+      timeStyle: "short",
+    });
+
+    const emailHtml = `
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>FoodFlow - Delivery Verification OTP #${orderId}</title>
+</head>
+<body style="margin: 0; padding: 0; background-color: #F8FAFC; font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; color: #1E293B;">
+  <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%" style="background-color: #F8FAFC; padding: 32px 16px;">
+    <tr>
+      <td align="center">
+        <!-- Main Container -->
+        <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%" style="max-width: 580px; background-color: #FFFFFF; border-radius: 24px; overflow: hidden; box-shadow: 0 10px 30px rgba(0,0,0,0.06); border: 1px solid #E2E8F0;">
+          
+          <!-- Header Banner -->
+          <tr>
+            <td style="background: linear-gradient(135deg, #FF6B35 0%, #EA580C 50%, #D97706 100%); padding: 36px 32px 30px 32px; text-align: center;">
+              <div style="margin-bottom: 12px;">
+                <span style="font-size: 28px; font-weight: 900; color: #FFFFFF; letter-spacing: -0.5px; text-transform: uppercase;">
+                  FOOD<span style="color: #FFE8DF; font-weight: 400;">FLOW</span>
+                </span>
+              </div>
+              <div style="display: inline-block; background-color: rgba(255,255,255,0.22); padding: 5px 18px; border-radius: 9999px; margin-bottom: 12px; border: 1px solid rgba(255,255,255,0.3);">
+                <span style="font-size: 11px; font-weight: 800; color: #FFFFFF; letter-spacing: 1px; text-transform: uppercase;">🚴 Out for Delivery</span>
+              </div>
+              <h1 style="margin: 0; color: #FFFFFF; font-size: 22px; font-weight: 800; letter-spacing: -0.5px;">Your Delivery Verification OTP</h1>
+              <p style="margin: 6px 0 0 0; color: #FFE8DF; font-size: 13px; font-weight: 500;">
+                Share this secure code with your rider upon receiving your order.
+              </p>
+            </td>
+          </tr>
+
+          <!-- Body Content -->
+          <tr>
+            <td style="padding: 32px;">
+              
+              <!-- Greeting -->
+              <p style="margin: 0 0 20px 0; font-size: 15px; color: #334155; line-height: 1.5;">
+                Hello <strong>${userName || "Valued Customer"}</strong>,<br/>
+                Your rider is currently on the way with your delicious order from <strong>${restaurantName || "FoodFlow Restaurant"}</strong>!
+              </p>
+
+              <!-- OTP Highlight Box -->
+              <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%" style="background: linear-gradient(135deg, #FFF7ED 0%, #FFEDD5 100%); border-radius: 20px; border: 2px dashed #F97316; margin-bottom: 24px;">
+                <tr>
+                  <td align="center" style="padding: 26px 20px;">
+                    <div style="font-size: 12px; font-weight: 800; color: #C2410C; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px;">
+                      Secure Delivery OTP Code
+                    </div>
+                    <div style="font-size: 38px; font-weight: 900; color: #EA580C; letter-spacing: 8px; font-family: monospace; background-color: #FFFFFF; display: inline-block; padding: 10px 24px; border-radius: 14px; border: 1px solid #FDBA74; box-shadow: 0 4px 12px rgba(234, 88, 12, 0.1);">
+                      ${otp}
+                    </div>
+                    <div style="font-size: 12px; color: #9A3412; font-weight: 600; margin-top: 10px;">
+                      ⚡ Please provide this 6-digit OTP code to the rider to confirm delivery.
+                    </div>
+                  </td>
+                </tr>
+              </table>
+
+              <!-- Order Summary Card -->
+              <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%" style="background-color: #F8FAFC; border-radius: 16px; border: 1px solid #E2E8F0; margin-bottom: 24px;">
+                <tr>
+                  <td style="padding: 16px 20px;">
+                    <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%">
+                      <tr>
+                        <td style="font-size: 13px; color: #64748B;">Order Reference:</td>
+                        <td align="right" style="font-size: 13px; font-weight: 800; color: #0F172A;">#${orderId}</td>
+                      </tr>
+                      ${
+                        restaurantName
+                          ? `
+                      <tr>
+                        <td style="font-size: 13px; color: #64748B; padding-top: 8px;">Restaurant:</td>
+                        <td align="right" style="font-size: 13px; font-weight: 700; color: #0F172A; padding-top: 8px;">${restaurantName}</td>
+                      </tr>
+                      `
+                          : ""
+                      }
+                      ${
+                        typeof totalAmount === "number"
+                          ? `
+                      <tr>
+                        <td style="font-size: 13px; color: #64748B; padding-top: 8px;">Total Amount:</td>
+                        <td align="right" style="font-size: 14px; font-weight: 800; color: #FF6B35; padding-top: 8px;">Tk ${totalAmount.toFixed(2)}</td>
+                      </tr>
+                      `
+                          : ""
+                      }
+                      <tr>
+                        <td style="font-size: 13px; color: #64748B; padding-top: 8px;">Generated Time:</td>
+                        <td align="right" style="font-size: 12px; font-weight: 600; color: #475569; padding-top: 8px;">${formattedDate}</td>
+                      </tr>
+                    </table>
+                  </td>
+                </tr>
+              </table>
+
+              <!-- Notice Box -->
+              <div style="background-color: #EFF6FF; border: 1px solid #BFDBFE; border-radius: 12px; padding: 14px 16px; font-size: 12px; color: #1E40AF; line-height: 1.5;">
+                🔒 <strong>Delivery Security Notice:</strong> Never share this OTP before the rider arrives with your food. Once the rider inputs this code, the order will be finalized as delivered.
+              </div>
+
+            </td>
+          </tr>
+
+          <!-- Footer -->
+          <tr>
+            <td style="background-color: #F8FAFC; border-top: 1px solid #F1F5F9; padding: 24px 32px; text-align: center;">
+              <p style="margin: 0 0 6px 0; font-size: 13px; color: #0F172A; font-weight: 700;">
+                Food Flow &bull; Fast, Fresh & Reliable Food Delivery
+              </p>
+              <p style="margin: 0; font-size: 11px; color: #64748B;">
+                Need help with your delivery? Contact customer support at <a href="mailto:support.foodflow@gmail.com" style="color: #FF6B35; text-decoration: none; font-weight: 700;">support.foodflow@gmail.com</a>
+              </p>
+            </td>
+          </tr>
+
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>
+    `;
+
+    const emailText = `
+Food Flow - Delivery Verification OTP
+
+Order Reference: #${orderId}
+Hello ${userName || "Customer"},
+
+Your order is out for delivery!
+Your Delivery Verification OTP is: ${otp}
+
+Please give this 6-digit code to your delivery rider when you receive your order to confirm delivery.
+
+Order Details:
+- Order Reference: #${orderId}
+- Restaurant: ${restaurantName || "FoodFlow Kitchen"}
+${typeof totalAmount === "number" ? `- Total Amount: Tk ${totalAmount.toFixed(2)}\n` : ""}
+
+Never share this code until the rider has arrived with your food package.
+Need help? Contact support.foodflow@gmail.com
+    `.trim();
+
+    return await sendEmail({
+      to: normalizedEmail,
+      subject: `🔑 Your Food Flow Delivery OTP [${otp}] for Order #${orderId}`,
+      html: emailHtml,
+      text: emailText,
+    });
+  } catch (err) {
+    console.error("⚠️ Error sending delivery OTP email:", err);
+    return false;
+  }
+}
+

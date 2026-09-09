@@ -199,8 +199,8 @@ export async function getRiderOrdersApi(
 }
 
 /**
- * Update order status (and optionally riderInfo) via PATCH /api/orders/:id
- * The backend handles: status transition logic, payment status, and rider info merge.
+ * Update order status (and optionally riderInfo, OTP, action) via PATCH /api/orders/:id
+ * The backend handles: status transition logic, payment status, rider info merge, and OTP validation.
  */
 export async function updateOrderStatusApi(
   orderId: string,
@@ -208,6 +208,11 @@ export async function updateOrderStatusApi(
     orderStatus?: string;
     riderInfo?: { riderId?: string; name?: string; phone?: string; vehicleNumber?: string };
     paymentStatus?: string;
+    otp?: string;
+    deliveryOtp?: string;
+    action?: string;
+    resendOtp?: boolean;
+    reason?: string;
   },
   userId?: string,
   userEmail?: string
@@ -233,3 +238,20 @@ export async function updateOrderStatusApi(
     };
   }
 }
+
+/**
+ * Trigger sending/resending Delivery OTP to customer (Email & Dashboard).
+ */
+export async function sendDeliveryOtpApi(
+  orderId: string,
+  userId?: string,
+  userEmail?: string
+): Promise<TOrderApiResponse> {
+  return updateOrderStatusApi(
+    orderId,
+    { action: "resend_otp" },
+    userId,
+    userEmail
+  );
+}
+

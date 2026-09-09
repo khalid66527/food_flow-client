@@ -111,8 +111,6 @@ export default function DashboardSideBar() {
           label: "Delivery Details",
           href: "/dashboard/rider/delivery-details",
           icon: Package,
-          badge: "4 Near",
-          badgeType: "brand",
         },
         {
           label: "Active Delivery",
