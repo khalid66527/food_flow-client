@@ -288,6 +288,14 @@ export default function CustomerAddress() {
 
     const payload = formatFormToPayload(values);
 
+    // Auto-default: If this is a brand-new address and the user has no
+    // existing addresses saved, force isDefault to true regardless of
+    // the checkbox state. For subsequent addresses, respect the checkbox.
+    const isCreating = !editingId || editingId === "";
+    if (isCreating && addresses.length === 0) {
+      payload.isDefault = true;
+    }
+
     const res =
       editingId && editingId !== ""
         ? await updateAddress(userId, userEmail, editingId, payload)
