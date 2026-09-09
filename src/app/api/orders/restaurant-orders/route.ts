@@ -28,15 +28,56 @@ export async function GET(req: NextRequest) {
     }
 
     const ordersCol = await getOrdersCollection();
+    const db = await getOrdersCollection().then((c) => c.dbName ? c : c);
+
+    let matchedRestaurantIds: string[] = [];
+    let matchedRestaurantNames: string[] = [];
+
+    if (restaurantId) matchedRestaurantIds.push(restaurantId);
+    if (restaurantName) matchedRestaurantNames.push(restaurantName);
+
+    // Look up restaurant document for this user if not fully specified
+    try {
+      const database = await (await import("@/lib/db")).getDb();
+      const restaurantsCol = database.collection("restaurants");
+      const rDocs = await restaurantsCol.find({
+        $or: [
+          { userId: userId },
+          { "owner.id": userId },
+          { "owner.userId": userId },
+          { email: req.headers.get("x-user-email") || "" },
+          { contactEmail: req.headers.get("x-user-email") || "" },
+        ],
+      }).toArray();
+
+      for (const r of rDocs) {
+        if (r._id) matchedRestaurantIds.push(r._id.toString());
+        if (r.id) matchedRestaurantIds.push(String(r.id));
+        if (r.restaurantName) matchedRestaurantNames.push(r.restaurantName);
+        if (r.name) matchedRestaurantNames.push(r.name);
+      }
+    } catch (e) {
+      console.warn("Could not query restaurants collection in restaurant-orders:", e);
+    }
 
     const query: Record<string, unknown> = {
       isDeleted: { $ne: true },
     };
 
-    if (restaurantId) {
-      query["items.restaurantId"] = restaurantId;
-    } else if (restaurantName) {
-      query["items.restaurantName"] = restaurantName;
+    const orConditions: Array<Record<string, unknown>> = [];
+
+    if (matchedRestaurantIds.length > 0) {
+      orConditions.push({ "items.restaurantId": { $in: matchedRestaurantIds } });
+    }
+    if (matchedRestaurantNames.length > 0) {
+      orConditions.push({ "items.restaurantName": { $in: matchedRestaurantNames } });
+      for (const rName of matchedRestaurantNames) {
+        orConditions.push({ "items.restaurantName": { $regex: new RegExp(`^${rName.trim()}$`, "i") } });
+      }
+    }
+
+    if (orConditions.length > 0) {
+      query["$or"] = orConditions;
     } else {
       query["$or"] = [
         { "items.restaurantId": userId },

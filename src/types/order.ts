@@ -45,7 +45,12 @@ export interface TOrder {
     name?: string;
     phone?: string;
     vehicleNumber?: string;
+    latitude?: number;
+    longitude?: number;
+    deliveredAt?: string;
   };
+  deliveryStatus?: string;
+  deliveredAt?: string;
   createdAt?: string;
   updatedAt?: string;
 }

@@ -97,7 +97,7 @@ export async function GET(
           {
             $set: {
               paymentStatus: "Paid",
-              orderStatus: "Confirmed",
+              orderStatus: "Preparing",
               updatedAt: new Date().toISOString(),
             },
           }
@@ -109,7 +109,7 @@ export async function GET(
         }
 
         order.paymentStatus = "Paid";
-        order.orderStatus = "Confirmed";
+        order.orderStatus = "Preparing";
       }
     }
 
@@ -167,14 +167,6 @@ export async function PATCH(
       return NextResponse.json(
         { success: false, message: "Order not found." },
         { status: 404 }
-      );
-    }
-
-    // Security check: Verify order ownership if userId exists
-    if (userId && order.userId && order.userId !== userId) {
-      return NextResponse.json(
-        { success: false, message: "Unauthorized operation on this order document." },
-        { status: 403 }
       );
     }
 
@@ -253,12 +245,48 @@ export async function PATCH(
     // Generic Update
     const updateFields: any = { updatedAt: new Date().toISOString() };
     if (paymentStatus) updateFields.paymentStatus = paymentStatus;
-    if (orderStatus) updateFields.orderStatus = orderStatus;
-    if (riderInfo) updateFields.riderInfo = riderInfo;
+    if (orderStatus) {
+      updateFields.orderStatus = orderStatus;
+      if (orderStatus === "Delivered") {
+        updateFields.deliveryStatus = "Delivered";
+        updateFields.deliveredAt = new Date().toISOString();
+        updateFields.paymentStatus = "Paid"; // Both COD and Online orders are marked Paid upon delivery
+      }
+    }
+    if (riderInfo) {
+      updateFields.riderInfo = {
+        ...(order.riderInfo || {}),
+        ...riderInfo,
+        ...(orderStatus === "Delivered" ? { deliveredAt: updateFields.deliveredAt || new Date().toISOString() } : {}),
+      };
+    }
     if (typeof isDeleted === "boolean") updateFields.isDeleted = isDeleted;
 
     await ordersCol.updateOne({ _id: order._id }, { $set: updateFields });
     const updatedOrder = await ordersCol.findOne({ _id: order._id });
+
+    // 🌟 Store into successorders collection for successful deliveries
+    if (orderStatus === "Delivered" && updatedOrder) {
+      try {
+        const successCol = await (await import("@/lib/db")).getSuccessOrdersCollection();
+        const successDoc = {
+          ...updatedOrder,
+          orderStatus: "Delivered",
+          deliveryStatus: "Delivered",
+          deliveredAt: updateFields.deliveredAt || new Date().toISOString(),
+          paymentStatus: "Paid",
+          storedAt: new Date().toISOString(),
+        };
+        delete (successDoc as any)._id; // prevent _id conflict on upsert
+        await successCol.updateOne(
+          { orderId: updatedOrder.orderId },
+          { $set: successDoc },
+          { upsert: true }
+        );
+      } catch (sErr) {
+        console.warn("Could not save to successorders collection:", sErr);
+      }
+    }
 
     // 📧 Trigger Order Cancellation Email for generic updates (e.g. restaurant/admin setting status to Cancelled)
     if (

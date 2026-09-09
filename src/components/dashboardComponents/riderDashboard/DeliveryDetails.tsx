@@ -147,7 +147,10 @@ export default function DeliveryDetails() {
     }
   };
 
-  const availableOrders = orders.filter((o) => o.orderStatus === "Out for Delivery" && !o.riderInfo?.riderId);
+  const availableOrders = orders.filter((o) => {
+    const s = (o.orderStatus || "").toLowerCase();
+    return ["ready", "ready for pickup", "out for delivery"].includes(s) && !o.riderInfo?.riderId;
+  });
   const myOrders = orders.filter((o) => o.riderInfo?.riderId === user?.id && o.orderStatus !== "Delivered");
   const deliveredOrders = orders.filter((o) => o.orderStatus === "Delivered" && o.riderInfo?.riderId === user?.id);
 
