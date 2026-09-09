@@ -31,11 +31,10 @@ import {
   ShieldCheck,
   Package,
 } from "lucide-react";
-import jsPDF from "jspdf";
-import autoTable from "jspdf-autotable";
 import { useSession } from "@/lib/auth-client";
 import { TOrder, TOrderItem } from "@/types/order";
 import LoadingSpinner from "@/lib/api/LoadingSpinner";
+import { downloadInvoicePdf } from "@/lib/pdf/generateInvoice";
 import { getOrderSocket, joinOrderRoom, disconnectOrderSocket } from "@/lib/socket";
 
 function getRestaurantProfile() {
@@ -189,217 +188,17 @@ export default function RestaurantSellHistory() {
   }, [filteredOrders, currentPage]);
 
   // ─── PDF INVOICE GENERATOR ─────────────────────────────────────────────
-  const handleDownloadPDF = useCallback(
-    (order: TOrder) => {
-      try {
-        setIsDownloadingPdf(true);
-        const doc = new jsPDF({
-          orientation: "portrait",
-          unit: "mm",
-          format: "a4",
-        });
-
-        const displayId = order.orderId || order._id || "N/A";
-        const restaurantName =
-          order.items?.[0]?.restaurantName || restaurantProfile?.restaurantName || "FoodFlow Kitchen";
-        const customerName = order.deliveryAddress?.fullName || order.userName || "Customer";
-        const customerPhone = order.deliveryAddress?.phoneNumber || "N/A";
-        const customerAddress = [
-          order.deliveryAddress?.streetAddress,
-          order.deliveryAddress?.area,
-          order.deliveryAddress?.postalCode,
-        ]
-          .filter(Boolean)
-          .join(", ");
-
-        const createdDate = order.createdAt
-          ? new Date(order.createdAt).toLocaleString("en-US", {
-              month: "short",
-              day: "numeric",
-              year: "numeric",
-              hour: "2-digit",
-              minute: "2-digit",
-            })
-          : "N/A";
-
-        const deliveredDate = order.deliveredAt || order.updatedAt
-          ? new Date(order.deliveredAt || order.updatedAt || Date.now()).toLocaleString("en-US", {
-              month: "short",
-              day: "numeric",
-              year: "numeric",
-              hour: "2-digit",
-              minute: "2-digit",
-            })
-          : "Completed";
-
-        // Header Background Banner
-        doc.setFillColor(255, 107, 53); // FoodFlow Orange
-        doc.rect(0, 0, 210, 32, "F");
-
-        // Header Titles
-        doc.setFont("helvetica", "bold");
-        doc.setFontSize(22);
-        doc.setTextColor(255, 255, 255);
-        doc.text("FoodFlow", 14, 18);
-
-        doc.setFontSize(10);
-        doc.setFont("helvetica", "normal");
-        doc.text("OFFICIAL SALES INVOICE & RECEIPT", 14, 26);
-
-        doc.setFont("helvetica", "bold");
-        doc.setFontSize(12);
-        doc.text(`INVOICE #${displayId}`, 196, 18, { align: "right" });
-        doc.setFontSize(9);
-        doc.setFont("helvetica", "normal");
-        doc.text(`Status: DELIVERED & PAID`, 196, 26, { align: "right" });
-
-        // Restaurant & Customer Details
-        doc.setFontSize(10);
-        doc.setTextColor(40, 40, 40);
-
-        // Left column
-        doc.setFont("helvetica", "bold");
-        doc.text("RESTAURANT / KITCHEN:", 14, 42);
-        doc.setFont("helvetica", "normal");
-        doc.text(restaurantName, 14, 48);
-
-        doc.setFont("helvetica", "bold");
-        doc.text("DELIVERY PARTNER (RIDER):", 14, 58);
-        doc.setFont("helvetica", "normal");
-        doc.text(
-          order.riderInfo?.name
-            ? `${order.riderInfo.name} (${order.riderInfo.phone || "No phone"})`
-            : "FoodFlow Direct Delivery",
-          14,
-          64
-        );
-
-        // Right column
-        doc.setFont("helvetica", "bold");
-        doc.text("CUSTOMER (BUYER) DETAILS:", 110, 42);
-        doc.setFont("helvetica", "normal");
-        doc.text(`Name: ${customerName}`, 110, 48);
-        doc.text(`Phone: ${customerPhone}`, 110, 54);
-        const splitAddr = doc.splitTextToSize(`Address: ${customerAddress || "Address on file"}`, 85);
-        doc.text(splitAddr, 110, 60);
-
-        // Timestamps
-        doc.setFont("helvetica", "bold");
-        doc.text("Order Placed:", 14, 76);
-        doc.setFont("helvetica", "normal");
-        doc.text(createdDate, 40, 76);
-
-        doc.setFont("helvetica", "bold");
-        doc.text("Delivered At:", 110, 76);
-        doc.setFont("helvetica", "normal");
-        doc.text(deliveredDate, 136, 76);
-
-        // Items Table
-        const tableBody = (order.items || []).map((item, idx) => {
-          const unitPrice = item.discountPrice || item.price || 0;
-          const qty = item.quantity || 1;
-          const lineTotal = unitPrice * qty;
-          return [
-            idx + 1,
-            item.name,
-            qty,
-            `Tk ${unitPrice.toFixed(2)}`,
-            `Tk ${lineTotal.toFixed(2)}`,
-          ];
-        });
-
-        autoTable(doc, {
-          startY: 84,
-          head: [["#", "Dish / Item Description", "Qty", "Unit Price", "Total Price"]],
-          body: tableBody,
-          theme: "grid",
-          headStyles: {
-            fillColor: [255, 107, 53],
-            textColor: [255, 255, 255],
-            fontStyle: "bold",
-            fontSize: 9,
-          },
-          bodyStyles: {
-            fontSize: 9,
-            textColor: [50, 50, 50],
-          },
-          columnStyles: {
-            0: { cellWidth: 12, halign: "center" },
-            1: { cellWidth: "auto" },
-            2: { cellWidth: 18, halign: "center" },
-            3: { cellWidth: 32, halign: "right" },
-            4: { cellWidth: 35, halign: "right" },
-          },
-          margin: { left: 14, right: 14 },
-        });
-
-        // Totals & Financials
-        const finalY = (doc as any).lastAutoTable?.finalY || 140;
-
-        let subtotal = 0;
-        (order.items || []).forEach((i) => {
-          subtotal += (i.discountPrice || i.price || 0) * (i.quantity || 1);
-        });
-        const totalAmount = order.totalAmount || subtotal;
-        const deliveryFee = Math.max(0, totalAmount - subtotal);
-
-        // Payment info on the left
-        doc.setFont("helvetica", "bold");
-        doc.setFontSize(9);
-        doc.setTextColor(60, 60, 60);
-        doc.text("PAYMENT SUMMARY:", 14, finalY + 12);
-        doc.setFont("helvetica", "normal");
-        doc.text(
-          `Payment Method: ${
-            order.paymentMethod === "STRIPE"
-              ? "Paid Online (Stripe / Card)"
-              : "Cash on Delivery (COD)"
-          }`,
-          14,
-          finalY + 18
-        );
-        doc.text(`Settlement: Delivered & Paid in Full`, 14, finalY + 24);
-
-        // Right totals summary
-        const rightBoxX = 130;
-        doc.setFont("helvetica", "normal");
-        doc.text("Items Subtotal:", rightBoxX, finalY + 12);
-        doc.text(`Tk ${subtotal.toFixed(2)}`, 196, finalY + 12, { align: "right" });
-
-        doc.text("Delivery & Platform:", rightBoxX, finalY + 18);
-        doc.text(`Tk ${deliveryFee.toFixed(2)}`, 196, finalY + 18, { align: "right" });
-
-        // Divider line
-        doc.setDrawColor(200, 200, 200);
-        doc.line(rightBoxX, finalY + 22, 196, finalY + 22);
-
-        doc.setFont("helvetica", "bold");
-        doc.setFontSize(12);
-        doc.setTextColor(255, 107, 53);
-        doc.text("Grand Total:", rightBoxX, finalY + 30);
-        doc.text(`Tk ${totalAmount.toFixed(2)}`, 196, finalY + 30, { align: "right" });
-
-        // Footer
-        doc.setFont("helvetica", "normal");
-        doc.setFontSize(8);
-        doc.setTextColor(150, 150, 150);
-        doc.text(
-          "Thank you for choosing FoodFlow. For inquiries, contact support@foodflow.com",
-          105,
-          285,
-          { align: "center" }
-        );
-
-        doc.save(`FoodFlow-Invoice-${displayId}.pdf`);
-      } catch (err) {
-        console.error("PDF generation failed:", err);
-        alert("Failed to generate PDF. You can also print this page directly.");
-      } finally {
-        setIsDownloadingPdf(false);
-      }
-    },
-    [restaurantProfile?.restaurantName]
-  );
+  const handleDownloadPDF = useCallback(async (order: TOrder) => {
+    setIsDownloadingPdf(true);
+    try {
+      await downloadInvoicePdf(order);
+    } catch (err) {
+      console.error("PDF generation failed:", err);
+      alert("Failed to generate PDF. You can also print this page directly.");
+    } finally {
+      setIsDownloadingPdf(false);
+    }
+  }, []);
 
   // Print invoice modal directly
   const handlePrint = () => {

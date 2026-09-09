@@ -34,6 +34,9 @@ export interface TOrder {
   deliveryAddress: TAddress;
   subtotal: number;
   deliveryFee: number;
+  vatAmount?: number;
+  platformFee?: number;
+  couponCode?: string;
   discount?: number;
   totalAmount: number;
   paymentMethod: TPaymentMethod;
