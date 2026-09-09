@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
-import { getOrdersCollection, getCartCollection } from "@/lib/db";
+import { getOrdersCollection, getCartCollection, getSettingsCollection, getCouponsCollection } from "@/lib/db";
 import Stripe from "stripe";
 import { sendOrderConfirmationEmail } from "@/lib/email";
 
@@ -61,7 +61,7 @@ export async function POST(req: NextRequest) {
 
     // 2. Request Payload & Validation
     const body = await req.json();
-    const { items, deliveryAddress, paymentMethod, subtotal, deliveryFee, discount, totalAmount } = body;
+    const { items, deliveryAddress, paymentMethod, subtotal, deliveryFee, discount, couponCode, totalAmount } = body;
 
     if (!items || !Array.isArray(items) || items.length === 0) {
       return NextResponse.json(
@@ -84,9 +84,58 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // 3. Create Order Document
+    // 3. Create Order Document & Financial Settlement Calculations
     const ordersCol = await getOrdersCollection();
     const cartCol = await getCartCollection();
+    const settingsCol = await getSettingsCollection();
+    const couponsCol = await getCouponsCollection();
+
+    // Fetch active platform settings
+    const settings = await settingsCol.findOne({ key: "global_settings" });
+    const vatPercentage = Number(settings?.vatPercentage ?? 5);
+    const restaurantCommissionPercentage = Number(settings?.restaurantCommissionPercentage ?? 15);
+    const riderCommissionPercentage = Number(settings?.riderCommissionPercentage ?? 100);
+
+    const numSubtotal = Number(subtotal) || 0;
+    const numDeliveryFee = Number(deliveryFee) || 0;
+    const numDiscount = Number(discount) || 0;
+    const formattedCouponCode = couponCode ? String(couponCode).trim().toUpperCase() : null;
+
+    // Check first-order coupon restriction if coupon applied
+    let isFirstOrderDiscount = false;
+    if (formattedCouponCode) {
+      const couponDoc = await couponsCol.findOne({ code: formattedCouponCode });
+      if (couponDoc?.isFirstOrderOnly) {
+        isFirstOrderDiscount = true;
+        const priorOrder = await ordersCol.findOne({
+          userId,
+          orderStatus: { $ne: "Cancelled" },
+        });
+        if (priorOrder) {
+          return NextResponse.json(
+            {
+              success: false,
+              message: "This welcome coupon is valid exclusively for your first successful order!",
+            },
+            { status: 400 }
+          );
+        }
+      }
+    }
+
+    // Financial split & settlement calculations
+    const vatAmount = Math.round(numSubtotal * (vatPercentage / 100) * 100) / 100;
+    const adminGrossCommission = Math.round(numSubtotal * (restaurantCommissionPercentage / 100) * 100) / 100;
+    // Coupon discount is subtracted strictly from Admin Commission
+    const adminNetProfit = Math.round((adminGrossCommission - numDiscount) * 100) / 100;
+    // Restaurant payout is Subtotal - Gross Commission (100% earnings protected)
+    const restaurantPayout = Math.round((numSubtotal - adminGrossCommission) * 100) / 100;
+    // Rider payout
+    const riderPayout = Math.round((numDeliveryFee * (riderCommissionPercentage / 100)) * 100) / 100;
+    const taxFundVat = vatAmount;
+
+    const calculatedTotal = numSubtotal + vatAmount + numDeliveryFee - numDiscount;
+    const finalTotalAmount = totalAmount ? Number(totalAmount) : Math.max(0, calculatedTotal);
 
     const timestamp = Date.now();
     const randomSuffix = Math.floor(1000 + Math.random() * 9000);
@@ -99,10 +148,20 @@ export async function POST(req: NextRequest) {
       userName,
       items,
       deliveryAddress,
-      subtotal: Number(subtotal) || 0,
-      deliveryFee: Number(deliveryFee) || 0,
-      discount: Number(discount) || 0,
-      totalAmount: Number(totalAmount) || 0,
+      subtotal: numSubtotal,
+      vatPercentage,
+      vatAmount,
+      deliveryFee: numDeliveryFee,
+      couponCode: formattedCouponCode,
+      discount: numDiscount,
+      isFirstOrderDiscount,
+      totalAmount: finalTotalAmount,
+      restaurantCommissionPercentage,
+      adminGrossCommission,
+      adminNetProfit,
+      restaurantPayout,
+      riderPayout,
+      taxFundVat,
       paymentMethod,
       paymentStatus: "Pending",
       orderStatus: "Placed",

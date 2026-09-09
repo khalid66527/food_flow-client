@@ -49,3 +49,12 @@ export async function getCartCollection() {
   return database.collection("cart");
 }
 
+export async function getSettingsCollection() {
+  const database = await getDb();
+  return database.collection("platform_settings");
+}
+
+export async function getCouponsCollection() {
+  const database = await getDb();
+  return database.collection("coupons");
+}

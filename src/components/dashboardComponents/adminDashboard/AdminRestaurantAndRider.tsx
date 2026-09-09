@@ -292,17 +292,17 @@ export default function AdminRestaurantAndRider() {
       )}
 
       {/* Header Banner */}
-      <div className="bg-gradient-to-br from-[#1E293B] via-[#0F172A] to-[#020617] rounded-3xl p-6 sm:p-8 text-white shadow-xl">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
+      <div className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-orange-600 via-[#FF6B35] to-amber-500 text-white p-6 sm:p-8 shadow-xl">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 relative z-10">
           <div className="space-y-2">
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/10 backdrop-blur-md text-orange-400 text-xs font-bold uppercase tracking-wider border border-white/10">
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/20 backdrop-blur-md text-white text-xs font-bold uppercase tracking-wider border border-white/20">
               <Sparkles className="w-3.5 h-3.5" />
               <span>Partner Approval &amp; Management</span>
             </div>
             <h1 className="text-2xl sm:text-3xl font-black tracking-tight">
               Restaurant &amp; Rider Control Center
             </h1>
-            <p className="text-slate-300 text-xs sm:text-sm max-w-2xl leading-relaxed">
+            <p className="text-orange-100 text-xs sm:text-sm max-w-2xl leading-relaxed">
               Review onboarding applications, verify vendor &amp; delivery partner credentials,
               approve newly created stores, and moderate platform active partners.
             </p>

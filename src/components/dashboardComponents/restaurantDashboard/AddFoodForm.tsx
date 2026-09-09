@@ -34,11 +34,13 @@ import {
   Eye,
   ShoppingBag,
   Star,
+  Calculator,
 } from "lucide-react";
 import { useSession } from "@/lib/auth-client";
 import { getMyRestaurantProfile, IRestaurant } from "@/lib/api/restaurant";
 import { createFoodItem } from "@/lib/actions/restaurant";
 import { getGlobalCategories, IGlobalCategory } from "@/lib/api/category";
+import { getPlatformSettings } from "@/lib/api/settings";
 import LoadingSpinner from "@/lib/api/LoadingSpinner";
 
 type CategoryType = string;
@@ -109,19 +111,28 @@ export default function AddFoodForm() {
   const [successMsg, setSuccessMsg] = useState("");
   const [errorMsg, setErrorMsg] = useState("");
 
-  // Fetch admin approved global categories
+  // Commission Percentage State
+  const [commissionPercentage, setCommissionPercentage] = useState<number>(15);
+
+  // Fetch admin approved global categories & platform settings
   useEffect(() => {
-    const loadCategories = async () => {
+    const loadData = async () => {
       try {
-        const res = await getGlobalCategories();
-        if (res.success && Array.isArray(res.data) && res.data.length > 0) {
-          setGlobalCategories(res.data);
+        const [catRes, settingsRes] = await Promise.all([
+          getGlobalCategories(),
+          getPlatformSettings(),
+        ]);
+        if (catRes.success && Array.isArray(catRes.data) && catRes.data.length > 0) {
+          setGlobalCategories(catRes.data);
+        }
+        if (settingsRes.success && settingsRes.data) {
+          setCommissionPercentage(settingsRes.data.restaurantCommissionPercentage);
         }
       } catch {
         // fallback
       }
     };
-    loadCategories();
+    loadData();
   }, []);
 
   // Common General Food Fields
@@ -1249,6 +1260,45 @@ export default function AddFoodForm() {
                 </div>
               </div>
             </div>
+
+            {/* 💰 REQUIREMENT 2: "ADD FOOD" LIVE PROFIT CALCULATOR */}
+            {(() => {
+              const rawPrice = Number(commonData.discountPrice || commonData.price || 0);
+              const priceNum = Number.isNaN(rawPrice) ? 0 : rawPrice;
+              const commissionVal = Math.round((priceNum * (commissionPercentage / 100)) * 100) / 100;
+              const netPayout = Math.max(0, Math.round((priceNum - commissionVal) * 100) / 100);
+
+              return (
+                <div className="p-4 rounded-2xl bg-gradient-to-br from-emerald-50/90 via-teal-50/50 to-emerald-50/90 border border-emerald-200/80 space-y-2.5 shadow-xs">
+                  <div className="flex items-center justify-between border-b border-emerald-200/60 pb-2">
+                    <div className="flex items-center gap-2 text-xs font-black text-emerald-950">
+                      <Calculator className="w-4 h-4 text-emerald-600" />
+                      <span>Live Profit & Settlement Calculator</span>
+                    </div>
+                    <span className="text-[10px] font-black bg-emerald-600 text-white px-2 py-0.5 rounded-full">
+                      {commissionPercentage}% Platform Commission
+                    </span>
+                  </div>
+
+                  <div className="space-y-1.5 text-xs font-semibold text-gray-700">
+                    <div className="flex items-center justify-between">
+                      <span className="text-gray-600">Food Price (Selling Price):</span>
+                      <span className="font-extrabold text-gray-900">৳ {priceNum.toFixed(2)}</span>
+                    </div>
+                    <div className="flex items-center justify-between text-rose-600">
+                      <span>Platform Commission ({commissionPercentage}%):</span>
+                      <span className="font-extrabold">-৳ {commissionVal.toFixed(2)}</span>
+                    </div>
+                    <div className="pt-2 border-t border-emerald-200/80 flex items-center justify-between text-sm">
+                      <span className="font-black text-emerald-950">Your Net Payout (Net Payout):</span>
+                      <span className="font-black text-emerald-600 text-base">
+                        ৳ {netPayout.toFixed(2)}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              );
+            })()}
 
             {/* ⭐ AVAILABILITY / STOCK STATUS FIELD */}
             <div className="space-y-1.5 pt-1">
