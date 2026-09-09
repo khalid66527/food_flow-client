@@ -111,8 +111,6 @@ export default function DashboardSideBar() {
           label: "Delivery Details",
           href: "/dashboard/rider/delivery-details",
           icon: Package,
-          badge: "4 Near",
-          badgeType: "brand",
         },
         {
           label: "Active Delivery",
@@ -132,8 +130,8 @@ export default function DashboardSideBar() {
           icon: DollarSign,
         },
         {
-          label: "History",
-          href: "/dashboard/rider/history",
+          label: "Delivery History",
+          href: "/dashboard/rider/delivery-history",
           icon: History,
         },
       ],

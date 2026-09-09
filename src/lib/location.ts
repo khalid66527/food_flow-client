@@ -1,8 +1,13 @@
 "use client";
 
+import { BANGLADESH_LOCATIONS } from "@/data/bangladeshLocations";
+
 export interface ILocationInfo {
   city: string;
   area: string;
+  division?: string;
+  district?: string;
+  upazila?: string;
   isDetecting: boolean;
   hasRealLocation: boolean;
   error?: string | null;
@@ -13,6 +18,9 @@ export interface ILocationInfo {
 let cachedLocation: ILocationInfo = {
   city: "Chattogram",
   area: "GEC, Chattogram",
+  division: "Chattogram",
+  district: "Chattogram",
+  upazila: "Chattogram GPO",
   isDetecting: false,
   hasRealLocation: false,
 };
@@ -34,12 +42,174 @@ export function getRealTimeLocation(): ILocationInfo {
   return cachedLocation;
 }
 
-export function updateRealTimeLocation(city: string, area?: string, lat?: number, lng?: number) {
+/**
+ * Parse reverse-geocode API response into Bangladesh Division, District, and Upazila
+ */
+export function parseBangladeshHierarchy(rawData: any): {
+  division: string;
+  district: string;
+  upazila: string;
+  city: string;
+  area: string;
+} {
+  const principalSubdivision = String(rawData.principalSubdivision || "").trim();
+  const cityRaw = String(rawData.city || "").trim();
+  const localityRaw = String(rawData.locality || "").trim();
+  
+  const adminList = Array.isArray(rawData.localityInfo?.administrative)
+    ? rawData.localityInfo.administrative
+    : [];
+
+  const combinedSearchText = [
+    localityRaw,
+    cityRaw,
+    principalSubdivision,
+    ...adminList.map((a: any) => a.name || ""),
+  ].join(" ").toLowerCase();
+
+  let foundDivision = "";
+  let foundDistrict = "";
+  let foundUpazila = "";
+
+  // Helper dictionary of known district aliases to canonical BANGLADESH_LOCATIONS district name
+  const DISTRICT_ALIASES: Record<string, { district: string; division: string }> = {
+    moulvibazar: { district: "Moulvibazar", division: "Sylhet" },
+    maulvibazar: { district: "Moulvibazar", division: "Sylhet" },
+    maulavibazar: { district: "Moulvibazar", division: "Sylhet" },
+    "maulvi bazar": { district: "Moulvibazar", division: "Sylhet" },
+    "moulvi bazar": { district: "Moulvibazar", division: "Sylhet" },
+    "maulavi bazar": { district: "Moulvibazar", division: "Sylhet" },
+    sreemangal: { district: "Moulvibazar", division: "Sylhet" },
+    kamalganj: { district: "Moulvibazar", division: "Sylhet" },
+    kulaura: { district: "Moulvibazar", division: "Sylhet" },
+    chattogram: { district: "Chattogram", division: "Chattogram" },
+    chittagong: { district: "Chattogram", division: "Chattogram" },
+    cumilla: { district: "Cumilla", division: "Chattogram" },
+    comilla: { district: "Cumilla", division: "Chattogram" },
+    bogura: { district: "Bogura", division: "Rajshahi" },
+    bogra: { district: "Bogura", division: "Rajshahi" },
+    jashore: { district: "Jashore", division: "Khulna" },
+    jessore: { district: "Jashore", division: "Khulna" },
+    barishal: { district: "Barishal", division: "Barishal" },
+    barisal: { district: "Barishal", division: "Barishal" },
+    "cox's bazar": { district: "Cox's Bazar", division: "Chattogram" },
+    coxsbazar: { district: "Cox's Bazar", division: "Chattogram" },
+    "coxs bazar": { district: "Cox's Bazar", division: "Chattogram" },
+    mymensingh: { district: "Mymensingh", division: "Mymensingh" },
+    dhaka: { district: "Dhaka", division: "Dhaka" },
+    gazipur: { district: "Gazipur", division: "Dhaka" },
+    narayanganj: { district: "Narayanganj", division: "Dhaka" },
+    sylhet: { district: "Sylhet", division: "Sylhet" },
+    habiganj: { district: "Habiganj", division: "Sylhet" },
+    sunamganj: { district: "Sunamganj", division: "Sylhet" },
+  };
+
+  // 1. Check known aliases first
+  for (const [alias, info] of Object.entries(DISTRICT_ALIASES)) {
+    if (combinedSearchText.includes(alias)) {
+      foundDistrict = info.district;
+      foundDivision = info.division;
+      break;
+    }
+  }
+
+  // 2. Check for specific Upazila / Postal Code
+  for (const divObj of BANGLADESH_LOCATIONS) {
+    for (const distObj of divObj.districts) {
+      for (const p of distObj.postalCodes) {
+        const pNameLower = p.name.toLowerCase();
+        if (
+          localityRaw.toLowerCase().includes(pNameLower) ||
+          cityRaw.toLowerCase().includes(pNameLower)
+        ) {
+          foundUpazila = p.name;
+          if (!foundDistrict) {
+            foundDistrict = distObj.name;
+            foundDivision = divObj.division;
+          }
+          break;
+        }
+      }
+      if (foundUpazila) break;
+    }
+    if (foundUpazila) break;
+  }
+
+  // 3. Check all districts in BANGLADESH_LOCATIONS
+  if (!foundDistrict) {
+    for (const divObj of BANGLADESH_LOCATIONS) {
+      for (const distObj of divObj.districts) {
+        const distLower = distObj.name.toLowerCase();
+        if (combinedSearchText.includes(distLower)) {
+          foundDistrict = distObj.name;
+          foundDivision = divObj.division;
+          break;
+        }
+      }
+      if (foundDistrict) break;
+    }
+  }
+
+  // 4. Check for Division
+  if (!foundDivision) {
+    for (const divObj of BANGLADESH_LOCATIONS) {
+      const divLower = divObj.division.toLowerCase();
+      if (combinedSearchText.includes(divLower)) {
+        foundDivision = divObj.division;
+        break;
+      }
+    }
+  }
+
+  // Fallbacks
+  if (!foundDivision) {
+    if (combinedSearchText.includes("dhaka")) foundDivision = "Dhaka";
+    else if (combinedSearchText.includes("chittagong") || combinedSearchText.includes("chattogram")) foundDivision = "Chattogram";
+    else if (combinedSearchText.includes("sylhet")) foundDivision = "Sylhet";
+    else if (combinedSearchText.includes("rajshahi")) foundDivision = "Rajshahi";
+    else if (combinedSearchText.includes("khulna")) foundDivision = "Khulna";
+    else if (combinedSearchText.includes("barisal") || combinedSearchText.includes("barishal")) foundDivision = "Barishal";
+    else if (combinedSearchText.includes("rangpur")) foundDivision = "Rangpur";
+    else if (combinedSearchText.includes("mymensingh")) foundDivision = "Mymensingh";
+    else foundDivision = "Dhaka";
+  }
+
+  if (!foundDistrict) {
+    foundDistrict = foundDivision;
+  }
+
+  // Clean area representation
+  const cleanArea = foundUpazila
+    ? `${foundUpazila}, ${foundDistrict}`
+    : localityRaw && localityRaw.toLowerCase() !== foundDistrict.toLowerCase()
+    ? `${localityRaw}, ${foundDistrict}`
+    : `${foundDistrict} Central`;
+
+  return {
+    division: foundDivision,
+    district: foundDistrict,
+    upazila: foundUpazila,
+    city: foundDistrict,
+    area: cleanArea,
+  };
+}
+
+export function updateRealTimeLocation(
+  city: string,
+  area?: string,
+  lat?: number,
+  lng?: number,
+  hierarchy?: { division?: string; district?: string; upazila?: string }
+) {
   const cleanCity = city.trim();
   const cleanArea = area ? area.trim() : `${cleanCity} Central`;
+
   cachedLocation = {
     city: cleanCity,
     area: cleanArea,
+    division: hierarchy?.division || cachedLocation.division || cleanCity,
+    district: hierarchy?.district || cachedLocation.district || cleanCity,
+    upazila: hierarchy?.upazila || cachedLocation.upazila || cleanArea,
     lat: lat ?? cachedLocation.lat,
     lng: lng ?? cachedLocation.lng,
     isDetecting: false,
@@ -72,33 +242,14 @@ export async function detectRealTimeLocation(): Promise<ILocationInfo> {
           );
           const data = await res.json();
 
-          const detectedCityRaw =
-            data.city ||
-            data.principalSubdivision ||
-            data.locality ||
-            "Chattogram";
-
-          const detectedAreaRaw =
-            data.locality || data.localityInfo?.locality?.[0]?.name || detectedCityRaw;
-
-          let city = "Chattogram";
-          const lowerRaw = detectedCityRaw.toLowerCase();
-          if (lowerRaw.includes("dhaka")) city = "Dhaka";
-          else if (lowerRaw.includes("chittagong") || lowerRaw.includes("chattogram")) city = "Chattogram";
-          else if (lowerRaw.includes("sylhet")) city = "Sylhet";
-          else if (lowerRaw.includes("rajshahi")) city = "Rajshahi";
-          else if (lowerRaw.includes("khulna")) city = "Khulna";
-          else if (lowerRaw.includes("barisal") || lowerRaw.includes("barishal")) city = "Barishal";
-          else if (lowerRaw.includes("rangpur")) city = "Rangpur";
-          else if (lowerRaw.includes("comilla") || lowerRaw.includes("cumilla")) city = "Comilla";
-          else if (lowerRaw.includes("mymensingh")) city = "Mymensingh";
-          else if (detectedCityRaw) city = detectedCityRaw;
-
-          const area = detectedAreaRaw ? `${detectedAreaRaw}, ${city}` : `${city} Central`;
+          const parsed = parseBangladeshHierarchy(data);
 
           cachedLocation = {
-            city,
-            area,
+            city: parsed.city,
+            area: parsed.area,
+            division: parsed.division,
+            district: parsed.district,
+            upazila: parsed.upazila,
             lat,
             lng: lon,
             isDetecting: false,
@@ -123,3 +274,4 @@ export async function detectRealTimeLocation(): Promise<ILocationInfo> {
     );
   });
 }
+

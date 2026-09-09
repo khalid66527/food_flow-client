@@ -14,6 +14,7 @@ import {
   updateRealTimeLocation,
   getRealTimeLocation,
   subscribeLocation,
+  parseBangladeshHierarchy,
 } from "@/lib/location";
 import LoadingSpinner from "@/components/LoadingSpinner";
 
@@ -52,60 +53,41 @@ function isRouteLocationRequired(pathname: string): boolean {
 
 export default function LocationGuard({ children }: { children?: React.ReactNode }) {
   const pathname = usePathname();
+  const [mounted, setMounted] = useState<boolean>(false);
   const isProtected = isRouteLocationRequired(pathname);
 
-  const [hasLocation, setHasLocation] = useState<boolean>(
-    () => getRealTimeLocation().hasRealLocation
-  );
-  
-  // Checking state for protected routes to prevent modal pop-up flickering
-  const [isChecking, setIsChecking] = useState<boolean>(() => {
-    if (typeof window === "undefined") return false;
-    return isProtected && !getRealTimeLocation().hasRealLocation;
-  });
-
+  const [hasLocation, setHasLocation] = useState<boolean>(false);
+  const [isChecking, setIsChecking] = useState<boolean>(false);
   const [isOpen, setIsOpen] = useState<boolean>(false);
   const [isDetecting, setIsDetecting] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
 
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
   // Reverse geocode helper & in-memory location updater
   const processCoordinates = useCallback(async (lat: number, lon: number) => {
-    let city = "Chattogram";
-    let area = "Chattogram Central";
-
     try {
       const res = await fetch(
         `https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${lat}&longitude=${lon}&localityLanguage=en`
       );
       const data = await res.json();
+      const parsed = parseBangladeshHierarchy(data);
 
-      const detectedCityRaw =
-        data.city ||
-        data.principalSubdivision ||
-        data.locality ||
-        "Chattogram";
-
-      const detectedAreaRaw =
-        data.locality || data.localityInfo?.locality?.[0]?.name || detectedCityRaw;
-
-      const lowerRaw = detectedCityRaw.toLowerCase();
-      if (lowerRaw.includes("dhaka")) city = "Dhaka";
-      else if (lowerRaw.includes("chittagong") || lowerRaw.includes("chattogram")) city = "Chattogram";
-      else if (lowerRaw.includes("sylhet")) city = "Sylhet";
-      else if (lowerRaw.includes("rajshahi")) city = "Rajshahi";
-      else if (lowerRaw.includes("khulna")) city = "Khulna";
-      else if (lowerRaw.includes("barisal") || lowerRaw.includes("barishal")) city = "Barishal";
-      else if (lowerRaw.includes("rangpur")) city = "Rangpur";
-      else if (lowerRaw.includes("comilla") || lowerRaw.includes("cumilla")) city = "Comilla";
-      else if (lowerRaw.includes("mymensingh")) city = "Mymensingh";
-      else if (detectedCityRaw) city = detectedCityRaw;
-
-      area = detectedAreaRaw ? `${detectedAreaRaw}, ${city}` : `${city} Central`;
+      updateRealTimeLocation(parsed.city, parsed.area, lat, lon, {
+        division: parsed.division,
+        district: parsed.district,
+        upazila: parsed.upazila,
+      });
     } catch {
-      area = `${city} Central`;
+      updateRealTimeLocation("Chattogram", "Chattogram Central", lat, lon, {
+        division: "Chattogram",
+        district: "Chattogram",
+        upazila: "Chattogram GPO",
+      });
     }
 
-    updateRealTimeLocation(city, area, lat, lon);
     setHasLocation(true);
     setIsOpen(false);
     setIsDetecting(false);
@@ -156,6 +138,8 @@ export default function LocationGuard({ children }: { children?: React.ReactNode
 
   // Initial & route-change background scan
   useEffect(() => {
+    if (!mounted) return;
+
     if (!isProtected) {
       setIsOpen(false);
       setIsChecking(false);
@@ -210,7 +194,7 @@ export default function LocationGuard({ children }: { children?: React.ReactNode
       window.removeEventListener("focus", handleFocus);
       window.removeEventListener("visibilitychange", handleFocus);
     };
-  }, [pathname, isProtected, scanAndDetectLocation]);
+  }, [mounted, pathname, isProtected, scanAndDetectLocation]);
 
   // Strict Guard: Prevent closing modal on Escape key press when open
   useEffect(() => {
@@ -223,6 +207,11 @@ export default function LocationGuard({ children }: { children?: React.ReactNode
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [isOpen]);
+
+  // 0. Pre-hydration SSR pass -> match server HTML output exactly
+  if (!mounted) {
+    return <>{children}</>;
+  }
 
   // 1. Unprotected public route -> render children immediately
   if (!isProtected) {

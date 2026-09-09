@@ -10,6 +10,8 @@ export interface TAddress {
   postalCode?: string;
   deliveryInstructions?: string;
   isDefault: boolean;
+  latitude?: number;
+  longitude?: number;
   createdAt?: string;
   updatedAt?: string;
 }
