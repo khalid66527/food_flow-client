@@ -1,3 +1,6 @@
+import dns from "node:dns";
+dns.setServers(["8.8.8.8", "8.8.4.4"]);
+
 import "@/lib/setup-dns";
 import { betterAuth } from "better-auth";
 import { mongodbAdapter } from "@better-auth/mongo-adapter";
@@ -47,5 +50,4 @@ export const auth = betterAuth({
       },
     },
   },
-
 });
