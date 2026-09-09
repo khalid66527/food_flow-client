@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState, useCallback, useMemo } from "react";
 import Link from "next/link";
+import { updateOrderStatusApi } from "@/lib/api/order";
 import {
   Loader2,
   RefreshCw,
@@ -27,9 +28,12 @@ import {
   ArrowRight,
   ShieldCheck,
   AlertCircle,
+  Ban,
+  ChevronLeft as ChevronLeftIcon,
+  ChevronRight as ChevronRightIcon,
 } from "lucide-react";
 import { useSession } from "@/lib/auth-client";
-import { getRestaurantOrdersApi, updateOrderStatusApi } from "@/lib/api/order";
+import { getRestaurantOrdersApi } from "@/lib/api/order";
 import { getOrderSocket, joinOrderRoom, disconnectOrderSocket } from "@/lib/socket";
 import { TOrder, TOrderItem } from "@/types/order";
 import LoadingSpinner from "@/lib/api/LoadingSpinner";
@@ -100,11 +104,14 @@ export default function RestaurantOrders() {
   const [searchQuery, setSearchQuery] = useState("");
   const [actionLoadingId, setActionLoadingId] = useState<string | null>(null);
   const [socketConnected, setSocketConnected] = useState(false);
+  const [cancelConfirmId, setCancelConfirmId] = useState<string | null>(null);
+  const [currentPage, setCurrentPage] = useState(1);
 
   // Live Tracking Modal State
   const [selectedOrder, setSelectedOrder] = useState<TOrder | null>(null);
   const [riderLiveCoords, setRiderLiveCoords] = useState<Record<string, { lat: number; lng: number }>>({});
 
+  const ORDERS_PER_PAGE = 10;
   const profile = getRestaurantProfile();
 
   const fetchOrders = useCallback(async () => {
@@ -251,9 +258,42 @@ export default function RestaurantOrders() {
     }
   };
 
-  // ─── Filtering ───────────────────────────────────────────────
+  // ─── Cancel COD Order (Restaurant Action) ───────────────────
+  const cancelOrder = async (order: TOrder) => {
+    const orderId = order.orderId || order._id || "";
+    if (!orderId || !user?.id) return;
+    try {
+      setActionLoadingId(orderId);
+      const res = await updateOrderStatusApi(
+        orderId,
+        { orderStatus: "Cancelled", reason: "Cancelled by restaurant" },
+        user.id,
+        user.email || ""
+      );
+      if (res.success) {
+        // Remove cancelled order from list immediately
+        setOrders((prev) => prev.filter((o) => o.orderId !== orderId && o._id !== orderId));
+        if (selectedOrder && (selectedOrder.orderId === orderId || selectedOrder._id === orderId)) {
+          setSelectedOrder(null);
+        }
+        // Broadcast cancel event via socket
+        const socket = getOrderSocket(orderId);
+        socket.emit("order_status_updated", { orderId, orderStatus: "Cancelled" });
+      } else {
+        setError(res.message || "Failed to cancel order.");
+      }
+    } catch (err) {
+      console.error("Cancel order failed:", err);
+      setError("Failed to cancel order. Please try again.");
+    } finally {
+      setActionLoadingId(null);
+      setCancelConfirmId(null);
+    }
+  };
+
+  // ─── Filtering & Sorting (Newest First) ─────────────────────
   const filteredOrders = useMemo(() => {
-    return orders.filter((o) => {
+    const filtered = orders.filter((o) => {
       const q = searchQuery.toLowerCase().trim();
       const matchesSearch =
         !q ||
@@ -265,7 +305,25 @@ export default function RestaurantOrders() {
       const matchesTab = activeTab === "ALL" || s === activeTab.toUpperCase();
       return matchesSearch && matchesTab;
     });
+    // Sort descending by createdAt (newest first)
+    return filtered.sort((a, b) => {
+      const dateA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+      const dateB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+      return dateB - dateA;
+    });
   }, [orders, searchQuery, activeTab]);
+
+  // Reset page when filters change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [activeTab, searchQuery]);
+
+  // ─── Pagination ─────────────────────────────────────────────
+  const totalPages = Math.max(1, Math.ceil(filteredOrders.length / ORDERS_PER_PAGE));
+  const paginatedOrders = useMemo(() => {
+    const start = (currentPage - 1) * ORDERS_PER_PAGE;
+    return filteredOrders.slice(start, start + ORDERS_PER_PAGE);
+  }, [filteredOrders, currentPage]);
 
   const activeOrderCount = orders.filter(
     (o) => o.orderStatus && !["Delivered", "Cancelled"].includes(o.orderStatus)
@@ -422,13 +480,17 @@ export default function RestaurantOrders() {
           </Link>
         </div>
       ) : (
+        <>
         <div className="space-y-4">
-          {filteredOrders.map((order) => {
+          {paginatedOrders.map((order) => {
             const orderId = order.orderId || order._id || "";
             const status = (order.orderStatus || "Placed").toLowerCase();
             const groupedItems = groupItemsByRestaurant(order.items || []);
             const totalItems = (order.items || []).reduce((s, i) => s + (i.quantity || 0), 0);
             const isActionLoading = actionLoadingId === orderId;
+            const isCOD = order.paymentMethod === "COD";
+            const isPaidOnline = order.paymentMethod === "STRIPE" || order.paymentStatus === "Paid";
+            const canCancel = isCOD && !isPaidOnline && status === "placed";
             const formattedDate = order.createdAt
               ? new Date(order.createdAt).toLocaleString("en-US", {
                   month: "short",
@@ -561,6 +623,39 @@ export default function RestaurantOrders() {
                   </div>
 
                   <div className="flex items-center gap-2 flex-wrap w-full sm:w-auto justify-end">
+                    {/* Cancel Order Button — Only for COD + Placed status */}
+                    {canCancel && (
+                      cancelConfirmId === orderId ? (
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs font-bold text-rose-600">Cancel this order?</span>
+                          <button
+                            type="button"
+                            disabled={isActionLoading}
+                            onClick={() => cancelOrder(order)}
+                            className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-rose-600 text-white text-xs font-extrabold transition hover:bg-rose-700 disabled:opacity-50 cursor-pointer"
+                          >
+                            {isActionLoading ? <Loader2 className="w-3 h-3 animate-spin" /> : <Ban className="w-3 h-3" />}
+                            Confirm Cancel
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setCancelConfirmId(null)}
+                            className="px-3 py-1.5 rounded-lg bg-gray-200 text-gray-700 text-xs font-bold hover:bg-gray-300 transition cursor-pointer"
+                          >
+                            No
+                          </button>
+                        </div>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => setCancelConfirmId(orderId)}
+                          className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-700 text-xs font-extrabold border border-rose-200 transition cursor-pointer"
+                        >
+                          <Ban className="w-3.5 h-3.5" /> Cancel Order
+                        </button>
+                      )
+                    )}
+
                     {/* Step 1: Placed / Confirmed -> Preparing */}
                     {(status === "placed" || status === "confirmed") && (
                       <button
@@ -620,6 +715,71 @@ export default function RestaurantOrders() {
             );
           })}
         </div>
+
+        {/* ─── Pagination Bar ──────────────────────────────────────── */}
+        {totalPages > 1 && (
+          <div className="flex items-center justify-center gap-2 pt-6">
+            <button
+              type="button"
+              disabled={currentPage <= 1}
+              onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+              className="inline-flex items-center gap-1 px-3.5 py-2 rounded-xl bg-white border border-gray-200 text-xs font-bold text-gray-700 hover:bg-gray-50 transition disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer shadow-xs"
+            >
+              <ChevronLeftIcon className="w-3.5 h-3.5" /> Previous
+            </button>
+
+            <div className="flex items-center gap-1">
+              {Array.from({ length: totalPages }, (_, i) => i + 1)
+                .filter((page) => {
+                  if (totalPages <= 7) return true;
+                  if (page === 1 || page === totalPages) return true;
+                  if (Math.abs(page - currentPage) <= 1) return true;
+                  return false;
+                })
+                .reduce<(number | "...")[]>((acc, page, idx, arr) => {
+                  if (idx > 0 && page - (arr[idx - 1] as number) > 1) {
+                    acc.push("...");
+                  }
+                  acc.push(page);
+                  return acc;
+                }, [])
+                .map((page, idx) =>
+                  page === "..." ? (
+                    <span key={`dots-${idx}`} className="px-2 text-xs text-gray-400 font-bold select-none">
+                      …
+                    </span>
+                  ) : (
+                    <button
+                      key={page}
+                      type="button"
+                      onClick={() => setCurrentPage(page as number)}
+                      className={`w-9 h-9 rounded-xl text-xs font-extrabold transition cursor-pointer ${
+                        currentPage === page
+                          ? "bg-gradient-to-r from-[#FF6B35] to-amber-500 text-white shadow-md shadow-orange-500/20"
+                          : "bg-white border border-gray-200 text-gray-700 hover:bg-orange-50 hover:border-orange-200"
+                      }`}
+                    >
+                      {page}
+                    </button>
+                  )
+                )}
+            </div>
+
+            <button
+              type="button"
+              disabled={currentPage >= totalPages}
+              onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+              className="inline-flex items-center gap-1 px-3.5 py-2 rounded-xl bg-white border border-gray-200 text-xs font-bold text-gray-700 hover:bg-gray-50 transition disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer shadow-xs"
+            >
+              Next <ChevronRightIcon className="w-3.5 h-3.5" />
+            </button>
+
+            <span className="text-[11px] text-gray-400 font-medium ml-2 hidden sm:inline">
+              Page {currentPage} of {totalPages} ({filteredOrders.length} orders)
+            </span>
+          </div>
+        )}
+        </>
       )}
 
       {/* ────────────────────────────────────────────────────────── */}

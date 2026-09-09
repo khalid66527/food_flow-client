@@ -3,7 +3,7 @@ import { getOrdersCollection, getCartCollection } from "@/lib/db";
 import { auth } from "@/lib/auth";
 import { ObjectId } from "mongodb";
 import Stripe from "stripe";
-import { sendOrderConfirmationEmail, sendOrderCancellationEmail, sendDeliveryOtpEmail } from "@/lib/email";
+import { sendOrderConfirmationEmail, sendOrderCancellationEmail, sendDeliveryOtpEmail, sendDeliverySuccessEmail } from "@/lib/email";
 
 export async function GET(
   req: NextRequest,
@@ -363,6 +363,13 @@ export async function PATCH(
         );
       } catch (sErr) {
         console.warn("Could not save to successorders collection:", sErr);
+      }
+
+      // 📧 Trigger Delivery Success Email to Customer
+      if (updatedOrder.userEmail) {
+        sendDeliverySuccessEmail(updatedOrder as any).catch((e) =>
+          console.warn("Background delivery success email trigger error:", e)
+        );
       }
     }
 
