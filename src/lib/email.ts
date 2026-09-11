@@ -1257,4 +1257,168 @@ export async function sendOrderRefundEmail(
   }
 }
 
+/**
+ * Send Order Preparing Email to Customer (Kitchen accepted & cooking)
+ */
+export async function sendOrderPreparingEmail(order: TOrderEmailPayload): Promise<boolean> {
+  try {
+    const rawEmail = order.userEmail || (order as any).customerEmail || (order as any).email;
+    if (!rawEmail) return false;
+
+    const normalizedEmail = rawEmail.trim().toLowerCase();
+    const rName =
+      [...new Set((order.items || []).map((i: any) => i.restaurantName).filter(Boolean))].join(", ") ||
+      "FoodFlow Kitchen";
+
+    const emailHtml = `
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Order Preparing - Food Flow</title>
+</head>
+<body style="margin: 0; padding: 0; background-color: #F8FAFC; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
+  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background-color: #F8FAFC; padding: 40px 16px;">
+    <tr>
+      <td align="center">
+        <table role="presentation" width="100%" style="max-width: 600px; background-color: #FFFFFF; border-radius: 16px; overflow: hidden; box-shadow: 0 4px 20px rgba(0,0,0,0.05); border: 1px solid #E2E8F0;">
+          <tr>
+            <td style="background: linear-gradient(135deg, #F97316 0%, #EA580C 100%); padding: 32px 24px; text-align: center;">
+              <h1 style="margin: 0 0 8px 0; color: #FFFFFF; font-size: 24px; font-weight: 800;">
+                🍳 Kitchen is Preparing Your Meal!
+              </h1>
+              <p style="margin: 0; color: #FFEDD5; font-size: 14px; font-weight: 600;">
+                Order #${order.orderId} • ${rName}
+              </p>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding: 32px 24px;">
+              <p style="margin: 0 0 16px 0; font-size: 15px; color: #334155; line-height: 1.6;">
+                Hello <strong>${order.userName || order.deliveryAddress?.fullName || "Valued Customer"}</strong>,
+              </p>
+              <p style="margin: 0 0 20px 0; font-size: 14px; color: #64748B; line-height: 1.6;">
+                Great news! <strong>${rName}</strong> has accepted your order and the chef is actively cooking your fresh, delicious food.
+              </p>
+              <div style="background-color: #FFF7ED; border: 1px solid #FED7AA; border-radius: 12px; padding: 18px; margin-bottom: 24px;">
+                <p style="margin: 0 0 8px 0; font-size: 13px; font-weight: 800; color: #C2410C;">
+                  Current Status: Preparing in Kitchen 👨‍🍳
+                </p>
+                <p style="margin: 0; font-size: 13px; color: #9A3412;">
+                  Total Items: ${(order.items || []).reduce((s: number, i: any) => s + (i.quantity || 1), 0)} • Total: ৳${(order.totalAmount || 0).toFixed(2)}
+                </p>
+              </div>
+              <p style="margin: 0; font-size: 13px; color: #64748B; line-height: 1.5;">
+                You can track live kitchen progress anytime from your FoodFlow customer dashboard.
+              </p>
+            </td>
+          </tr>
+          <tr>
+            <td style="background-color: #F8FAFC; border-top: 1px solid #F1F5F9; padding: 20px 24px; text-align: center;">
+              <p style="margin: 0; font-size: 12px; color: #94A3B8;">
+                Food Flow &bull; support.foodflow@gmail.com
+              </p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>
+    `;
+
+    return await sendEmail({
+      to: normalizedEmail,
+      subject: `🍳 Kitchen is Preparing Your Food (Order #${order.orderId}) — Food Flow`,
+      html: emailHtml,
+      text: `Your order #${order.orderId} from ${rName} is now being prepared in the kitchen.`,
+    });
+  } catch (err) {
+    console.error("⚠️ Error sending order preparing email:", err);
+    return false;
+  }
+}
+
+/**
+ * Send Order Ready Email to Customer (Food prepared, waiting for rider pickup)
+ */
+export async function sendOrderReadyEmail(order: TOrderEmailPayload): Promise<boolean> {
+  try {
+    const rawEmail = order.userEmail || (order as any).customerEmail || (order as any).email;
+    if (!rawEmail) return false;
+
+    const normalizedEmail = rawEmail.trim().toLowerCase();
+    const rName =
+      [...new Set((order.items || []).map((i: any) => i.restaurantName).filter(Boolean))].join(", ") ||
+      "FoodFlow Kitchen";
+
+    const emailHtml = `
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Food Ready for Pickup - Food Flow</title>
+</head>
+<body style="margin: 0; padding: 0; background-color: #F8FAFC; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
+  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background-color: #F8FAFC; padding: 40px 16px;">
+    <tr>
+      <td align="center">
+        <table role="presentation" width="100%" style="max-width: 600px; background-color: #FFFFFF; border-radius: 16px; overflow: hidden; box-shadow: 0 4px 20px rgba(0,0,0,0.05); border: 1px solid #E2E8F0;">
+          <tr>
+            <td style="background: linear-gradient(135deg, #0284C7 0%, #0369A1 100%); padding: 32px 24px; text-align: center;">
+              <h1 style="margin: 0 0 8px 0; color: #FFFFFF; font-size: 24px; font-weight: 800;">
+                📦 Your Food is Ready for Pickup!
+              </h1>
+              <p style="margin: 0; color: #E0F2FE; font-size: 14px; font-weight: 600;">
+                Order #${order.orderId} • ${rName}
+              </p>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding: 32px 24px;">
+              <p style="margin: 0 0 16px 0; font-size: 15px; color: #334155; line-height: 1.6;">
+                Hello <strong>${order.userName || order.deliveryAddress?.fullName || "Valued Customer"}</strong>,
+              </p>
+              <p style="margin: 0 0 20px 0; font-size: 14px; color: #64748B; line-height: 1.6;">
+                Your food package is freshly packed and ready! Nearby delivery riders have been notified to pick it up and head to your address.
+              </p>
+              <div style="background-color: #F0F9FF; border: 1px solid #BAE6FD; border-radius: 12px; padding: 18px; margin-bottom: 24px;">
+                <p style="margin: 0 0 8px 0; font-size: 13px; font-weight: 800; color: #0369A1;">
+                  Current Status: Ready for Rider Pickup 🚴
+                </p>
+                <p style="margin: 0; font-size: 13px; color: #075985;">
+                  Delivery Address: ${order.deliveryAddress?.streetAddress || "Your Address"}, ${order.deliveryAddress?.area || ""}
+                </p>
+              </div>
+            </td>
+          </tr>
+          <tr>
+            <td style="background-color: #F8FAFC; border-top: 1px solid #F1F5F9; padding: 20px 24px; text-align: center;">
+              <p style="margin: 0; font-size: 12px; color: #94A3B8;">
+                Food Flow &bull; support.foodflow@gmail.com
+              </p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>
+    `;
+
+    return await sendEmail({
+      to: normalizedEmail,
+      subject: `📦 Your Food is Ready for Pickup (Order #${order.orderId}) — Food Flow`,
+      html: emailHtml,
+      text: `Your food for order #${order.orderId} is freshly packed and ready for delivery pickup.`,
+    });
+  } catch (err) {
+    console.error("⚠️ Error sending order ready email:", err);
+    return false;
+  }
+}
+
+
 

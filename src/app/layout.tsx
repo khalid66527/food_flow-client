@@ -12,6 +12,7 @@ import AIChatbot from "@/components/ai/AIChatbot";
 import CartSidebar from "@/components/cart/CartSidebar";
 import { CartProvider } from "@/contexts/CartContext";
 import LocationGuard from "@/components/common/LocationGuard";
+import ToastProvider from "@/components/common/ToastProvider";
 
 const inter = Inter({
   variable: "--font-inter",
@@ -58,6 +59,7 @@ export default function RootLayout({
             <Footer></Footer>
             <CartSidebar />
             <AIChatbot />
+            <ToastProvider />
           </CartProvider>
         </LocationGuard>
       </body>

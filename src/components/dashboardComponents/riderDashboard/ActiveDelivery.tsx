@@ -36,7 +36,11 @@ import {
   X,
   Banknote,
   Sparkles,
+  Copy,
+  Check,
+  ExternalLink,
 } from "lucide-react";
+import { toast } from "react-toastify";
 import { useSession } from "@/lib/auth-client";
 import { getOrderByIdApi, getRiderOrdersApi, updateOrderStatusApi, sendDeliveryOtpApi } from "@/lib/api/order";
 import { getOrderSocket, joinOrderRoom, disconnectOrderSocket } from "@/lib/socket";
@@ -130,6 +134,7 @@ export default function ActiveDelivery() {
   const [actionLoadingId, setActionLoadingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [connected, setConnected] = useState<boolean>(false);
+  const [copiedPhone, setCopiedPhone] = useState<boolean>(false);
 
   // Live location sharing state for rider
   const [sharing, setSharing] = useState<boolean>(false);
@@ -425,18 +430,32 @@ export default function ActiveDelivery() {
           setIsOtpModalOpen(false);
           setOtpInput("");
           setOtpError(null);
+
+          toast.success("🎉 OTP Verified! Delivery completed.", {
+            position: "top-center",
+            toastId: `otp-success-${oId}`,
+          });
+        } else {
+          toast.success(`✅ Status updated to ${newStatus}`, {
+            position: "top-center",
+          });
         }
       } else {
         if (newStatus === "Delivered") {
-          setOtpError(res.message || "Invalid OTP code. Please ask customer for correct code.");
+          const errMsg = res.message || "Invalid OTP code. Please ask customer for correct code.";
+          setOtpError(errMsg);
+          toast.error(errMsg, { position: "top-center" });
         } else {
-          alert(res.message || "Failed to update delivery status.");
+          toast.error(res.message || "Failed to update delivery status.", { position: "top-center" });
         }
       }
     } catch (err: any) {
       console.error("Failed to update status:", err);
       if (newStatus === "Delivered") {
         setOtpError(err.message || "Failed to verify OTP.");
+        toast.error(err.message || "Failed to verify OTP.", { position: "top-center" });
+      } else {
+        toast.error("Failed to update status.", { position: "top-center" });
       }
     } finally {
       setActionLoadingId(null);
@@ -796,7 +815,156 @@ export default function ActiveDelivery() {
             <OrderStatusStepper currentStatus={currentStatus} />
           </div>
 
-          {/* 3. Live Map Route & Rider Location */}
+          {/* 🌟 3. Accepted Delivery Card: Title, Customer Name, Number & Address */}
+          <div className="bg-white rounded-3xl border border-gray-100 shadow-sm p-5 sm:p-7 space-y-6">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-gray-100 pb-5">
+              <div className="flex items-center gap-3.5">
+                <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-orange-500 to-amber-500 text-white flex items-center justify-center font-black text-lg shrink-0 shadow-md shadow-orange-500/20">
+                  <Store className="w-6 h-6" />
+                </div>
+                <div>
+                  <div className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-orange-50 text-orange-700 text-[10px] font-extrabold uppercase tracking-wider mb-0.5">
+                    <Package className="w-3 h-3" /> Order & Restaurant Title
+                  </div>
+                  <h3 className="text-base sm:text-xl font-black text-gray-900 leading-tight">
+                    {restaurantNames.join(", ") || "FoodFlow Restaurant"}
+                  </h3>
+                  <p className="text-xs text-gray-500 font-medium mt-0.5">
+                    Order #{displayOrderId.slice(-6).toUpperCase()} • {totalItems} item{totalItems === 1 ? "" : "s"}
+                  </p>
+                </div>
+              </div>
+
+              {/* Payment Method Badge */}
+              <div className="flex items-center gap-2">
+                <span
+                  className={`inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-black border ${
+                    order?.paymentMethod === "COD" && currentStatus !== "Delivered"
+                      ? "bg-amber-50 text-amber-800 border-amber-300 shadow-2xs"
+                      : "bg-emerald-50 text-emerald-800 border-emerald-300 shadow-2xs"
+                  }`}
+                >
+                  <Banknote className="w-4 h-4" />
+                  {order?.paymentMethod === "COD" && currentStatus !== "Delivered"
+                    ? `Collect Cash: Tk ${(order?.totalAmount || 0).toFixed(2)}`
+                    : "Paid Online (No Cash Collection)"}
+                </span>
+              </div>
+            </div>
+
+            {/* 3 Core Fields: Customer Name, Phone Number, Full Delivery Address */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-6">
+              {/* Field 1: Customer Name */}
+              <div className="p-4 rounded-2xl bg-orange-50/60 border border-orange-100 flex items-start gap-3">
+                <div className="w-9 h-9 rounded-xl bg-orange-500 text-white flex items-center justify-center font-black text-sm shrink-0 shadow-xs">
+                  <User className="w-4 h-4" />
+                </div>
+                <div className="min-w-0">
+                  <span className="text-[10px] font-extrabold uppercase tracking-wider text-orange-700 block">
+                    Customer Name
+                  </span>
+                  <p className="text-sm sm:text-base font-black text-gray-900 leading-snug mt-0.5 truncate">
+                    {order?.deliveryAddress?.fullName || order?.userName || "Valued Customer"}
+                  </p>
+                </div>
+              </div>
+
+              {/* Field 2: Customer Phone Number */}
+              <div className="p-4 rounded-2xl bg-emerald-50/60 border border-emerald-100 flex items-start gap-3">
+                <div className="w-9 h-9 rounded-xl bg-emerald-600 text-white flex items-center justify-center font-black text-sm shrink-0 shadow-xs">
+                  <Phone className="w-4 h-4" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <span className="text-[10px] font-extrabold uppercase tracking-wider text-emerald-700 block">
+                    Phone Number
+                  </span>
+                  {order?.deliveryAddress?.phoneNumber ? (
+                    <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+                      <a
+                        href={`tel:${order.deliveryAddress.phoneNumber}`}
+                        className="text-sm sm:text-base font-black text-emerald-700 hover:text-emerald-800 hover:underline"
+                      >
+                        {order.deliveryAddress.phoneNumber}
+                      </a>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (order?.deliveryAddress?.phoneNumber) {
+                            navigator.clipboard.writeText(order.deliveryAddress.phoneNumber);
+                            setCopiedPhone(true);
+                            setTimeout(() => setCopiedPhone(false), 2500);
+                          }
+                        }}
+                        className="p-1 rounded-lg bg-emerald-100 hover:bg-emerald-200 text-emerald-800 transition cursor-pointer"
+                        title="Copy Phone Number"
+                      >
+                        {copiedPhone ? <Check className="w-3.5 h-3.5 text-emerald-700" /> : <Copy className="w-3.5 h-3.5" />}
+                      </button>
+                    </div>
+                  ) : (
+                    <p className="text-xs font-bold text-gray-400 mt-0.5">Not provided</p>
+                  )}
+                </div>
+              </div>
+
+              {/* Field 3: Delivery Address */}
+              <div className="p-4 rounded-2xl bg-blue-50/60 border border-blue-100 flex items-start gap-3 md:col-span-1">
+                <div className="w-9 h-9 rounded-xl bg-blue-600 text-white flex items-center justify-center font-black text-sm shrink-0 shadow-xs">
+                  <MapPin className="w-4 h-4" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center justify-between gap-1">
+                    <span className="text-[10px] font-extrabold uppercase tracking-wider text-blue-700 block">
+                      Delivery Address
+                    </span>
+                    <a
+                      href={
+                        deliveryLat && deliveryLng
+                          ? `https://www.google.com/maps/dir/?api=1&destination=${deliveryLat},${deliveryLng}`
+                          : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
+                              [
+                                order?.deliveryAddress?.streetAddress,
+                                order?.deliveryAddress?.building,
+                                order?.deliveryAddress?.area,
+                                (order?.deliveryAddress as any)?.city,
+                                order?.deliveryAddress?.postalCode,
+                              ]
+                                .filter(Boolean)
+                                .join(", ") || "Delivery Destination"
+                            )}`
+                      }
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-[10px] font-extrabold text-blue-600 hover:text-blue-800 flex items-center gap-0.5 hover:underline"
+                    >
+                      Maps <ExternalLink className="w-2.5 h-2.5" />
+                    </a>
+                  </div>
+                  <p className="text-xs sm:text-sm font-bold text-gray-800 leading-snug mt-0.5">
+                    {[
+                      order?.deliveryAddress?.streetAddress,
+                      order?.deliveryAddress?.building,
+                      order?.deliveryAddress?.area,
+                      (order?.deliveryAddress as any)?.city,
+                      order?.deliveryAddress?.postalCode,
+                    ]
+                      .filter(Boolean)
+                      .join(", ") || "Address on file"}
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Delivery Note if present */}
+            {order?.deliveryAddress?.deliveryInstructions && (
+              <div className="bg-amber-50/80 border border-amber-200/80 rounded-2xl p-3.5 text-xs text-amber-900 font-medium leading-relaxed">
+                <span className="font-extrabold text-amber-950 block mb-0.5">📌 Delivery Note / Instructions:</span>
+                {order.deliveryAddress.deliveryInstructions}
+              </div>
+            )}
+          </div>
+
+          {/* 4. Live Map Route & Rider Location */}
           <div className="bg-white rounded-3xl border border-gray-100 shadow-sm overflow-hidden">
             <div className="p-5 sm:p-6 pb-4 flex flex-wrap items-center justify-between gap-3 border-b border-gray-100">
               <div className="flex items-center gap-3">
@@ -839,99 +1007,6 @@ export default function ActiveDelivery() {
                   </div>
                 )}
               </div>
-            </div>
-          </div>
-
-          {/* 4. Details Grid: Customer Destination, Pickup, and Payment */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-            {/* Delivery Destination (Customer) */}
-            <div className="bg-white rounded-3xl border border-gray-100 shadow-sm p-5 sm:p-6 space-y-4">
-              <h3 className="text-sm font-black text-gray-900 flex items-center gap-2">
-                <MapPin className="w-4 h-4 text-[#FF6B35]" /> Delivery Destination
-              </h3>
-              <div className="space-y-1">
-                <p className="text-xs sm:text-sm font-bold text-gray-800">
-                  {order?.deliveryAddress?.fullName || order?.userName || "Customer Address"}
-                </p>
-                <p className="text-xs font-medium text-gray-500 leading-relaxed">
-                  {[order?.deliveryAddress?.streetAddress, order?.deliveryAddress?.building, city]
-                    .filter(Boolean)
-                    .join(", ")}
-                </p>
-                {order?.deliveryAddress?.phoneNumber && (
-                  <a
-                    href={`tel:${order.deliveryAddress.phoneNumber}`}
-                    className="inline-flex items-center gap-1.5 text-xs font-bold text-[#FF6B35] hover:underline pt-1"
-                  >
-                    <Phone className="w-3.5 h-3.5" />
-                    {order.deliveryAddress.phoneNumber}
-                  </a>
-                )}
-              </div>
-
-              {order?.deliveryAddress?.deliveryInstructions && (
-                <div className="bg-amber-50 border border-amber-100 rounded-2xl p-3 text-xs text-amber-800 font-semibold">
-                  📌 {order.deliveryAddress.deliveryInstructions}
-                </div>
-              )}
-            </div>
-
-            {/* Pickup / Restaurant Info */}
-            <div className="bg-white rounded-3xl border border-gray-100 shadow-sm p-5 sm:p-6 space-y-4">
-              <h3 className="text-sm font-black text-gray-900 flex items-center gap-2">
-                <Store className="w-4 h-4 text-[#FF6B35]" /> Pickup Details
-              </h3>
-              <div className="space-y-2">
-                <p className="text-xs sm:text-sm font-black text-gray-900">
-                  {restaurantNames.join(", ") || "FoodFlow Kitchen"}
-                </p>
-                <div className="space-y-1">
-                  <span className="text-[11px] font-bold text-gray-400 uppercase tracking-wider block">Items to deliver:</span>
-                  <div className="space-y-1 max-h-24 overflow-y-auto pr-1">
-                    {(order?.items || []).map((item, idx) => (
-                      <div key={idx} className="flex items-center justify-between text-xs text-gray-700 font-medium">
-                        <span>{item.name} × {item.quantity}</span>
-                        <span className="font-bold text-gray-900">Tk {(item.price * item.quantity).toFixed(2)}</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Cash on Delivery (COD) Notice */}
-            {order?.paymentMethod === "COD" && currentStatus !== "Delivered" && (
-              <div className="md:col-span-2 bg-amber-50 border border-amber-200 rounded-3xl p-5 flex items-center justify-between gap-4 flex-wrap">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-2xl bg-amber-500/20 text-amber-800 flex items-center justify-center font-black">
-                    <Banknote className="w-5 h-5" />
-                  </div>
-                  <div>
-                    <h5 className="text-xs font-black text-amber-900">Cash on Delivery (COD)</h5>
-                    <p className="text-[11px] text-amber-700 font-medium">
-                      Collect cash payment from the customer before completing delivery.
-                    </p>
-                  </div>
-                </div>
-                <div className="text-right ml-auto">
-                  <span className="text-[10px] text-amber-700 font-bold uppercase tracking-wider block">Total To Collect</span>
-                  <span className="text-base font-black text-amber-950">Tk {(order?.totalAmount || 0).toFixed(2)}</span>
-                </div>
-              </div>
-            )}
-
-            {/* Bottom Summary Footer */}
-            <div className="md:col-span-2 bg-gray-50/70 border border-gray-100 rounded-3xl p-5 sm:p-6 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-              <div className="flex items-center gap-2 text-xs font-bold text-gray-500">
-                <Wallet className="w-4 h-4 text-gray-400" />
-                {order?.paymentMethod === "STRIPE" ? "Paid by Card" : "Cash on Delivery"}
-                <span>•</span>
-                <span>Tk {(order?.totalAmount || 0).toFixed(2)}</span>
-              </div>
-              <span className="inline-flex items-center gap-1.5 text-[11px] font-bold text-gray-400">
-                <Store className="w-3.5 h-3.5" />
-                {restaurantNames.join(", ") || "FoodFlow Kitchen"}
-              </span>
             </div>
           </div>
         </>

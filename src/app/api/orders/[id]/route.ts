@@ -9,6 +9,8 @@ import {
   sendOrderRefundEmail,
   sendDeliveryOtpEmail,
   sendDeliverySuccessEmail,
+  sendOrderPreparingEmail,
+  sendOrderReadyEmail,
 } from "@/lib/email";
 
 
@@ -439,6 +441,20 @@ export async function PATCH(
         body.reason || "Order cancelled by kitchen or restaurant administrator"
       ).catch((e) =>
         console.warn("Background order cancellation email trigger error:", e)
+      );
+    }
+
+    // 📧 Trigger Order Preparing Email (Kitchen started cooking)
+    if (orderStatus === "Preparing" && order.orderStatus !== "Preparing" && updatedOrder) {
+      sendOrderPreparingEmail(updatedOrder as any).catch((e) =>
+        console.warn("Background order preparing email trigger error:", e)
+      );
+    }
+
+    // 📧 Trigger Order Ready Email (Food packed, waiting for rider)
+    if (orderStatus === "Ready" && order.orderStatus !== "Ready" && updatedOrder) {
+      sendOrderReadyEmail(updatedOrder as any).catch((e) =>
+        console.warn("Background order ready email trigger error:", e)
       );
     }
 
