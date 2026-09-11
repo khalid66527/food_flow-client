@@ -30,7 +30,7 @@ import type {
   FormFieldName,
   RoleRedirectMap,
 } from "@/types/auth";
-import { signUp, signIn } from "@/lib/auth-client";
+import { signUp, signIn, signOut } from "@/lib/auth-client";
 
 // ---------------------------------------------------------------------------
 // Role configuration displayed in the public registration UI.
@@ -289,12 +289,12 @@ export default function RegisterPage() {
     }
   }, [shakeSubmit]);
 
-  // Auto-redirect countdown after successful registration
+  // Auto-redirect countdown after successful registration -> redirect to Login for OTP verification
   useEffect(() => {
     if (!isSuccess || !form.role) return;
 
     if (redirectCountdown <= 0) {
-      const destination = ROLE_REDIRECT_MAP[form.role as PublicRole] || "/dashboard/customer";
+      const destination = `/auth/login?registered=true&email=${encodeURIComponent(form.email)}`;
       router.push(destination);
       return;
     }
@@ -304,7 +304,7 @@ export default function RegisterPage() {
       1000
     );
     return () => clearTimeout(timer);
-  }, [isSuccess, redirectCountdown, form.role, router]);
+  }, [isSuccess, redirectCountdown, form.role, form.email, router]);
 
   const handleChange = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -416,8 +416,12 @@ export default function RegisterPage() {
         if (error) {
           setServerError(error.message || "Registration failed. Please try again.");
         } else if (data) {
-          setIsSuccess(true);
-          setRedirectCountdown(REDIRECT_COUNTDOWN_SECONDS);
+          try {
+            await signOut();
+          } catch {
+            // ignore
+          }
+          router.push(`/auth/login?registered=true&email=${encodeURIComponent(form.email)}`);
         } else {
           setServerError("Could not complete registration.");
         }
@@ -461,10 +465,10 @@ export default function RegisterPage() {
           {/* Headline */}
           <div className="space-y-2">
             <h1 className="text-2xl sm:text-3xl font-extrabold text-gray-900 tracking-tight">
-              Welcome to Food Flow!
+              Account Created!
             </h1>
             <p className="text-sm text-gray-500 leading-relaxed">
-              Your account has been created successfully.
+              Please sign in with your email to verify with OTP and activate your account.
             </p>
           </div>
 
@@ -495,9 +499,9 @@ export default function RegisterPage() {
           {/* Redirect countdown */}
           <div className="space-y-3">
             <p className="text-xs text-gray-400">
-              Redirecting to your{" "}
+              Redirecting to{" "}
               <span className="font-semibold text-gray-700">
-                {role.toLowerCase()} dashboard
+                Sign In & OTP Verification
               </span>{" "}
               in{" "}
               <span className="font-bold text-orange-500 tabular-nums">
@@ -524,17 +528,11 @@ export default function RegisterPage() {
           {/* Actions */}
           <div className="flex flex-col sm:flex-row items-center justify-center gap-3 pt-2">
             <Link
-              href={dashboardRoute}
-              className="w-full sm:w-auto flex-1 inline-flex items-center justify-center gap-2 px-6 py-3 rounded-full bg-orange-500 text-white font-semibold text-sm shadow-lg shadow-orange-500/25 hover:bg-orange-600 hover:shadow-xl hover:shadow-orange-500/30 active:scale-95 transition-all duration-200"
+              href={`/auth/login?registered=true&email=${encodeURIComponent(form.email)}`}
+              className="w-full inline-flex items-center justify-center gap-2 px-6 py-3.5 rounded-full bg-orange-500 text-white font-semibold text-sm shadow-lg shadow-orange-500/25 hover:bg-orange-600 hover:shadow-xl hover:shadow-orange-500/30 active:scale-95 transition-all duration-200"
             >
-              Go to Dashboard
+              Proceed to Sign In & Verify
               <ArrowRight className="h-4 w-4" />
-            </Link>
-            <Link
-              href="/auth/login"
-              className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-6 py-3 rounded-full border border-gray-200 text-gray-700 font-semibold text-sm hover:bg-gray-50 active:scale-95 transition-all duration-200"
-            >
-              Sign In Instead
             </Link>
           </div>
         </div>
