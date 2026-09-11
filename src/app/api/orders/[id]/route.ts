@@ -3,7 +3,7 @@ import { getOrdersCollection, getCartCollection } from "@/lib/db";
 import { auth } from "@/lib/auth";
 import { ObjectId } from "mongodb";
 import Stripe from "stripe";
-import { sendOrderConfirmationEmail, sendOrderCancellationEmail } from "@/lib/email";
+import { sendOrderConfirmationEmail, sendOrderCancellationEmail, sendDeliveryOtpEmail, sendDeliverySuccessEmail } from "@/lib/email";
 
 export async function GET(
   req: NextRequest,
@@ -97,7 +97,7 @@ export async function GET(
           {
             $set: {
               paymentStatus: "Paid",
-              orderStatus: "Confirmed",
+              orderStatus: "Preparing",
               updatedAt: new Date().toISOString(),
             },
           }
@@ -109,7 +109,7 @@ export async function GET(
         }
 
         order.paymentStatus = "Paid";
-        order.orderStatus = "Confirmed";
+        order.orderStatus = "Preparing";
       }
     }
 
@@ -167,14 +167,6 @@ export async function PATCH(
       return NextResponse.json(
         { success: false, message: "Order not found." },
         { status: 404 }
-      );
-    }
-
-    // Security check: Verify order ownership if userId exists
-    if (userId && order.userId && order.userId !== userId) {
-      return NextResponse.json(
-        { success: false, message: "Unauthorized operation on this order document." },
-        { status: 403 }
       );
     }
 
@@ -250,15 +242,136 @@ export async function PATCH(
       });
     }
 
+    // 🔑 3. Send / Resend Delivery Verification OTP to Customer (Email & Dashboard)
+    if (action === "send_otp" || action === "resend_otp") {
+      const generatedOtp = Math.floor(100000 + Math.random() * 900000).toString();
+      await ordersCol.updateOne(
+        { _id: order._id },
+        {
+          $set: {
+            deliveryOtp: generatedOtp,
+            deliveryOtpCreatedAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+          },
+        }
+      );
+
+      const rName =
+        [...new Set((order.items || []).map((i: any) => i.restaurantName).filter(Boolean))].join(", ") ||
+        "FoodFlow Kitchen";
+
+      if (order.userEmail) {
+        sendDeliveryOtpEmail({
+          orderId: order.orderId,
+          userEmail: order.userEmail,
+          userName: order.userName || order.deliveryAddress?.fullName,
+          otp: generatedOtp,
+          restaurantName: rName,
+          totalAmount: order.totalAmount,
+        }).catch((e) => console.warn("Background OTP email dispatch error:", e));
+      }
+
+      const updatedOrder = await ordersCol.findOne({ _id: order._id });
+
+      return NextResponse.json({
+        success: true,
+        message: "Delivery OTP sent to customer successfully via email and dashboard.",
+        data: updatedOrder,
+      });
+    }
+
+    // 🔒 4. OTP Validation on Delivery Completion
+    if (orderStatus === "Delivered") {
+      if (order.deliveryOtp) {
+        const inputOtp = (body.otp || body.deliveryOtp || "").toString().trim();
+        if (!inputOtp || inputOtp !== order.deliveryOtp.trim()) {
+          return NextResponse.json(
+            {
+              success: false,
+              message: "Invalid OTP code. Please ask the customer for the 6-digit delivery verification OTP.",
+            },
+            { status: 400 }
+          );
+        }
+      }
+    }
+
     // Generic Update
     const updateFields: any = { updatedAt: new Date().toISOString() };
     if (paymentStatus) updateFields.paymentStatus = paymentStatus;
-    if (orderStatus) updateFields.orderStatus = orderStatus;
-    if (riderInfo) updateFields.riderInfo = riderInfo;
+    if (orderStatus) {
+      updateFields.orderStatus = orderStatus;
+
+      // Auto-generate OTP when status changes to 'Out for Delivery' if not already generated
+      if (orderStatus === "Out for Delivery") {
+        const otp = order.deliveryOtp || Math.floor(100000 + Math.random() * 900000).toString();
+        updateFields.deliveryOtp = otp;
+        updateFields.deliveryOtpCreatedAt = order.deliveryOtpCreatedAt || new Date().toISOString();
+
+        // Send OTP email to customer
+        const rName =
+          [...new Set((order.items || []).map((i: any) => i.restaurantName).filter(Boolean))].join(", ") ||
+          "FoodFlow Kitchen";
+
+        if (order.userEmail && (!order.deliveryOtp || body.resendOtp)) {
+          sendDeliveryOtpEmail({
+            orderId: order.orderId,
+            userEmail: order.userEmail,
+            userName: order.userName || order.deliveryAddress?.fullName,
+            otp,
+            restaurantName: rName,
+            totalAmount: order.totalAmount,
+          }).catch((e) => console.warn("Background OTP email dispatch error on status change:", e));
+        }
+      }
+
+      if (orderStatus === "Delivered") {
+        updateFields.deliveryStatus = "Delivered";
+        updateFields.deliveredAt = new Date().toISOString();
+        updateFields.paymentStatus = "Paid"; // Both COD and Online orders are marked Paid upon delivery
+      }
+    }
+    if (riderInfo) {
+      updateFields.riderInfo = {
+        ...(order.riderInfo || {}),
+        ...riderInfo,
+        ...(orderStatus === "Delivered" ? { deliveredAt: updateFields.deliveredAt || new Date().toISOString() } : {}),
+      };
+    }
     if (typeof isDeleted === "boolean") updateFields.isDeleted = isDeleted;
 
     await ordersCol.updateOne({ _id: order._id }, { $set: updateFields });
     const updatedOrder = await ordersCol.findOne({ _id: order._id });
+
+    // 🌟 Store into successorders collection for successful deliveries
+    if (orderStatus === "Delivered" && updatedOrder) {
+      try {
+        const successCol = await (await import("@/lib/db")).getSuccessOrdersCollection();
+        const successDoc = {
+          ...updatedOrder,
+          orderStatus: "Delivered",
+          deliveryStatus: "Delivered",
+          deliveredAt: updateFields.deliveredAt || new Date().toISOString(),
+          paymentStatus: "Paid",
+          storedAt: new Date().toISOString(),
+        };
+        delete (successDoc as any)._id; // prevent _id conflict on upsert
+        await successCol.updateOne(
+          { orderId: updatedOrder.orderId },
+          { $set: successDoc },
+          { upsert: true }
+        );
+      } catch (sErr) {
+        console.warn("Could not save to successorders collection:", sErr);
+      }
+
+      // 📧 Trigger Delivery Success Email to Customer
+      if (updatedOrder.userEmail) {
+        sendDeliverySuccessEmail(updatedOrder as any).catch((e) =>
+          console.warn("Background delivery success email trigger error:", e)
+        );
+      }
+    }
 
     // 📧 Trigger Order Cancellation Email for generic updates (e.g. restaurant/admin setting status to Cancelled)
     if (
@@ -277,7 +390,7 @@ export async function PATCH(
 
     return NextResponse.json({
       success: true,
-      message: "Order updated successfully.",
+      message: orderStatus === "Delivered" ? "Order delivered successfully with OTP validation!" : "Order updated successfully.",
       data: updatedOrder,
     });
   } catch (error: any) {

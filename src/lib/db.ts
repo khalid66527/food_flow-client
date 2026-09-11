@@ -39,7 +39,22 @@ export async function getOrdersCollection() {
   return database.collection("orders");
 }
 
+export async function getSuccessOrdersCollection() {
+  const database = await getDb();
+  return database.collection("successorders");
+}
+
 export async function getCartCollection() {
   const database = await getDb();
   return database.collection("cart");
+}
+
+export async function getSettingsCollection() {
+  const database = await getDb();
+  return database.collection("platform_settings");
+}
+
+export async function getCouponsCollection() {
+  const database = await getDb();
+  return database.collection("coupons");
 }

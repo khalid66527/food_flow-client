@@ -29,11 +29,14 @@ import {
   XCircle,
   AlertTriangle,
   Layers,
+  Phone,
+  Receipt,
 } from "lucide-react";
 import { useSession } from "@/lib/auth-client";
 import LoadingSpinner from "@/lib/api/LoadingSpinner";
 import { TOrder, TOrderItem } from "@/types/order";
 import { downloadInvoicePdf } from "@/lib/pdf/generateInvoice";
+import OrderInvoiceModal from "@/components/common/OrderInvoiceModal";
 
 export default function CustomerOrders() {
   const router = useRouter();
@@ -46,6 +49,7 @@ export default function CustomerOrders() {
   const [orders, setOrders] = useState<TOrder[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
+  const [selectedInvoiceOrder, setSelectedInvoiceOrder] = useState<TOrder | null>(null);
 
   // Action Loading States & Confirmation Modals
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
@@ -88,7 +92,14 @@ export default function CustomerOrders() {
 
       const json = await res.json();
       if (json.success && Array.isArray(json.data)) {
-        setOrders(json.data);
+        // Exclude delivered and cancelled orders — they belong to Delivery History
+        const activeList = (json.data as TOrder[]).filter(
+          (o) =>
+            !["delivered", "completed", "cancelled", "canceled", "rejected", "failed"].includes(
+              (o.orderStatus || "").toLowerCase()
+            )
+        );
+        setOrders(activeList);
       } else {
         setOrders([]);
         if (json.message) setError(json.message);
@@ -208,17 +219,13 @@ export default function CustomerOrders() {
           currentStatus === "ACCEPTED" ||
           currentStatus === "COOKING" ||
           currentStatus === "PROCESSING" ||
+          currentStatus === "READY";
+      } else if (statusFilter === "OUT FOR DELIVERY") {
+        matchesStatus =
           currentStatus === "ON-THE-WAY" ||
           currentStatus === "ON_THE_WAY" ||
           currentStatus === "OUT FOR DELIVERY" ||
           currentStatus === "OUT_FOR_DELIVERY";
-      } else if (statusFilter === "DELIVERED") {
-        matchesStatus = currentStatus === "DELIVERED" || currentStatus === "COMPLETED";
-      } else if (statusFilter === "CANCELLED") {
-        matchesStatus =
-          currentStatus === "CANCELLED" ||
-          currentStatus === "CANCELED" ||
-          currentStatus === "REJECTED";
       }
 
       return matchesSearch && matchesStatus;
@@ -422,17 +429,22 @@ export default function CustomerOrders() {
 
         {/* Filter Pills */}
         <div className="flex items-center gap-1.5 overflow-x-auto w-full sm:w-auto pb-1 sm:pb-0 scrollbar-none">
-          {["ALL", "PLACED", "CONFIRMED", "DELIVERED", "CANCELLED"].map((st) => (
+          {[
+            { key: "ALL", label: "All Active Orders" },
+            { key: "PLACED", label: "New Placed" },
+            { key: "CONFIRMED", label: "Preparing in Kitchen" },
+            { key: "OUT FOR DELIVERY", label: "Out for Delivery" },
+          ].map((tab) => (
             <button
-              key={st}
+              key={tab.key}
               type="button"
-              onClick={() => setStatusFilter(st)}
-              className={`px-3 py-1.5 rounded-xl text-xs font-extrabold transition cursor-pointer shrink-0 ${statusFilter === st
+              onClick={() => setStatusFilter(tab.key)}
+              className={`px-3 py-1.5 rounded-xl text-xs font-extrabold transition cursor-pointer shrink-0 ${statusFilter === tab.key
                   ? "bg-[#FF6B35] text-white shadow-xs"
                   : "bg-gray-100 text-gray-600 hover:bg-gray-200"
                 }`}
             >
-              {st === "ALL" ? "All Orders" : st}
+              {tab.label}
             </button>
           ))}
         </div>
@@ -459,21 +471,30 @@ export default function CustomerOrders() {
           </div>
           <div className="space-y-1">
             <h3 className="text-lg font-extrabold text-gray-900">
-              No Orders Found
+              No Active Orders in Progress
             </h3>
             <p className="text-xs text-gray-500 max-w-sm mx-auto">
               {searchQuery || statusFilter !== "ALL"
-                ? "No orders match your current search or status filter criteria."
-                : "You haven't placed any food orders yet. Explore our delicious menu today!"}
+                ? "No active orders match your search or filter criteria."
+                : "You don't have any active food orders right now. Completed and delivered orders are saved in your Delivery History."}
             </p>
           </div>
-          <Link
-            href="/restaurants"
-            className="inline-flex items-center gap-2 px-6 py-3 rounded-full bg-gradient-to-r from-[#FF6B35] to-amber-500 text-white text-xs font-extrabold shadow-md shadow-orange-500/20 hover:brightness-105 transition"
-          >
-            <span>Explore Restaurants</span>
-            <ArrowRight className="w-4 h-4" />
-          </Link>
+          <div className="flex flex-wrap items-center justify-center gap-3 pt-2">
+            <Link
+              href="/dashboard/customer/delivery-history"
+              className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 text-xs font-extrabold hover:bg-emerald-100 transition shadow-2xs"
+            >
+              <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+              <span>View Delivery History</span>
+            </Link>
+            <Link
+              href="/dishes"
+              className="inline-flex items-center gap-2 px-6 py-2.5 rounded-full bg-gradient-to-r from-[#FF6B35] to-amber-500 text-white text-xs font-extrabold shadow-md shadow-orange-500/20 hover:brightness-105 transition"
+            >
+              <span>Explore Dishes</span>
+              <ArrowRight className="w-4 h-4" />
+            </Link>
+          </div>
         </div>
       ) : (
         <div className="space-y-6">
@@ -496,16 +517,18 @@ export default function CustomerOrders() {
             const isDownloading = downloadingId === (order.orderId || order._id);
             const isActionLoading = actionLoadingId === (order.orderId || order._id);
 
-            // Universal Voucher Rule: Enabled ONLY when orderStatus is 'Delivered'
+            // Universal Voucher & Invoice Rule: Enabled ONLY when orderStatus is 'Delivered'
             const isDelivered = (order.orderStatus || "").toLowerCase() === "delivered";
-            const isVoucherEnabled = isDelivered;
             const isStripe =
               order.paymentMethod === "STRIPE" ||
-              (order.paymentMethod as string) === "STRIPE_CARD";
-            const currentStatusLower = (order.orderStatus || "Placed").toLowerCase();
+              (order.paymentMethod as string) === "STRIPE_CARD" ||
+              (order.paymentStatus || "").toLowerCase() === "paid";
+            const currentStatusLower = (order.orderStatus || "placed").toLowerCase();
             const isCancelled = currentStatusLower === "cancelled";
             const isTrackEnabled = !isCancelled;
-            const canCancel = !isStripe && currentStatusLower === "placed";
+            
+            // COD (Cash on Delivery) orders can be cancelled ONLY when order is initial 'placed' state
+            const canCancel = !isStripe && !isCancelled && !isDelivered && currentStatusLower === "placed";
 
             return (
               <div
@@ -626,16 +649,46 @@ export default function CustomerOrders() {
                     ))}
                   </div>
 
-                  {/* Financial Total Footer Bar */}
+                  {/* Financial Total & Delivery Partner Footer Bar */}
                   <div className="pt-4 border-t border-gray-100 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                    <div className="text-xs text-gray-500 space-y-0.5">
+                    <div className="text-xs text-gray-500 space-y-1">
                       <p>
                         Subtotal: <strong className="text-gray-800">Tk {(order.subtotal || order.totalAmount).toFixed(2)}</strong>
                         {order.deliveryFee ? ` | Delivery: Tk ${order.deliveryFee.toFixed(2)}` : " | Free Delivery"}
                       </p>
-                      <p className="text-[11px] text-gray-400">
-                        Delivery Address: {order.deliveryAddress?.streetAddress || "Registered Address"}
+                      <p className="text-[11px] text-gray-400 flex items-center gap-1">
+                        <MapPin className="w-3.5 h-3.5 text-[#FF6B35] shrink-0" />
+                        <span>Delivery Address: {order.deliveryAddress?.streetAddress || "Registered Address"}{order.deliveryAddress?.area ? `, ${order.deliveryAddress.area}` : ""}</span>
                       </p>
+
+                      {/* Delivery Partner (Rider) Details */}
+                      {order.riderInfo?.name ? (
+                        <div className="flex items-center gap-2 pt-1 flex-wrap">
+                          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-emerald-50 border border-emerald-100 text-emerald-800 text-[11px] font-bold">
+                            <Truck className="w-3.5 h-3.5 text-emerald-600" />
+                            <span>Rider: {order.riderInfo.name}</span>
+                            {order.riderInfo.vehicleNumber && <span>({order.riderInfo.vehicleNumber})</span>}
+                          </span>
+                          {order.riderInfo.phone && (
+                            <a
+                              href={`tel:${order.riderInfo.phone}`}
+                              className="inline-flex items-center gap-1 text-[11px] font-bold text-[#FF6B35] hover:underline"
+                            >
+                              <Phone className="w-3 h-3" />
+                              {order.riderInfo.phone}
+                            </a>
+                          )}
+                          {order.riderInfo.deliveredAt && (
+                            <span className="text-[11px] text-emerald-700 font-medium">
+                              • Delivered at {new Date(order.riderInfo.deliveredAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                            </span>
+                          )}
+                        </div>
+                      ) : isDelivered ? (
+                        <span className="text-[11px] text-emerald-700 font-semibold inline-flex items-center gap-1">
+                          <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" /> Completed Delivery
+                        </span>
+                      ) : null}
                     </div>
 
                     <div className="flex items-center justify-between sm:justify-end gap-3">
@@ -654,7 +707,7 @@ export default function CustomerOrders() {
                   </span>
 
                   <div className="flex items-center gap-2 flex-wrap w-full sm:w-auto justify-end">
-                    {/* 🔴 4. Smart Order Cancellation Button */}
+                    {/* 🔴 1. Cancel Order Button (ONLY for COD & Placed status) */}
                     {canCancel && (
                       <button
                         type="button"
@@ -668,8 +721,17 @@ export default function CustomerOrders() {
                       </button>
                     )}
 
-                    {/* Action 1: Track Order */}
-                    {isTrackEnabled ? (
+                    {/* 📍 2. Track Order / Delivery History Button */}
+                    {isDelivered ? (
+                      <Link
+                        href="/dashboard/customer/delivery-history"
+                        className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 text-xs font-black transition shadow-2xs cursor-pointer hover:scale-102 active:scale-98"
+                        title="View Delivery History Record"
+                      >
+                        <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                        <span>Delivered (View History)</span>
+                      </Link>
+                    ) : isTrackEnabled ? (
                       <Link
                         href={`/dashboard/customer/order-tracking?orderId=${order.orderId || order._id || order.id}`}
                         className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-gradient-to-r from-[#FF6B35] to-amber-500 text-white text-xs font-extrabold transition shadow-xs cursor-pointer hover:brightness-110 hover:scale-102 active:scale-98"
@@ -689,33 +751,37 @@ export default function CustomerOrders() {
                       </button>
                     )}
 
-                    {/* Action 2: Download Voucher PDF */}
-                    <button
-                      type="button"
-                      onClick={() => isVoucherEnabled && handleDownloadVoucher(order)}
-                      disabled={isDownloading || !isVoucherEnabled}
-                      className={`inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-extrabold transition shadow-xs ${isVoucherEnabled
-                          ? "bg-gradient-to-r from-gray-900 to-black text-white cursor-pointer hover:brightness-125 hover:scale-102 active:scale-98"
-                          : "bg-gray-100 text-gray-400 border border-gray-200 cursor-not-allowed opacity-60"
-                        }`}
-                      title={
-                        isVoucherEnabled
-                          ? "Download Official Invoice Voucher"
-                          : "Voucher download will unlock after successful delivery (Delivered)"
-                      }
-                    >
-                      {isDownloading ? (
-                        <Loader2 className="w-3.5 h-3.5 animate-spin text-amber-400" />
-                      ) : (
-                        <Download
-                          className={`w-3.5 h-3.5 ${isVoucherEnabled ? "text-amber-400" : "text-gray-400"
-                            }`}
-                        />
-                      )}
-                      <span>Download Voucher</span>
-                    </button>
+                    {/* 🧾 3. View Invoice & Download Voucher PDF (ONLY RENDERED WHEN STATUS IS DELIVERED) */}
+                    {isDelivered && (
+                      <>
+                        <button
+                          type="button"
+                          onClick={() => setSelectedInvoiceOrder(order)}
+                          className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-orange-50 hover:bg-orange-100 text-[#FF6B35] text-xs font-bold border border-orange-200/80 transition cursor-pointer shadow-2xs hover:scale-102 active:scale-98"
+                          title="View Official Sales Invoice"
+                        >
+                          <Receipt className="w-3.5 h-3.5 text-[#FF6B35]" />
+                          <span>View Invoice</span>
+                        </button>
 
-                    {/* 🗑️ 3. Delete / Remove Order from History Button */}
+                        <button
+                          type="button"
+                          onClick={() => handleDownloadVoucher(order)}
+                          disabled={isDownloading}
+                          className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-gradient-to-r from-gray-900 to-black text-white text-xs font-extrabold transition shadow-xs cursor-pointer hover:brightness-125 hover:scale-102 active:scale-98 disabled:opacity-50"
+                          title="Download Official Invoice Voucher"
+                        >
+                          {isDownloading ? (
+                            <Loader2 className="w-3.5 h-3.5 animate-spin text-amber-400" />
+                          ) : (
+                            <Download className="w-3.5 h-3.5 text-amber-400" />
+                          )}
+                          <span>Download Voucher</span>
+                        </button>
+                      </>
+                    )}
+
+                    {/* 🗑️ 4. Delete / Remove Order from History Button */}
                     <button
                       type="button"
                       onClick={() => setDeleteModalOrder(order)}
@@ -880,6 +946,12 @@ export default function CustomerOrders() {
           </div>
         </div>
       )}
+
+      {/* 📄 ORDER INVOICE MODAL */}
+      <OrderInvoiceModal
+        order={selectedInvoiceOrder}
+        onClose={() => setSelectedInvoiceOrder(null)}
+      />
 
     </div>
   );

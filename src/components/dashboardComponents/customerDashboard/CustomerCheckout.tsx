@@ -24,12 +24,18 @@ import {
   Sparkles,
   ChevronLeft,
   Zap,
+  Tag,
+  Percent,
+  Receipt,
+  X,
 } from "lucide-react";
 import { useSession } from "@/lib/auth-client";
 import { useCart } from "@/contexts/CartContext";
 import { TAddress } from "@/types/address";
 import { getAddresses } from "@/lib/api/address";
 import { createOrderApi } from "@/lib/api/order";
+import { getPlatformSettings } from "@/lib/api/settings";
+import { applyCouponApi } from "@/lib/api/coupon";
 import AddressQuickSwitcherModal from "./AddressQuickSwitcherModal";
 
 const DELIVERY_FEE = 40;
@@ -88,10 +94,76 @@ export default function CustomerCheckout() {
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-  // Calculate Delivery Fee & Total based on active checkout items (Buy Now vs Cart)
+  // Platform Settings State
+  const [vatPercentage, setVatPercentage] = useState<number>(5);
+  const [deliveryFeeBase, setDeliveryFeeBase] = useState<number>(40);
+  const [freeDeliveryThreshold, setFreeDeliveryThreshold] = useState<number>(500);
+
+  // Coupon Engine State
+  const [couponInput, setCouponInput] = useState<string>("");
+  const [appliedCoupon, setAppliedCoupon] = useState<{
+    code: string;
+    discountAmount: number;
+    isFirstOrderOnly?: boolean;
+  } | null>(null);
+  const [couponLoading, setCouponLoading] = useState<boolean>(false);
+  const [couponMessage, setCouponMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
+
+  // Fetch Platform Settings
+  useEffect(() => {
+    const loadSettings = async () => {
+      try {
+        const res = await getPlatformSettings();
+        if (res.success && res.data) {
+          setVatPercentage(res.data.vatPercentage);
+          setDeliveryFeeBase(res.data.deliveryFeeBase);
+          setFreeDeliveryThreshold(res.data.freeDeliveryThreshold);
+        }
+      } catch (err) {
+        console.warn("Failed to load platform settings:", err);
+      }
+    };
+    loadSettings();
+  }, []);
+
+  // Calculate Delivery Fee, VAT & Grand Total based on active settings & coupon
+  const vatAmount = Math.round(activeSubtotal * (vatPercentage / 100) * 100) / 100;
   const deliveryFee =
-    activeSubtotal === 0 || activeSubtotal >= FREE_DELIVERY_THRESHOLD ? 0 : DELIVERY_FEE;
-  const grandTotal = activeSubtotal + deliveryFee;
+    activeSubtotal === 0 || activeSubtotal >= freeDeliveryThreshold ? 0 : deliveryFeeBase;
+  const couponDiscount = appliedCoupon ? appliedCoupon.discountAmount : 0;
+  const grandTotal = Math.max(0, activeSubtotal + vatAmount + deliveryFee - couponDiscount);
+
+  // Handle Apply Coupon
+  const handleApplyCoupon = async () => {
+    if (!couponInput.trim()) {
+      setCouponMessage({ type: "error", text: "Please enter a coupon code." });
+      return;
+    }
+
+    setCouponLoading(true);
+    setCouponMessage(null);
+
+    const res = await applyCouponApi(couponInput, userId, activeSubtotal);
+    setCouponLoading(false);
+
+    if (res.success && res.code && res.discountAmount !== undefined) {
+      setAppliedCoupon({
+        code: res.code,
+        discountAmount: res.discountAmount,
+        isFirstOrderOnly: res.isFirstOrderOnly,
+      });
+      setCouponMessage({ type: "success", text: res.message });
+    } else {
+      setCouponMessage({ type: "error", text: res.message || "Invalid coupon code." });
+    }
+  };
+
+  // Remove Coupon
+  const handleRemoveCoupon = () => {
+    setAppliedCoupon(null);
+    setCouponInput("");
+    setCouponMessage(null);
+  };
 
   // 1. Address Validation Guard Execution
   const fetchAndValidateAddress = useCallback(async () => {
@@ -170,8 +242,11 @@ export default function CustomerCheckout() {
       deliveryAddress: selectedAddress,
       paymentMethod,
       subtotal: activeSubtotal,
+      vatPercentage,
+      vatAmount,
       deliveryFee,
-      discount: 0,
+      couponCode: appliedCoupon?.code || null,
+      discount: couponDiscount,
       totalAmount: grandTotal,
     };
 
@@ -516,11 +591,87 @@ export default function CustomerCheckout() {
               })}
             </div>
 
-            {/* Financial Summary */}
+            {/* 🎟️ COUPON & PROMO CODE INPUT WIDGET */}
+            <div className="pt-3 border-t border-gray-100 space-y-2">
+              <label className="text-[11px] font-bold text-gray-700 uppercase tracking-wider flex items-center justify-between">
+                <span className="flex items-center gap-1.5">
+                  <Tag className="w-3.5 h-3.5 text-[#FF6B35]" />
+                  Promo / Coupon Code
+                </span>
+                {appliedCoupon && (
+                  <span className="text-[10px] text-emerald-600 font-extrabold flex items-center gap-1">
+                    <CheckCircle2 className="w-3 h-3" /> Applied
+                  </span>
+                )}
+              </label>
+
+              {appliedCoupon ? (
+                <div className="p-3 rounded-2xl bg-emerald-50 border border-emerald-200 flex items-center justify-between">
+                  <div>
+                    <span className="font-black text-xs text-emerald-900 tracking-wider">
+                      {appliedCoupon.code}
+                    </span>
+                    <p className="text-[10px] text-emerald-700 font-semibold">
+                      Discount Saved: ৳ {appliedCoupon.discountAmount.toFixed(2)}
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleRemoveCoupon}
+                    className="p-1 rounded-lg text-emerald-700 hover:bg-emerald-100 transition cursor-pointer"
+                    title="Remove Coupon"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+              ) : (
+                <div className="flex gap-2">
+                  <div className="relative flex-1">
+                    <input
+                      type="text"
+                      value={couponInput}
+                      onChange={(e) => setCouponInput(e.target.value.toUpperCase())}
+                      placeholder="e.g. WELCOME50"
+                      className="w-full px-3 py-2 rounded-xl bg-gray-50 border border-gray-200 focus:bg-white focus:border-[#FF6B35] outline-none text-xs font-bold uppercase transition"
+                    />
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleApplyCoupon}
+                    disabled={couponLoading || !couponInput.trim()}
+                    className="px-4 py-2 rounded-xl bg-[#FF6B35] text-white text-xs font-extrabold shadow-sm hover:bg-[#e85b27] transition disabled:opacity-50 cursor-pointer shrink-0"
+                  >
+                    {couponLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : "Apply"}
+                  </button>
+                </div>
+              )}
+
+              {couponMessage && (
+                <p
+                  className={`text-[11px] font-semibold flex items-center gap-1 mt-1 ${
+                    couponMessage.type === "success" ? "text-emerald-700" : "text-rose-600"
+                  }`}
+                >
+                  {couponMessage.type === "success" ? (
+                    <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
+                  ) : (
+                    <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                  )}
+                  <span>{couponMessage.text}</span>
+                </p>
+              )}
+            </div>
+
+            {/* Financial Summary Breakdown */}
             <div className="pt-3 border-t border-gray-100 space-y-2.5 text-xs">
               <div className="flex items-center justify-between text-gray-600">
-                <span>Subtotal</span>
+                <span>Subtotal (Food Price)</span>
                 <span className="font-bold text-gray-900">Tk {activeSubtotal.toFixed(2)}</span>
+              </div>
+
+              <div className="flex items-center justify-between text-gray-600">
+                <span>VAT ({vatPercentage}%)</span>
+                <span className="font-bold text-gray-900">+Tk {vatAmount.toFixed(2)}</span>
               </div>
 
               <div className="flex items-center justify-between text-gray-600">
@@ -529,15 +680,22 @@ export default function CustomerCheckout() {
                   {deliveryFee === 0 ? (
                     <span className="text-emerald-600 font-extrabold">FREE</span>
                   ) : (
-                    `Tk ${deliveryFee.toFixed(2)}`
+                    `+Tk ${deliveryFee.toFixed(2)}`
                   )}
                 </span>
               </div>
 
+              {couponDiscount > 0 && (
+                <div className="flex items-center justify-between text-emerald-600 font-extrabold">
+                  <span>Coupon Discount ({appliedCoupon?.code})</span>
+                  <span>-Tk {couponDiscount.toFixed(2)}</span>
+                </div>
+              )}
+
               {deliveryFee > 0 && (
                 <div className="p-2.5 rounded-xl bg-orange-50 text-[11px] text-orange-700 flex items-center gap-1.5 font-medium border border-orange-100">
                   <Sparkles className="w-3.5 h-3.5 shrink-0 text-[#FF6B35]" />
-                  Add Tk {(FREE_DELIVERY_THRESHOLD - activeSubtotal).toFixed(2)} more for free delivery!
+                  Add Tk {(freeDeliveryThreshold - activeSubtotal).toFixed(2)} more for free delivery!
                 </div>
               )}
 

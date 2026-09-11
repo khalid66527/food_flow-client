@@ -28,6 +28,7 @@ import {
   Plus,
   Clock,
   Lock,
+  Receipt,
 } from "lucide-react";
 import { useSession, signOut } from "@/lib/auth-client";
 
@@ -130,8 +131,6 @@ export default function DashboardSideBar() {
           label: "Orders",
           href: "/dashboard/restaurant/orders",
           icon: ClipboardList,
-          badge: "8 Active",
-          badgeType: "brand",
         },
         {
           label: "Delivery",
@@ -139,6 +138,11 @@ export default function DashboardSideBar() {
           icon: Truck,
           badge: "Live",
           badgeType: "accent",
+        },
+        {
+          label: "Sell History",
+          href: "/dashboard/restaurant/sell-history",
+          icon: Receipt,
         },
       ],
     },
