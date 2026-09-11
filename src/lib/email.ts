@@ -1420,5 +1420,111 @@ export async function sendOrderReadyEmail(order: TOrderEmailPayload): Promise<bo
   }
 }
 
+/**
+ * Send a secure Login Verification OTP code to the user's email.
+ */
+export async function sendLoginOtpEmail(params: {
+  email: string;
+  otp: string;
+  userName?: string;
+}): Promise<boolean> {
+  try {
+    const { email, otp, userName } = params;
+    if (!email || !otp) {
+      console.warn("⚠️ Cannot send login OTP email: Missing email or otp.");
+      return false;
+    }
 
+    const normalizedEmail = email.trim().toLowerCase();
+    const displayName = userName?.trim() || normalizedEmail.split("@")[0] || "Valued User";
 
+    const emailHtml = `
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Food Flow - Login Verification Code</title>
+</head>
+<body style="margin: 0; padding: 0; background-color: #F8FAFC; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; color: #1E293B;">
+  <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%" style="background-color: #F8FAFC; padding: 40px 16px;">
+    <tr>
+      <td align="center">
+        <!-- Main Card Container -->
+        <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%" style="max-width: 520px; background-color: #FFFFFF; border-radius: 24px; overflow: hidden; box-shadow: 0 12px 35px rgba(0,0,0,0.06); border: 1px solid #E2E8F0;">
+          
+          <!-- Header with Brand Accent -->
+          <tr>
+            <td style="background: linear-gradient(135deg, #FF6B35 0%, #F97316 100%); padding: 36px 32px 30px 32px; text-align: center;">
+              <div style="display: inline-block; background-color: rgba(255,255,255,0.2); padding: 6px 18px; border-radius: 9999px; margin-bottom: 12px; border: 1px solid rgba(255,255,255,0.3);">
+                <span style="font-size: 12px; font-weight: 800; color: #FFFFFF; letter-spacing: 1.2px; text-transform: uppercase;">🍔 FOOD FLOW SECURITY</span>
+              </div>
+              <h1 style="margin: 0; color: #FFFFFF; font-size: 24px; font-weight: 800; letter-spacing: -0.5px;">Login Verification Code</h1>
+            </td>
+          </tr>
+
+          <!-- Content Body -->
+          <tr>
+            <td style="padding: 36px 32px 28px 32px; text-align: center;">
+              <p style="margin: 0 0 8px 0; font-size: 16px; font-weight: 700; color: #0F172A;">
+                Hello ${displayName},
+              </p>
+              <p style="margin: 0 0 24px 0; font-size: 14px; color: #64748B; line-height: 1.6;">
+                Use the 6-digit one-time password (OTP) below to verify your email and sign in securely to your <strong>Food Flow</strong> account:
+              </p>
+
+              <!-- OTP Code Display Box -->
+              <div style="background: #FFF7ED; border: 2px dashed #FDBA74; border-radius: 18px; padding: 22px 16px; margin: 20px 0; text-align: center;">
+                <span style="display: block; font-size: 11px; font-weight: 800; color: #EA580C; text-transform: uppercase; letter-spacing: 1.5px; margin-bottom: 6px;">Your Login Code</span>
+                <span style="display: block; font-size: 38px; font-weight: 900; letter-spacing: 10px; color: #C2410C; font-family: 'Courier New', Courier, monospace; margin-left: 10px;">
+                  ${otp}
+                </span>
+              </div>
+
+              <!-- Expiry Alert -->
+              <div style="display: inline-block; background-color: #FEF3C7; border-radius: 10px; padding: 8px 16px; margin-bottom: 22px; border: 1px solid #FDE68A;">
+                <p style="margin: 0; font-size: 13px; font-weight: 600; color: #92400E;">
+                  ⏱️ This code expires in <strong>5 minutes</strong>
+                </p>
+              </div>
+
+              <!-- Security Tips -->
+              <p style="margin: 0 0 10px 0; font-size: 12px; color: #64748B; line-height: 1.5; text-align: left; background-color: #F8FAFC; padding: 14px 18px; border-radius: 12px; border-left: 4px solid #CBD5E1;">
+                🔒 <strong>Security Warning:</strong> Never share this verification code with anyone. Food Flow staff will never ask for your code. If you did not attempt to sign in, please secure your account immediately.
+              </p>
+            </td>
+          </tr>
+
+          <!-- Footer -->
+          <tr>
+            <td style="background-color: #F8FAFC; border-top: 1px solid #F1F5F9; padding: 22px 32px; text-align: center;">
+              <p style="margin: 0 0 6px 0; font-size: 12px; color: #64748B; font-weight: 600;">
+                Food Flow &bull; Fast, Fresh & Reliable Food Delivery
+              </p>
+              <p style="margin: 0; font-size: 11px; color: #94A3B8;">
+                Need help? Contact support at <a href="mailto:support.foodflow@gmail.com" style="color: #FF6B35; text-decoration: none; font-weight: 700;">support.foodflow@gmail.com</a>
+              </p>
+            </td>
+          </tr>
+
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>
+    `;
+
+    const emailText = `Food Flow Login Verification Code: ${otp}\n\nThis code expires in 5 minutes. Never share this code with anyone.\n\nIf you did not make this request, please safely ignore this message.`;
+
+    return await sendEmail({
+      to: normalizedEmail,
+      subject: "🔐 Food Flow - Your Login Verification Code",
+      html: emailHtml,
+      text: emailText,
+    });
+  } catch (err) {
+    console.error("⚠️ Error sending login OTP email:", err);
+    return false;
+  }
+}
