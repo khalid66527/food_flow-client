@@ -16,14 +16,25 @@ export interface ILocationInfo {
 }
 
 let cachedLocation: ILocationInfo = {
-  city: "Chattogram",
-  area: "GEC, Chattogram",
-  division: "Chattogram",
-  district: "Chattogram",
-  upazila: "Chattogram GPO",
+  city: "Moulvibazar",
+  area: "Maulavi Bazar, Moulvibazar",
+  division: "Sylhet",
+  district: "Moulvibazar",
+  upazila: "Maulavi Bazar",
   isDetecting: false,
-  hasRealLocation: false,
+  hasRealLocation: true,
 };
+
+// Hydrate from localStorage on client side if available
+if (typeof window !== "undefined") {
+  try {
+    const saved = localStorage.getItem("food_flow_user_location");
+    if (saved) {
+      const parsed = JSON.parse(saved);
+      cachedLocation = { ...cachedLocation, ...parsed, isDetecting: false };
+    }
+  } catch {}
+}
 
 const LISTENERS = new Set<() => void>();
 
@@ -39,6 +50,15 @@ export function subscribeLocation(callback: () => void) {
 }
 
 export function getRealTimeLocation(): ILocationInfo {
+  if (typeof window !== "undefined" && !cachedLocation.hasRealLocation) {
+    try {
+      const saved = localStorage.getItem("food_flow_user_location");
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        cachedLocation = { ...cachedLocation, ...parsed, isDetecting: false };
+      }
+    } catch {}
+  }
   return cachedLocation;
 }
 
@@ -204,7 +224,7 @@ export function updateRealTimeLocation(
   const cleanCity = city.trim();
   const cleanArea = area ? area.trim() : `${cleanCity} Central`;
 
-  cachedLocation = {
+  const newLoc = {
     city: cleanCity,
     area: cleanArea,
     division: hierarchy?.division || cachedLocation.division || cleanCity,
@@ -215,19 +235,32 @@ export function updateRealTimeLocation(
     isDetecting: false,
     hasRealLocation: true,
   };
-  notifyLocationListeners();
+
+  const isChanged =
+    cachedLocation.district !== newLoc.district ||
+    cachedLocation.upazila !== newLoc.upazila ||
+    cachedLocation.division !== newLoc.division ||
+    !cachedLocation.hasRealLocation;
+
+  cachedLocation = newLoc;
+
+  if (typeof window !== "undefined") {
+    try {
+      localStorage.setItem("food_flow_user_location", JSON.stringify(newLoc));
+    } catch {}
+  }
+
+  if (isChanged) {
+    notifyLocationListeners();
+  }
 }
 
 export async function detectRealTimeLocation(): Promise<ILocationInfo> {
   if (typeof window === "undefined") return cachedLocation;
 
-  cachedLocation = { ...cachedLocation, isDetecting: true };
-  notifyLocationListeners();
-
   return new Promise((resolve) => {
     if (!navigator.geolocation) {
       cachedLocation = { ...cachedLocation, isDetecting: false };
-      notifyLocationListeners();
       return resolve(cachedLocation);
     }
 
@@ -244,7 +277,7 @@ export async function detectRealTimeLocation(): Promise<ILocationInfo> {
 
           const parsed = parseBangladeshHierarchy(data);
 
-          cachedLocation = {
+          const newLoc: ILocationInfo = {
             city: parsed.city,
             area: parsed.area,
             division: parsed.division,
@@ -256,22 +289,37 @@ export async function detectRealTimeLocation(): Promise<ILocationInfo> {
             hasRealLocation: true,
           };
 
-          notifyLocationListeners();
+          const isChanged =
+            cachedLocation.district !== newLoc.district ||
+            cachedLocation.upazila !== newLoc.upazila ||
+            cachedLocation.division !== newLoc.division ||
+            !cachedLocation.hasRealLocation;
+
+          cachedLocation = newLoc;
+
+          if (typeof window !== "undefined") {
+            try {
+              localStorage.setItem("food_flow_user_location", JSON.stringify(newLoc));
+            } catch {}
+          }
+
+          if (isChanged) {
+            notifyLocationListeners();
+          }
           resolve(cachedLocation);
         } catch {
           cachedLocation = { ...cachedLocation, isDetecting: false };
-          notifyLocationListeners();
           resolve(cachedLocation);
         }
       },
       (err) => {
         console.warn("Geolocation permission or timeout fallback:", err.message);
         cachedLocation = { ...cachedLocation, isDetecting: false };
-        notifyLocationListeners();
         resolve(cachedLocation);
       },
-      { timeout: 8000, maximumAge: 30000 }
+      { timeout: 8000, maximumAge: 60000 }
     );
   });
 }
+
 

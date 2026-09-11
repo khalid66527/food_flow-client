@@ -177,11 +177,22 @@ function ExploreFoodContent() {
   const [locationInfo, setLocationInfo] = useState<ILocationInfo>(() => getRealTimeLocation());
 
   useEffect(() => {
-    setLocationInfo(getRealTimeLocation());
+    const initialLoc = getRealTimeLocation();
+    setLocationInfo(initialLoc);
 
     const unsubscribe = subscribeLocation(() => {
-      setLocationInfo(getRealTimeLocation());
-      setCurrentPage(1);
+      const latest = getRealTimeLocation();
+      setLocationInfo((prev) => {
+        if (
+          prev.upazila === latest.upazila &&
+          prev.district === latest.district &&
+          prev.division === latest.division &&
+          prev.hasRealLocation === latest.hasRealLocation
+        ) {
+          return prev;
+        }
+        return latest;
+      });
     });
     detectRealTimeLocation();
     return unsubscribe;
@@ -398,35 +409,12 @@ function ExploreFoodContent() {
         return;
       }
 
-      // 5. DEFAULT SMART CASCADING MODE ('auto'):
-      // Step A: Check Upazila (উপজেলা) if present and distinct from district
+      // 5. DEFAULT SMART CASCADING & PRIORITY MODE ('auto'):
       const userUpazila = locationInfo.upazila?.trim();
       const userDistrict = (locationInfo.district || locationInfo.city || '').trim();
       const userDivision = (locationInfo.division || locationInfo.city || '').trim();
 
-      if (userUpazila && userUpazila.toLowerCase() !== userDistrict.toLowerCase()) {
-        const upazilaRes = await getAllGlobalFoodItems({
-          ...baseQuery,
-          upazila: userUpazila,
-        });
-
-        if (upazilaRes.success && Array.isArray(upazilaRes.data) && upazilaRes.data.length > 0) {
-          setFoodItems(upazilaRes.data);
-          setActiveMatchedTier('upazila');
-          setFallbackNotice({
-            tier: 'upazila',
-            title: `Found in your Upazila: ${userUpazila}`,
-            description: `Showing freshly prepared dishes from restaurants in ${userUpazila}.`,
-            badge: 'Upazila Match',
-          });
-          if ((upazilaRes as unknown as { pagination?: typeof pagination }).pagination) {
-            setPagination((upazilaRes as unknown as { pagination: typeof pagination }).pagination);
-          }
-          return;
-        }
-      }
-
-      // Step B: Check District (জেলা)
+      // Step A: Fetch all dishes in the User's District (all upazilas included)
       if (userDistrict) {
         const districtRes = await getAllGlobalFoodItems({
           ...baseQuery,
@@ -434,16 +422,38 @@ function ExploreFoodContent() {
         });
 
         if (districtRes.success && Array.isArray(districtRes.data) && districtRes.data.length > 0) {
-          setFoodItems(districtRes.data);
-          setActiveMatchedTier('district');
+          const sortedList = [...districtRes.data];
+
+          // If user has a specific Upazila, prioritize Upazila items at the top
+          let upazilaMatchesCount = 0;
+          if (userUpazila) {
+            const upazilaClean = userUpazila.toLowerCase();
+            sortedList.sort((a: any, b: any) => {
+              const aUpazila = (a.restaurantUpazila || a.restaurantLocation || a.restaurantAddress || a.restaurantName || '').toLowerCase();
+              const bUpazila = (b.restaurantUpazila || b.restaurantLocation || b.restaurantAddress || b.restaurantName || '').toLowerCase();
+              const aMatch = aUpazila.includes('moulvi') || aUpazila.includes('maulavi') || aUpazila.includes(upazilaClean);
+              const bMatch = bUpazila.includes('moulvi') || bUpazila.includes('maulavi') || bUpazila.includes(upazilaClean);
+
+              if (aMatch && !bMatch) return -1;
+              if (!aMatch && bMatch) return 1;
+              return 0;
+            });
+
+            upazilaMatchesCount = sortedList.filter((item: any) => {
+              const loc = (item.restaurantUpazila || item.restaurantLocation || item.restaurantAddress || item.restaurantName || '').toLowerCase();
+              return loc.includes('moulvi') || loc.includes('maulavi') || loc.includes(upazilaClean);
+            }).length;
+          }
+
+          setFoodItems(sortedList);
+          setActiveMatchedTier(upazilaMatchesCount > 0 ? 'upazila' : 'district');
           setFallbackNotice({
-            tier: 'district',
-            title: `Showing Dishes from ${userDistrict} District`,
-            description: userUpazila && userUpazila.toLowerCase() !== userDistrict.toLowerCase()
-              ? `No partner restaurants found in ${userUpazila} Upazila. Showing dishes from restaurants in ${userDistrict} District.`
-              : `Showing dishes from partner restaurants in ${userDistrict} District.`,
-            badge: 'District Match',
+            tier: upazilaMatchesCount > 0 ? 'upazila' : 'district',
+            title: `Closest to Your Location: ${userUpazila ? `${userUpazila}, ` : ''}${userDistrict}`,
+            description: `Showing dishes from restaurants closest to your current location (${userUpazila || userDistrict}) first.`,
+            badge: 'Nearest First',
           });
+
           if ((districtRes as unknown as { pagination?: typeof pagination }).pagination) {
             setPagination((districtRes as unknown as { pagination: typeof pagination }).pagination);
           }
