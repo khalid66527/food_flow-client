@@ -32,6 +32,7 @@ import {
   ChevronLeft as ChevronLeftIcon,
   ChevronRight as ChevronRightIcon,
 } from "lucide-react";
+import { toast } from "react-toastify";
 import { useSession } from "@/lib/auth-client";
 import { getRestaurantOrdersApi } from "@/lib/api/order";
 import { getOrderSocket, joinOrderRoom, disconnectOrderSocket } from "@/lib/socket";
@@ -250,9 +251,29 @@ export default function RestaurantOrders() {
         // Broadcast to customer and rider tracking channels
         const socket = getOrderSocket(orderId);
         socket.emit("order_status_updated", { orderId, orderStatus: newStatus });
+
+        // Show Toast in Center/Top-Center
+        if (newStatus === "Preparing") {
+          toast.success("🍳 Kitchen is now preparing the food!", {
+            position: "top-center",
+            toastId: `prep-${orderId}`,
+          });
+        } else if (newStatus === "Ready") {
+          toast.info("📦 Food is ready for rider pickup!", {
+            position: "top-center",
+            toastId: `ready-${orderId}`,
+          });
+        } else {
+          toast.success(`✅ Status updated to ${newStatus}`, {
+            position: "top-center",
+          });
+        }
+      } else {
+        toast.error(res.message || "Failed to update order status.", { position: "top-center" });
       }
     } catch (err) {
       console.error("Status update failed:", err);
+      toast.error("Status update failed. Please try again.", { position: "top-center" });
     } finally {
       setActionLoadingId(null);
     }
@@ -279,12 +300,19 @@ export default function RestaurantOrders() {
         // Broadcast cancel event via socket
         const socket = getOrderSocket(orderId);
         socket.emit("order_status_updated", { orderId, orderStatus: "Cancelled" });
+
+        toast.error("❌ Order has been cancelled!", {
+          position: "top-center",
+          toastId: `cancel-${orderId}`,
+        });
       } else {
         setError(res.message || "Failed to cancel order.");
+        toast.error(res.message || "Failed to cancel order.", { position: "top-center" });
       }
     } catch (err) {
       console.error("Cancel order failed:", err);
       setError("Failed to cancel order. Please try again.");
+      toast.error("Failed to cancel order. Please try again.", { position: "top-center" });
     } finally {
       setActionLoadingId(null);
       setCancelConfirmId(null);

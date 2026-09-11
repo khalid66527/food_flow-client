@@ -83,6 +83,7 @@ export async function POST(req: NextRequest) {
         { status: 400 }
       );
     }
+    const normalizedPaymentMethod = paymentMethod as "COD" | "STRIPE";
 
     // 3. Create Order Document & Financial Settlement Calculations
     const ordersCol = await getOrdersCollection();
@@ -141,7 +142,7 @@ export async function POST(req: NextRequest) {
     const randomSuffix = Math.floor(1000 + Math.random() * 9000);
     const orderId = `FF-${timestamp.toString().slice(-6)}-${randomSuffix}`;
 
-    const orderDoc = {
+    const orderDoc: any = {
       orderId,
       userId,
       userEmail,
@@ -162,7 +163,7 @@ export async function POST(req: NextRequest) {
       restaurantPayout,
       riderPayout,
       taxFundVat,
-      paymentMethod,
+      paymentMethod: normalizedPaymentMethod,
       paymentStatus: "Pending",
       orderStatus: "Placed",
       createdAt: new Date().toISOString(),
@@ -173,7 +174,7 @@ export async function POST(req: NextRequest) {
     const mongoId = insertResult.insertedId.toString();
 
     // 4. Handle Payment Method Flows
-    if (paymentMethod === "COD") {
+    if (normalizedPaymentMethod === "COD") {
       // Clear Cart on COD success
       await cartCol.deleteOne({ userId });
 
@@ -192,7 +193,8 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    if (paymentMethod === "STRIPE") {
+
+    if (normalizedPaymentMethod === "STRIPE") {
       const baseUrl =
         process.env.NEXT_PUBLIC_BETTER_AUTH_URL ||
         process.env.BETTER_AUTH_URL ||
@@ -220,7 +222,7 @@ export async function POST(req: NextRequest) {
           }));
 
           // Add delivery fee line item if applicable
-          if (deliveryFee && deliveryFee > 0) {
+          if (numDeliveryFee && numDeliveryFee > 0) {
             lineItems.push({
               price_data: {
                 currency: "usd",
@@ -229,7 +231,7 @@ export async function POST(req: NextRequest) {
                   images: [],
                   description: "Standard Delivery Charge",
                 },
-                unit_amount: Math.round(deliveryFee * 100),
+                unit_amount: Math.round(numDeliveryFee * 100),
               },
               quantity: 1,
             });
@@ -268,7 +270,6 @@ export async function POST(req: NextRequest) {
         } catch (stripeErr: any) {
           console.error("Stripe Checkout Session error:", stripeErr);
           
-          // Return clear error if key is invalid placeholder
           return NextResponse.json(
             {
               success: false,
@@ -283,7 +284,7 @@ export async function POST(req: NextRequest) {
         return NextResponse.json(
           {
             success: false,
-            message: "Stripe payment gateway is not configured. Please verify your STRIPE_SECRET_KEY in .env or choose Cash on Delivery (COD).",
+            message: "Stripe payment gateway is not configured. Please verify your STRIPE_SECRET_KEY in .env or choose Cash on Delivery (COD) or Mobile Wallet.",
           },
           { status: 400 }
         );

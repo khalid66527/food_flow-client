@@ -16,9 +16,9 @@ const activeRooms = new Set<string>();
 export function getSocket(): Socket {
   if (!socket) {
     socket = io(SERVER_BASE_URL, {
-      transports: ["websocket", "polling"],
+      transports: ["polling", "websocket"],
       reconnection: true,
-      reconnectionAttempts: Infinity,
+      reconnectionAttempts: 10,
       reconnectionDelay: 1000,
       reconnectionDelayMax: 5000,
       timeout: 10000,
@@ -26,7 +26,6 @@ export function getSocket(): Socket {
     });
 
     socket.on("connect", () => {
-      console.log("⚡ Connected to Real-time Socket server:", socket?.id);
       // Re-join all active rooms on reconnect
       activeRooms.forEach((room) => {
         socket?.emit("join_order_room", { orderId: room });
@@ -34,12 +33,8 @@ export function getSocket(): Socket {
       });
     });
 
-    socket.on("disconnect", (reason) => {
-      console.log("🔌 Disconnected from Socket server:", reason);
-    });
-
-    socket.on("connect_error", (error) => {
-      console.warn("⚠️ Socket connection error:", error.message);
+    socket.on("connect_error", () => {
+      // Silently retry connection
     });
   }
 

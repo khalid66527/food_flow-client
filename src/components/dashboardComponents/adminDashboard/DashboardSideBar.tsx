@@ -109,6 +109,13 @@ export default function DashboardSideBar() {
           href: "/dashboard/admin/messages",
           icon: MessageSquare,
         },
+        {
+          label: "Payment Transactions",
+          href: "/dashboard/admin/transactions",
+          icon: CreditCard,
+          badge: "Live",
+          badgeType: "success",
+        },
       ],
     },
     {
@@ -126,6 +133,7 @@ export default function DashboardSideBar() {
         },
       ],
     },
+
   ];
 
   const getBadgeClass = (type?: "brand" | "accent" | "success" | "muted", isActive?: boolean) => {
