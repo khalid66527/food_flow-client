@@ -255,3 +255,35 @@ export async function sendDeliveryOtpApi(
   );
 }
 
+/**
+ * Issue refund for an order via POST /api/orders/refund
+ */
+export async function refundOrderApi(
+  orderId: string,
+  payload: { amount?: number; reason?: string; markAsCancelled?: boolean },
+  userId?: string,
+  userEmail?: string
+): Promise<TOrderApiResponse> {
+  try {
+    const endpoint = `/api/orders/refund`;
+    const headers: Record<string, string> = { "Content-Type": "application/json" };
+    if (userId && userEmail) {
+      headers["x-user-id"] = userId;
+      headers["x-user-email"] = userEmail;
+    }
+    const res = await fetch(endpoint, {
+      method: "POST",
+      headers,
+      body: JSON.stringify({ orderId, ...payload }),
+    });
+    const data = await res.json();
+    return data as TOrderApiResponse;
+  } catch (err: unknown) {
+    return {
+      success: false,
+      message: err instanceof Error ? err.message : "Failed to process refund.",
+    };
+  }
+}
+
+

@@ -1126,3 +1126,135 @@ Need help? Contact support.foodflow@gmail.com
   }
 }
 
+/**
+ * Send Refund Confirmation Email to Customer
+ */
+export async function sendOrderRefundEmail(
+  order: TOrderEmailPayload,
+  refundDetails: {
+    refundId: string;
+    amount: number;
+    reason?: string;
+    refundedAt?: string;
+    status?: string;
+    refundedBy?: string;
+    stripeRefundId?: string;
+  }
+): Promise<boolean> {
+
+  try {
+    const rawEmail = order.userEmail || (order as any).customerEmail || (order as any).email;
+    if (!rawEmail) return false;
+
+    const normalizedEmail = rawEmail.trim().toLowerCase();
+    const refundDate = refundDetails.refundedAt
+      ? new Date(refundDetails.refundedAt).toLocaleString("en-US", {
+          month: "short",
+          day: "numeric",
+          year: "numeric",
+          hour: "2-digit",
+          minute: "2-digit",
+        })
+      : new Date().toLocaleString("en-US", {
+          month: "short",
+          day: "numeric",
+          year: "numeric",
+          hour: "2-digit",
+          minute: "2-digit",
+        });
+
+    const paymentMethodLabel =
+      order.paymentMethod === "STRIPE"
+        ? "Online Card (Stripe)"
+        : "Cash on Delivery (COD)";
+
+
+    const emailHtml = `
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Refund Confirmation - Food Flow</title>
+</head>
+<body style="margin: 0; padding: 0; background-color: #F8FAFC; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
+  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background-color: #F8FAFC; padding: 40px 16px;">
+    <tr>
+      <td align="center">
+        <table role="presentation" width="100%" style="max-width: 600px; background-color: #FFFFFF; border-radius: 16px; overflow: hidden; box-shadow: 0 4px 20px rgba(0,0,0,0.05); border: 1px solid #E2E8F0;">
+          <tr>
+            <td style="background: linear-gradient(135deg, #059669 0%, #10B981 100%); padding: 32px 24px; text-align: center;">
+              <h1 style="margin: 0 0 8px 0; color: #FFFFFF; font-size: 24px; font-weight: 800;">
+                Food Flow Refund Processed
+              </h1>
+              <p style="margin: 0; color: #ECFDF5; font-size: 14px; font-weight: 500;">
+                Refund ID: ${refundDetails.refundId}
+              </p>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding: 32px 24px;">
+              <p style="margin: 0 0 16px 0; font-size: 15px; color: #334155; line-height: 1.6;">
+                Hello <strong>${order.userName || "Valued Customer"}</strong>,
+              </p>
+              <p style="margin: 0 0 20px 0; font-size: 14px; color: #64748B; line-height: 1.6;">
+                We have processed a refund of <strong>৳${refundDetails.amount.toFixed(2)}</strong> for your order <strong>#${order.orderId}</strong>.
+              </p>
+
+              <div style="background-color: #F0FDF4; border: 1px solid #BBF7D0; border-radius: 12px; padding: 18px; margin-bottom: 24px;">
+                <table width="100%" cellspacing="0" cellpadding="0">
+                  <tr>
+                    <td style="font-size: 13px; color: #166534; padding-bottom: 6px;">Refund Amount:</td>
+                    <td align="right" style="font-size: 16px; font-weight: 800; color: #15803D;">৳${refundDetails.amount.toFixed(2)}</td>
+                  </tr>
+                  <tr>
+                    <td style="font-size: 13px; color: #166534; padding-bottom: 6px;">Payment Method:</td>
+                    <td align="right" style="font-size: 13px; font-weight: 600; color: #166534;">${paymentMethodLabel}</td>
+                  </tr>
+                  <tr>
+                    <td style="font-size: 13px; color: #166534; padding-bottom: 6px;">Refund Date:</td>
+                    <td align="right" style="font-size: 13px; font-weight: 500; color: #166534;">${refundDate}</td>
+                  </tr>
+                  ${
+                    refundDetails.reason
+                      ? `<tr>
+                    <td style="font-size: 13px; color: #166534;">Reason:</td>
+                    <td align="right" style="font-size: 13px; font-weight: 500; color: #166534;">${refundDetails.reason}</td>
+                  </tr>`
+                      : ""
+                  }
+                </table>
+              </div>
+
+              <p style="margin: 0; font-size: 12px; color: #64748B; line-height: 1.5;">
+                ℹ️ <em>Depending on your bank or payment provider (Stripe/Mobile Wallet), the funds will appear in your account within 1-5 business days.</em>
+              </p>
+            </td>
+          </tr>
+          <tr>
+            <td style="background-color: #F8FAFC; border-top: 1px solid #F1F5F9; padding: 20px 24px; text-align: center;">
+              <p style="margin: 0; font-size: 12px; color: #94A3B8;">
+                Food Flow Customer Support &bull; support.foodflow@gmail.com
+              </p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>
+    `;
+
+    return await sendEmail({
+      to: normalizedEmail,
+      subject: `💰 Refund Processed for Order #${order.orderId} — Food Flow`,
+      html: emailHtml,
+      text: `Your refund of ৳${refundDetails.amount.toFixed(2)} for Order #${order.orderId} has been successfully processed. Refund ID: ${refundDetails.refundId}`,
+    });
+  } catch (err) {
+    console.error("⚠️ Error sending order refund email:", err);
+    return false;
+  }
+}
+
+
