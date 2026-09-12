@@ -7,31 +7,43 @@ if (!mongodbUri) {
   throw new Error("MONGODB_URI is not defined in environment variables");
 }
 
-let client: MongoClient;
-let db: Db;
-
 declare global {
   // eslint-disable-next-line no-var
-  var _mongoClientPromise: Promise<MongoClient> | undefined;
+  var _mongoDbClientPromise: Promise<MongoClient> | undefined;
+}
+
+function createClientPromise(): Promise<MongoClient> {
+  const client = new MongoClient(mongodbUri as string, {
+    serverSelectionTimeoutMS: 8000,
+  });
+  return client.connect().catch((err) => {
+    delete global._mongoDbClientPromise;
+    throw err;
+  });
 }
 
 let clientPromise: Promise<MongoClient>;
 
 if (process.env.NODE_ENV === "development") {
-  if (!global._mongoClientPromise) {
-    client = new MongoClient(mongodbUri);
-    global._mongoClientPromise = client.connect();
+  if (!global._mongoDbClientPromise) {
+    global._mongoDbClientPromise = createClientPromise();
   }
-  clientPromise = global._mongoClientPromise;
+  clientPromise = global._mongoDbClientPromise;
 } else {
-  client = new MongoClient(mongodbUri);
-  clientPromise = client.connect();
+  clientPromise = createClientPromise();
 }
 
 export async function getDb(): Promise<Db> {
-  const connectedClient = await clientPromise;
   const dbName = process.env.DB_NAME || "food-delivery-platform";
-  return connectedClient.db(dbName);
+  try {
+    const connectedClient = await clientPromise;
+    return connectedClient.db(dbName);
+  } catch (err) {
+    delete global._mongoDbClientPromise;
+    const retryClient = await createClientPromise();
+    global._mongoDbClientPromise = Promise.resolve(retryClient);
+    return retryClient.db(dbName);
+  }
 }
 
 export async function getOrdersCollection() {

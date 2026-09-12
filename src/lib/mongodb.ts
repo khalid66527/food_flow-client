@@ -1,33 +1,48 @@
+import "@/lib/setup-dns";
 import { MongoClient, Db } from "mongodb";
 
 const uri = process.env.MONGODB_URI;
-const dbName = "food-delivery-platform";
+const dbName = process.env.DB_NAME || "food-delivery-platform";
 
 if (!uri) {
   throw new Error("Please add your MONGODB_URI to .env");
 }
 
-let client: MongoClient;
-let clientPromise: Promise<MongoClient>;
-
 const globalWithMongo = global as typeof globalThis & {
   _mongoClientPromise?: Promise<MongoClient>;
 };
 
+function createClientPromise(): Promise<MongoClient> {
+  const client = new MongoClient(uri as string, {
+    serverSelectionTimeoutMS: 8000,
+  });
+  return client.connect().catch((err) => {
+    delete globalWithMongo._mongoClientPromise;
+    throw err;
+  });
+}
+
+let clientPromise: Promise<MongoClient>;
+
 if (process.env.NODE_ENV === "development") {
   if (!globalWithMongo._mongoClientPromise) {
-    client = new MongoClient(uri);
-    globalWithMongo._mongoClientPromise = client.connect();
+    globalWithMongo._mongoClientPromise = createClientPromise();
   }
   clientPromise = globalWithMongo._mongoClientPromise;
 } else {
-  client = new MongoClient(uri);
-  clientPromise = client.connect();
+  clientPromise = createClientPromise();
 }
 
 export default clientPromise;
 
 export async function getDb(): Promise<Db> {
-  const client = await clientPromise;
-  return client.db(dbName);
+  try {
+    const connectedClient = await clientPromise;
+    return connectedClient.db(dbName);
+  } catch (err) {
+    delete globalWithMongo._mongoClientPromise;
+    const retryClient = await createClientPromise();
+    globalWithMongo._mongoClientPromise = Promise.resolve(retryClient);
+    return retryClient.db(dbName);
+  }
 }
