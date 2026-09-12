@@ -100,6 +100,8 @@ const API_BASE_URL = `${SERVER_BASE_URL}/api`;
 /**
  * Get All Users with role filtering, search, pagination, and stats
  */
+import { getAuthHeaders } from "@/lib/jwt";
+
 export async function getAllUsers(
   queryParams: IUserQueryParams = {}
 ): Promise<ApiResponse<IUser[]>> {
@@ -130,9 +132,7 @@ export async function getAllUsers(
 
     const res = await fetch(url.toString(), {
       method: "GET",
-      headers: {
-        "Content-Type": "application/json",
-      },
+      headers: getAuthHeaders(),
       cache: "no-store",
     });
 
@@ -182,9 +182,7 @@ export async function getUserById(
 
     const res = await fetch(`${API_BASE_URL}/admin/users/${encodeURIComponent(userIdOrEmail)}`, {
       method: "GET",
-      headers: {
-        "Content-Type": "application/json",
-      },
+      headers: getAuthHeaders(userIdOrEmail),
       cache: "no-store",
     });
 
@@ -214,9 +212,7 @@ export async function getUserRestaurantDetails(
       `${API_BASE_URL}/admin/restaurant-details/${encodeURIComponent(emailOrId)}`,
       {
         method: "GET",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers: getAuthHeaders(emailOrId),
         cache: "no-store",
       }
     );

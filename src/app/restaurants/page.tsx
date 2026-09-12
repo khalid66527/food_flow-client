@@ -155,12 +155,6 @@ function ExploreFoodContent() {
   // Location Hierarchy Modes & Fallback State
   const [locationFilterMode, setLocationFilterMode] = useState<LocationFilterMode>('auto');
   const [activeMatchedTier, setActiveMatchedTier] = useState<LocationTierType>('all');
-  const [fallbackNotice, setFallbackNotice] = useState<{
-    tier: LocationTierType;
-    title: string;
-    description: string;
-    badge: string;
-  } | null>(null);
 
   // Restaurant dropdown (extracted from food items + DB)
   const [availableRestaurants, setAvailableRestaurants] = useState<
@@ -178,21 +172,11 @@ function ExploreFoodContent() {
 
   useEffect(() => {
     const initialLoc = getRealTimeLocation();
-    setLocationInfo(initialLoc);
+    setLocationInfo({ ...initialLoc });
 
     const unsubscribe = subscribeLocation(() => {
       const latest = getRealTimeLocation();
-      setLocationInfo((prev) => {
-        if (
-          prev.upazila === latest.upazila &&
-          prev.district === latest.district &&
-          prev.division === latest.division &&
-          prev.hasRealLocation === latest.hasRealLocation
-        ) {
-          return prev;
-        }
-        return latest;
-      });
+      setLocationInfo({ ...latest });
     });
     detectRealTimeLocation();
     return unsubscribe;
@@ -328,19 +312,12 @@ function ExploreFoodContent() {
         if (res.success && Array.isArray(res.data) && res.data.length > 0) {
           setFoodItems(res.data);
           setActiveMatchedTier('upazila');
-          setFallbackNotice({
-            tier: 'upazila',
-            title: `Showing Upazila Dishes`,
-            description: `Showing dishes from restaurants in ${locationInfo.upazila || 'your Upazila'}.`,
-            badge: 'Upazila / Area',
-          });
           if ((res as unknown as { pagination?: typeof pagination }).pagination) {
             setPagination((res as unknown as { pagination: typeof pagination }).pagination);
           }
         } else {
           setFoodItems([]);
           setActiveMatchedTier('upazila');
-          setFallbackNotice(null);
         }
         return;
       }
@@ -352,19 +329,12 @@ function ExploreFoodContent() {
         if (res.success && Array.isArray(res.data) && res.data.length > 0) {
           setFoodItems(res.data);
           setActiveMatchedTier('district');
-          setFallbackNotice({
-            tier: 'district',
-            title: `Showing District Dishes`,
-            description: `Showing dishes from restaurants across ${locationInfo.district || 'your District'}.`,
-            badge: 'District / Zila',
-          });
           if ((res as unknown as { pagination?: typeof pagination }).pagination) {
             setPagination((res as unknown as { pagination: typeof pagination }).pagination);
           }
         } else {
           setFoodItems([]);
           setActiveMatchedTier('district');
-          setFallbackNotice(null);
         }
         return;
       }
@@ -376,19 +346,12 @@ function ExploreFoodContent() {
         if (res.success && Array.isArray(res.data) && res.data.length > 0) {
           setFoodItems(res.data);
           setActiveMatchedTier('division');
-          setFallbackNotice({
-            tier: 'division',
-            title: `Showing Division Dishes`,
-            description: `Showing dishes from restaurants across ${locationInfo.division || 'your Division'}.`,
-            badge: 'Division',
-          });
           if ((res as unknown as { pagination?: typeof pagination }).pagination) {
             setPagination((res as unknown as { pagination: typeof pagination }).pagination);
           }
         } else {
           setFoodItems([]);
           setActiveMatchedTier('division');
-          setFallbackNotice(null);
         }
         return;
       }
@@ -399,7 +362,6 @@ function ExploreFoodContent() {
         if (res.success && Array.isArray(res.data)) {
           setFoodItems(res.data);
           setActiveMatchedTier('all');
-          setFallbackNotice(null);
           if ((res as unknown as { pagination?: typeof pagination }).pagination) {
             setPagination((res as unknown as { pagination: typeof pagination }).pagination);
           }
@@ -410,11 +372,28 @@ function ExploreFoodContent() {
       }
 
       // 5. DEFAULT SMART CASCADING & PRIORITY MODE ('auto'):
-      const userUpazila = locationInfo.upazila?.trim();
-      const userDistrict = (locationInfo.district || locationInfo.city || '').trim();
-      const userDivision = (locationInfo.division || locationInfo.city || '').trim();
+      const userUpazila = locationInfo.hasRealLocation ? locationInfo.upazila?.trim() : '';
+      const userDistrict = locationInfo.hasRealLocation ? (locationInfo.district || locationInfo.city || '').trim() : '';
+      const userDivision = locationInfo.hasRealLocation ? (locationInfo.division || locationInfo.city || '').trim() : '';
 
-      // Step A: Fetch all dishes in the User's District (all upazilas included)
+      // Step A: If user has a specific Upazila / Postal Area, check Upazila dishes first
+      if (userUpazila) {
+        const upazilaRes = await getAllGlobalFoodItems({
+          ...baseQuery,
+          upazila: userUpazila,
+        });
+
+        if (upazilaRes.success && Array.isArray(upazilaRes.data) && upazilaRes.data.length > 0) {
+          setFoodItems(upazilaRes.data);
+          setActiveMatchedTier('upazila');
+          if ((upazilaRes as unknown as { pagination?: typeof pagination }).pagination) {
+            setPagination((upazilaRes as unknown as { pagination: typeof pagination }).pagination);
+          }
+          return;
+        }
+      }
+
+      // Step B: Check User's District
       if (userDistrict) {
         const districtRes = await getAllGlobalFoodItems({
           ...baseQuery,
@@ -424,15 +403,15 @@ function ExploreFoodContent() {
         if (districtRes.success && Array.isArray(districtRes.data) && districtRes.data.length > 0) {
           const sortedList = [...districtRes.data];
 
-          // If user has a specific Upazila, prioritize Upazila items at the top
+          // If user has a specific Upazila, prioritize any matching restaurant at the top
           let upazilaMatchesCount = 0;
           if (userUpazila) {
             const upazilaClean = userUpazila.toLowerCase();
             sortedList.sort((a: any, b: any) => {
               const aUpazila = (a.restaurantUpazila || a.restaurantLocation || a.restaurantAddress || a.restaurantName || '').toLowerCase();
               const bUpazila = (b.restaurantUpazila || b.restaurantLocation || b.restaurantAddress || b.restaurantName || '').toLowerCase();
-              const aMatch = aUpazila.includes('moulvi') || aUpazila.includes('maulavi') || aUpazila.includes(upazilaClean);
-              const bMatch = bUpazila.includes('moulvi') || bUpazila.includes('maulavi') || bUpazila.includes(upazilaClean);
+              const aMatch = aUpazila.includes(upazilaClean);
+              const bMatch = bUpazila.includes(upazilaClean);
 
               if (aMatch && !bMatch) return -1;
               if (!aMatch && bMatch) return 1;
@@ -441,19 +420,12 @@ function ExploreFoodContent() {
 
             upazilaMatchesCount = sortedList.filter((item: any) => {
               const loc = (item.restaurantUpazila || item.restaurantLocation || item.restaurantAddress || item.restaurantName || '').toLowerCase();
-              return loc.includes('moulvi') || loc.includes('maulavi') || loc.includes(upazilaClean);
+              return loc.includes(upazilaClean);
             }).length;
           }
 
           setFoodItems(sortedList);
           setActiveMatchedTier(upazilaMatchesCount > 0 ? 'upazila' : 'district');
-          setFallbackNotice({
-            tier: upazilaMatchesCount > 0 ? 'upazila' : 'district',
-            title: `Closest to Your Location: ${userUpazila ? `${userUpazila}, ` : ''}${userDistrict}`,
-            description: `Showing dishes from restaurants closest to your current location (${userUpazila || userDistrict}) first.`,
-            badge: 'Nearest First',
-          });
-
           if ((districtRes as unknown as { pagination?: typeof pagination }).pagination) {
             setPagination((districtRes as unknown as { pagination: typeof pagination }).pagination);
           }
@@ -461,7 +433,7 @@ function ExploreFoodContent() {
         }
       }
 
-      // Step C: Check Division (বিভাগ) if 0 items in District
+      // Step C: Check Division if 0 items in District
       if (userDivision) {
         const divisionRes = await getAllGlobalFoodItems({
           ...baseQuery,
@@ -471,14 +443,6 @@ function ExploreFoodContent() {
         if (divisionRes.success && Array.isArray(divisionRes.data) && divisionRes.data.length > 0) {
           setFoodItems(divisionRes.data);
           setActiveMatchedTier('division');
-          setFallbackNotice({
-            tier: 'division',
-            title: `Expanded to Division: ${userDivision}`,
-            description: userDistrict
-              ? `No partner restaurants found in ${userDistrict} District. Showing dishes available across ${userDivision} Division.`
-              : `Showing dishes available in ${userDivision} Division.`,
-            badge: 'Division Match',
-          });
           if ((divisionRes as unknown as { pagination?: typeof pagination }).pagination) {
             setPagination((divisionRes as unknown as { pagination: typeof pagination }).pagination);
           }
@@ -486,10 +450,17 @@ function ExploreFoodContent() {
         }
       }
 
-      // Step D: If no restaurants exist in the user's division, do not mix unrelated cities
-      setFoodItems([]);
-      setActiveMatchedTier('all');
-      setFallbackNotice(null);
+      // Step D: If location is OFF or no regional matches -> Load all dishes across Bangladesh
+      const allRes = await getAllGlobalFoodItems(baseQuery);
+      if (allRes.success && Array.isArray(allRes.data)) {
+        setFoodItems(allRes.data);
+        setActiveMatchedTier('all');
+        if ((allRes as unknown as { pagination?: typeof pagination }).pagination) {
+          setPagination((allRes as unknown as { pagination: typeof pagination }).pagination);
+        }
+      } else {
+        setFoodItems([]);
+      }
     } catch {
       setFoodItems([]);
       setError('Something went wrong while fetching dishes. Please try again.');
@@ -710,18 +681,24 @@ function ExploreFoodContent() {
 
             <div className="flex flex-wrap items-center gap-3">
               {/* Location display badge */}
-              <div className="flex items-center gap-2 bg-white/15 backdrop-blur-md border border-white/25 rounded-2xl px-4 py-2.5 text-white text-xs font-medium shadow-inner">
+              <button
+                type="button"
+                onClick={() => detectRealTimeLocation()}
+                className="flex items-center gap-2 bg-white/15 hover:bg-white/25 backdrop-blur-md border border-white/25 rounded-2xl px-4 py-2.5 text-white text-xs font-medium shadow-inner transition-colors cursor-pointer text-left"
+                title="Click to detect GPS location"
+              >
                 <MapPin className="w-4 h-4 text-amber-300 shrink-0 animate-bounce" />
                 <div className="flex flex-col text-left">
                   <span className="text-[10px] text-amber-200 uppercase font-extrabold tracking-wider">
-                    Detected Location
+                    {locationInfo.hasRealLocation ? "Detected Location" : "Location"}
                   </span>
                   <span className="truncate max-w-[200px] font-bold text-white text-xs">
-                    {locationInfo.upazila ? `${locationInfo.upazila}, ` : ''}
-                    {locationInfo.district || locationInfo.city}
+                    {locationInfo.hasRealLocation
+                      ? (locationInfo.upazila ? `${locationInfo.upazila}, ` : '') + (locationInfo.district || locationInfo.city)
+                      : "Location Off"}
                   </span>
                 </div>
-              </div>
+              </button>
 
               {/* Restaurant dropdown */}
               <div className="relative">
@@ -908,56 +885,6 @@ function ExploreFoodContent() {
 
           {/* RIGHT CONTENT */}
           <main className="flex-1 min-w-0">
-            {/* DYNAMIC SMART LOCATION NOTIFICATION BANNER */}
-            {fallbackNotice && !loading && foodItems.length > 0 && (
-              <motion.div
-                initial={{ opacity: 0, y: -10 }}
-                animate={{ opacity: 1, y: 0 }}
-                className={`mb-6 p-4 rounded-2xl border flex items-start sm:items-center justify-between gap-4 shadow-xs ${
-                  fallbackNotice.tier === 'upazila'
-                    ? 'bg-emerald-50/80 border-emerald-200 text-emerald-900'
-                    : fallbackNotice.tier === 'district'
-                    ? 'bg-amber-50/90 border-amber-200 text-amber-900'
-                    : fallbackNotice.tier === 'division'
-                    ? 'bg-orange-50/90 border-orange-200 text-orange-900'
-                    : 'bg-blue-50/90 border-blue-200 text-blue-900'
-                }`}
-              >
-                <div className="flex items-start sm:items-center gap-3">
-                  <div className={`p-2 rounded-xl shrink-0 ${
-                    fallbackNotice.tier === 'upazila'
-                      ? 'bg-emerald-500 text-white'
-                      : fallbackNotice.tier === 'district'
-                      ? 'bg-amber-500 text-white'
-                      : fallbackNotice.tier === 'division'
-                      ? 'bg-orange-500 text-white'
-                      : 'bg-blue-500 text-white'
-                  }`}>
-                    {fallbackNotice.tier === 'upazila' ? (
-                      <CheckCircle2 className="w-5 h-5" />
-                    ) : (
-                      <Info className="w-5 h-5" />
-                    )}
-                  </div>
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <h4 className="font-extrabold text-sm">{fallbackNotice.title}</h4>
-                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-white/80 border shadow-2xs">
-                        {fallbackNotice.badge}
-                      </span>
-                    </div>
-                    <p className="text-xs mt-0.5 opacity-90 leading-relaxed max-w-xl">
-                      {fallbackNotice.description}
-                    </p>
-                  </div>
-                </div>
-
-                <div className="hidden md:flex items-center gap-2 text-xs font-bold text-gray-500 shrink-0">
-                  <span>{pagination.totalItems} dishes available</span>
-                </div>
-              </motion.div>
-            )}
-
             {/* LOADING WITH SPINNER */}
             {loading && (
               <div className="flex items-center justify-center min-h-[450px] w-full">

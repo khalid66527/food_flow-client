@@ -13,6 +13,7 @@ import CartSidebar from "@/components/cart/CartSidebar";
 import { CartProvider } from "@/contexts/CartContext";
 import LocationGuard from "@/components/common/LocationGuard";
 import ToastProvider from "@/components/common/ToastProvider";
+import JwtTokenSync from "@/components/auth/JwtTokenSync";
 
 const inter = Inter({
   variable: "--font-inter",
@@ -54,6 +55,7 @@ export default function RootLayout({
         <ScrollToHash />
         <LocationGuard>
           <CartProvider>
+            <JwtTokenSync />
             <Navbar session={null} cartItemCount={0} />
             <main className="flex-grow">{children}</main>
             <Footer></Footer>

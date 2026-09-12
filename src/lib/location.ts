@@ -15,24 +15,22 @@ export interface ILocationInfo {
   lng?: number;
 }
 
-let cachedLocation: ILocationInfo = {
-  city: "Moulvibazar",
-  area: "Maulavi Bazar, Moulvibazar",
-  division: "Sylhet",
-  district: "Moulvibazar",
-  upazila: "Maulavi Bazar",
+const DEFAULT_INITIAL_LOCATION: ILocationInfo = {
+  city: "Bangladesh",
+  area: "All Bangladesh",
+  division: "",
+  district: "",
+  upazila: "",
   isDetecting: false,
-  hasRealLocation: true,
+  hasRealLocation: false,
 };
 
-// Hydrate from localStorage on client side if available
+let cachedLocation: ILocationInfo = { ...DEFAULT_INITIAL_LOCATION };
+
+// Clear any stale cached location from localStorage on load
 if (typeof window !== "undefined") {
   try {
-    const saved = localStorage.getItem("food_flow_user_location");
-    if (saved) {
-      const parsed = JSON.parse(saved);
-      cachedLocation = { ...cachedLocation, ...parsed, isDetecting: false };
-    }
+    localStorage.removeItem("food_flow_user_location");
   } catch {}
 }
 
@@ -50,15 +48,6 @@ export function subscribeLocation(callback: () => void) {
 }
 
 export function getRealTimeLocation(): ILocationInfo {
-  if (typeof window !== "undefined" && !cachedLocation.hasRealLocation) {
-    try {
-      const saved = localStorage.getItem("food_flow_user_location");
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        cachedLocation = { ...cachedLocation, ...parsed, isDetecting: false };
-      }
-    } catch {}
-  }
   return cachedLocation;
 }
 
@@ -72,9 +61,12 @@ export function parseBangladeshHierarchy(rawData: any): {
   city: string;
   area: string;
 } {
-  const principalSubdivision = String(rawData.principalSubdivision || "").trim();
-  const cityRaw = String(rawData.city || "").trim();
-  const localityRaw = String(rawData.locality || "").trim();
+  const addr = rawData?.address || {};
+  const principalSubdivision = String(rawData.principalSubdivision || addr.state || "").trim();
+  const cityRaw = String(rawData.city || addr.city || addr.town || addr.municipality || "").trim();
+  const localityRaw = String(rawData.locality || addr.suburb || addr.neighbourhood || addr.village || "").trim();
+  const countyRaw = String(addr.county || addr.state_district || addr.district || "").trim();
+  const displayName = String(rawData.display_name || "").trim();
   
   const adminList = Array.isArray(rawData.localityInfo?.administrative)
     ? rawData.localityInfo.administrative
@@ -83,7 +75,9 @@ export function parseBangladeshHierarchy(rawData: any): {
   const combinedSearchText = [
     localityRaw,
     cityRaw,
+    countyRaw,
     principalSubdivision,
+    displayName,
     ...adminList.map((a: any) => a.name || ""),
   ].join(" ").toLowerCase();
 
@@ -139,6 +133,7 @@ export function parseBangladeshHierarchy(rawData: any): {
       for (const p of distObj.postalCodes) {
         const pNameLower = p.name.toLowerCase();
         if (
+          combinedSearchText.includes(pNameLower) ||
           localityRaw.toLowerCase().includes(pNameLower) ||
           cityRaw.toLowerCase().includes(pNameLower)
         ) {
@@ -214,6 +209,61 @@ export function parseBangladeshHierarchy(rawData: any): {
   };
 }
 
+export async function reverseGeocodeCoordinates(lat: number, lon: number) {
+  // 1. Try Nominatim for high-resolution BD geography
+  try {
+    const nomRes = await fetch(
+      `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}&addressdetails=1`,
+      { headers: { "Accept-Language": "en" } }
+    );
+    if (nomRes.ok) {
+      const nomData = await nomRes.json();
+      if (nomData && nomData.address) {
+        return parseBangladeshHierarchy(nomData);
+      }
+    }
+  } catch {}
+
+  // 2. Fallback to BigDataCloud
+  try {
+    const bdcRes = await fetch(
+      `https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${lat}&longitude=${lon}&localityLanguage=en`
+    );
+    if (bdcRes.ok) {
+      const bdcData = await bdcRes.json();
+      return parseBangladeshHierarchy(bdcData);
+    }
+  } catch {}
+
+  return parseBangladeshHierarchy({});
+}
+
+/**
+ * Haversine formula to calculate the distance between two coordinates in meters
+ */
+export function getDistanceFromLatLonInMeters(
+  lat1: number,
+  lon1: number,
+  lat2: number,
+  lon2: number
+): number {
+  const R = 6371e3; // Earth's radius in meters
+  const dLat = (lat2 - lat1) * (Math.PI / 180);
+  const dLon = (lon2 - lon1) * (Math.PI / 180);
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(lat1 * (Math.PI / 180)) *
+      Math.cos(lat2 * (Math.PI / 180)) *
+      Math.sin(dLon / 2) *
+      Math.sin(dLon / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return R * c;
+}
+
+let lastResolvedCoords: { lat: number; lng: number } | null = null;
+const MIN_DISTANCE_METERS = 30; // Minimum 30m distance delta before re-resolving location
+const MAX_ACCEPTABLE_ACCURACY = 2500; // Ignore GPS jitter with accuracy radius > 2500m
+
 export function updateRealTimeLocation(
   city: string,
   area?: string,
@@ -223,6 +273,10 @@ export function updateRealTimeLocation(
 ) {
   const cleanCity = city.trim();
   const cleanArea = area ? area.trim() : `${cleanCity} Central`;
+
+  if (lat !== undefined && lng !== undefined) {
+    lastResolvedCoords = { lat, lng };
+  }
 
   const newLoc = {
     city: cleanCity,
@@ -244,12 +298,6 @@ export function updateRealTimeLocation(
 
   cachedLocation = newLoc;
 
-  if (typeof window !== "undefined") {
-    try {
-      localStorage.setItem("food_flow_user_location", JSON.stringify(newLoc));
-    } catch {}
-  }
-
   if (isChanged) {
     notifyLocationListeners();
   }
@@ -260,22 +308,44 @@ export async function detectRealTimeLocation(): Promise<ILocationInfo> {
 
   return new Promise((resolve) => {
     if (!navigator.geolocation) {
-      cachedLocation = { ...cachedLocation, isDetecting: false };
+      cachedLocation = { ...DEFAULT_INITIAL_LOCATION, isDetecting: false };
       return resolve(cachedLocation);
     }
+
+    const geoOptions: PositionOptions = {
+      enableHighAccuracy: true, // Force hardware GPS when available
+      timeout: 10000,           // 10 second timeout limit
+      maximumAge: 5000,          // Use recent cached position within 5s to avoid constant jumps
+    };
 
     navigator.geolocation.getCurrentPosition(
       async (position) => {
         try {
           const lat = position.coords.latitude;
           const lon = position.coords.longitude;
+          const accuracy = position.coords.accuracy;
 
-          const res = await fetch(
-            `https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${lat}&longitude=${lon}&localityLanguage=en`
-          );
-          const data = await res.json();
+          // 1. Accuracy Threshold: If accuracy radius is bad (> 2500m) and we already have a location, ignore jitter
+          if (accuracy && accuracy > MAX_ACCEPTABLE_ACCURACY && cachedLocation.hasRealLocation) {
+            return resolve(cachedLocation);
+          }
 
-          const parsed = parseBangladeshHierarchy(data);
+          // 2. Distance Threshold: If movement from last position is less than MIN_DISTANCE_METERS, do not jump
+          if (lastResolvedCoords && cachedLocation.hasRealLocation) {
+            const distance = getDistanceFromLatLonInMeters(
+              lastResolvedCoords.lat,
+              lastResolvedCoords.lng,
+              lat,
+              lon
+            );
+
+            if (distance < MIN_DISTANCE_METERS) {
+              return resolve(cachedLocation);
+            }
+          }
+
+          const parsed = await reverseGeocodeCoordinates(lat, lon);
+          lastResolvedCoords = { lat, lng: lon };
 
           const newLoc: ILocationInfo = {
             city: parsed.city,
@@ -297,27 +367,25 @@ export async function detectRealTimeLocation(): Promise<ILocationInfo> {
 
           cachedLocation = newLoc;
 
-          if (typeof window !== "undefined") {
-            try {
-              localStorage.setItem("food_flow_user_location", JSON.stringify(newLoc));
-            } catch {}
-          }
-
           if (isChanged) {
             notifyLocationListeners();
           }
           resolve(cachedLocation);
         } catch {
-          cachedLocation = { ...cachedLocation, isDetecting: false };
+          cachedLocation = { ...DEFAULT_INITIAL_LOCATION, isDetecting: false };
           resolve(cachedLocation);
         }
       },
       (err) => {
         console.warn("Geolocation permission or timeout fallback:", err.message);
-        cachedLocation = { ...cachedLocation, isDetecting: false };
+        const wasReal = cachedLocation.hasRealLocation;
+        cachedLocation = { ...DEFAULT_INITIAL_LOCATION, isDetecting: false, error: err.message };
+        if (wasReal) {
+          notifyLocationListeners();
+        }
         resolve(cachedLocation);
       },
-      { timeout: 8000, maximumAge: 60000 }
+      geoOptions
     );
   });
 }
