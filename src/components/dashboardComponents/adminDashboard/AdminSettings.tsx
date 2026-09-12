@@ -23,9 +23,11 @@ import {
   ToggleLeft,
   ToggleRight,
   Calculator,
+  Pencil,
+  X,
 } from "lucide-react";
 import { getPlatformSettings, updatePlatformSettings, TPlatformSettings } from "@/lib/api/settings";
-import { getCoupons, createCoupon, toggleCouponStatus, deleteCoupon, TCoupon } from "@/lib/api/coupon";
+import { getCoupons, createCoupon, updateCoupon, toggleCouponStatus, deleteCoupon, TCoupon } from "@/lib/api/coupon";
 import LoadingSpinner from "@/lib/api/LoadingSpinner";
 
 export default function AdminSettings() {
@@ -46,6 +48,8 @@ export default function AdminSettings() {
 
   // Coupons State
   const [coupons, setCoupons] = useState<TCoupon[]>([]);
+  const [editingCoupon, setEditingCoupon] = useState<TCoupon | null>(null);
+  const [updatingCoupon, setUpdatingCoupon] = useState(false);
 
   // New Coupon Form State
   const [newCoupon, setNewCoupon] = useState({
@@ -150,6 +154,57 @@ export default function AdminSettings() {
       setTimeout(() => setMessage(null), 4000);
     } else {
       setMessage({ type: "error", text: res.message || "Failed to create coupon." });
+    }
+  };
+
+  // Open Edit Modal Handler
+  const handleOpenEdit = (coupon: TCoupon) => {
+    setEditingCoupon({
+      ...coupon,
+      expiryDate: coupon.expiryDate ? coupon.expiryDate.split("T")[0] : "",
+    });
+  };
+
+  // Update Coupon Handler
+  const handleUpdateCoupon = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingCoupon || !editingCoupon._id) return;
+    if (!editingCoupon.code.trim()) {
+      setMessage({ type: "error", text: "Please enter a coupon code." });
+      return;
+    }
+    const val = Number(editingCoupon.discountValue);
+    if (isNaN(val) || val <= 0) {
+      setMessage({ type: "error", text: "Please enter a valid discount value greater than 0." });
+      return;
+    }
+
+    setUpdatingCoupon(true);
+    setMessage(null);
+
+    const payload = {
+      code: editingCoupon.code.toUpperCase(),
+      discountType: editingCoupon.discountType,
+      discountValue: val,
+      minOrderValue: editingCoupon.minOrderValue ? Number(editingCoupon.minOrderValue) : 0,
+      maxDiscountAmount: editingCoupon.maxDiscountAmount ? Number(editingCoupon.maxDiscountAmount) : undefined,
+      isFirstOrderOnly: editingCoupon.isFirstOrderOnly,
+      expiryDate: editingCoupon.expiryDate ? new Date(editingCoupon.expiryDate).toISOString() : undefined,
+      isActive: editingCoupon.isActive,
+    };
+
+    const res = await updateCoupon(editingCoupon._id, payload);
+    setUpdatingCoupon(false);
+
+    if (res.success && res.data) {
+      setCoupons((prev) =>
+        prev.map((c) => (c._id === res.data!._id ? res.data! : c))
+      );
+      setEditingCoupon(null);
+      setMessage({ type: "success", text: `✨ Coupon "${res.data.code}" updated successfully!` });
+      setTimeout(() => setMessage(null), 4000);
+    } else {
+      setMessage({ type: "error", text: res.message || "Failed to update coupon." });
     }
   };
 
@@ -632,14 +687,24 @@ export default function AdminSettings() {
                           </button>
                         </td>
                         <td className="py-3 px-3 text-right">
-                          <button
-                            type="button"
-                            onClick={() => handleDeleteCoupon(c._id!)}
-                            className="p-1.5 text-rose-500 hover:bg-rose-50 rounded-lg transition cursor-pointer"
-                            title="Delete Coupon"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
+                          <div className="flex items-center justify-end gap-1.5">
+                            <button
+                              type="button"
+                              onClick={() => handleOpenEdit(c)}
+                              className="p-1.5 text-indigo-600 hover:text-indigo-800 hover:bg-indigo-50 rounded-lg transition cursor-pointer"
+                              title="Edit Coupon"
+                            >
+                              <Pencil className="w-4 h-4" />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteCoupon(c._id!)}
+                              className="p-1.5 text-rose-500 hover:bg-rose-50 rounded-lg transition cursor-pointer"
+                              title="Delete Coupon"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </div>
                         </td>
                       </tr>
                     ))}
@@ -650,6 +715,167 @@ export default function AdminSettings() {
           </div>
         </div>
       </div>
+
+      {/* EDIT COUPON MODAL */}
+      {editingCoupon && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl border border-gray-200 shadow-2xl w-full max-w-xl overflow-hidden p-6 sm:p-8 space-y-6">
+            <div className="flex items-center justify-between border-b border-gray-100 pb-4">
+              <div className="flex items-center gap-2.5">
+                <div className="w-10 h-10 rounded-2xl bg-orange-50 text-[#FF6B35] flex items-center justify-center font-bold">
+                  <Pencil className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-black text-gray-900">Edit Coupon Details</h3>
+                  <p className="text-xs text-gray-400">Update promo logic, values, and restrictions</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setEditingCoupon(null)}
+                className="p-2 rounded-xl text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleUpdateCoupon} className="space-y-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {/* Coupon Code */}
+                <div className="space-y-1">
+                  <label className="text-xs font-bold text-gray-700 uppercase tracking-wider">
+                    Coupon Code <span className="text-rose-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={editingCoupon.code}
+                    onChange={(e) => setEditingCoupon({ ...editingCoupon, code: e.target.value.toUpperCase() })}
+                    className="w-full px-4 py-2.5 rounded-2xl bg-gray-50/80 border border-gray-200 focus:bg-white focus:border-[#FF6B35] outline-none text-xs font-bold uppercase transition"
+                  />
+                </div>
+
+                {/* Discount Type */}
+                <div className="space-y-1">
+                  <label className="text-xs font-bold text-gray-700 uppercase tracking-wider">
+                    Discount Type
+                  </label>
+                  <select
+                    value={editingCoupon.discountType}
+                    onChange={(e) =>
+                      setEditingCoupon({ ...editingCoupon, discountType: e.target.value as "fixed" | "percentage" })
+                    }
+                    className="w-full px-4 py-2.5 rounded-2xl bg-gray-50/80 border border-gray-200 focus:bg-white focus:border-[#FF6B35] outline-none text-xs font-bold transition cursor-pointer"
+                  >
+                    <option value="fixed">Fixed Amount Discount (Tk)</option>
+                    <option value="percentage">Percentage Discount (%)</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                {/* Discount Value */}
+                <div className="space-y-1">
+                  <label className="text-xs font-bold text-gray-700 uppercase tracking-wider">
+                    Discount Value <span className="text-rose-500">*</span>
+                  </label>
+                  <input
+                    type="number"
+                    min="0.1"
+                    step="0.1"
+                    required
+                    value={editingCoupon.discountValue}
+                    onChange={(e) => setEditingCoupon({ ...editingCoupon, discountValue: Number(e.target.value) })}
+                    className="w-full px-4 py-2.5 rounded-2xl bg-gray-50/80 border border-gray-200 focus:bg-white focus:border-[#FF6B35] outline-none text-xs font-semibold"
+                  />
+                </div>
+
+                {/* Min Order Value */}
+                <div className="space-y-1">
+                  <label className="text-xs font-bold text-gray-700 uppercase tracking-wider">
+                    Min Order (Tk)
+                  </label>
+                  <input
+                    type="number"
+                    min="0"
+                    value={editingCoupon.minOrderValue ?? 0}
+                    onChange={(e) => setEditingCoupon({ ...editingCoupon, minOrderValue: Number(e.target.value) })}
+                    className="w-full px-4 py-2.5 rounded-2xl bg-gray-50/80 border border-gray-200 focus:bg-white focus:border-[#FF6B35] outline-none text-xs font-semibold"
+                  />
+                </div>
+
+                {/* Expiry Date */}
+                <div className="space-y-1">
+                  <label className="text-xs font-bold text-gray-700 uppercase tracking-wider">
+                    Expiry Date
+                  </label>
+                  <input
+                    type="date"
+                    value={editingCoupon.expiryDate || ""}
+                    onChange={(e) => setEditingCoupon({ ...editingCoupon, expiryDate: e.target.value })}
+                    className="w-full px-3 py-2 rounded-2xl bg-gray-50/80 border border-gray-200 focus:bg-white focus:border-[#FF6B35] outline-none text-xs font-medium"
+                  />
+                </div>
+              </div>
+
+              {/* FIRST-ORDER RESTRICTION TOGGLE */}
+              <div className="pt-2 flex items-center justify-between p-3.5 rounded-2xl bg-orange-50/70 border border-orange-200/80">
+                <div className="flex items-center gap-2.5">
+                  <UserCheck className="w-4 h-4 text-[#FF6B35]" />
+                  <div>
+                    <p className="text-xs font-black text-gray-900">First-Order Only Restriction</p>
+                    <p className="text-[11px] text-gray-500">
+                      Valid only for users with zero prior completed orders.
+                    </p>
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() =>
+                    setEditingCoupon({ ...editingCoupon, isFirstOrderOnly: !editingCoupon.isFirstOrderOnly })
+                  }
+                  className="cursor-pointer text-[#FF6B35]"
+                >
+                  {editingCoupon.isFirstOrderOnly ? (
+                    <ToggleRight className="w-8 h-8 text-[#FF6B35]" />
+                  ) : (
+                    <ToggleLeft className="w-8 h-8 text-gray-400" />
+                  )}
+                </button>
+              </div>
+
+              {/* ACTIONS FOOTER */}
+              <div className="pt-3 flex items-center justify-end gap-3 border-t border-gray-100">
+                <button
+                  type="button"
+                  onClick={() => setEditingCoupon(null)}
+                  className="px-5 py-2.5 rounded-2xl bg-gray-100 text-gray-700 text-xs font-bold hover:bg-gray-200 transition cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={updatingCoupon}
+                  className="flex items-center justify-center gap-2 px-6 py-2.5 rounded-2xl bg-[#FF6B35] text-white text-xs font-black shadow-lg shadow-orange-500/20 hover:bg-[#e85b27] active:scale-98 transition disabled:opacity-50 cursor-pointer"
+                >
+                  {updatingCoupon ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      Updating...
+                    </>
+                  ) : (
+                    <>
+                      <CheckCircle2 className="w-4 h-4" />
+                      Update Coupon
+                    </>
+                  )}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
