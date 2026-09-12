@@ -221,8 +221,8 @@ export default function Navbar({
             Home
           </Link>
           <Link 
-            href="/restaurants" 
-            className={`px-4 py-1.5 rounded-full transition-all ${pathname === "/restaurants" || pathname === "/dishes" ? "bg-white text-orange-600 shadow-xs font-semibold" : "hover:bg-white hover:text-orange-600"}`}
+            href="/dishes" 
+            className={`px-4 py-1.5 rounded-full transition-all ${pathname === "/restaurants" || pathname.startsWith("/dishes") ? "bg-white text-orange-600 shadow-xs font-semibold" : "hover:bg-white hover:text-orange-600"}`}
           >
             Dishes
           </Link>
@@ -366,9 +366,9 @@ export default function Navbar({
             Home
           </Link>
           <Link 
-            href="/restaurants" 
+            href="/dishes" 
             onClick={() => setIsMobileMenuOpen(false)}
-            className={`block px-3 py-2 rounded-lg text-base font-medium transition-colors ${pathname === "/restaurants" || pathname === "/dishes" ? "bg-orange-50 text-orange-600" : "text-gray-700 hover:bg-orange-50 hover:text-orange-600"}`}
+            className={`block px-3 py-2 rounded-lg text-base font-medium transition-colors ${pathname === "/restaurants" || pathname.startsWith("/dishes") ? "bg-orange-50 text-orange-600" : "text-gray-700 hover:bg-orange-50 hover:text-orange-600"}`}
           >
             Dishes
           </Link>

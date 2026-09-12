@@ -351,7 +351,7 @@ const Banner = () => {
                         <motion.div variants={itemVariants}>
                             <div className="mt-8 flex flex-col gap-4 sm:flex-row">
                                 <Link
-                                    href="/restaurants"
+                                    href="/dishes"
                                     className="inline-flex items-center justify-center gap-2 rounded-full bg-orange-500 px-8 py-4 text-base font-semibold text-white shadow-lg shadow-orange-500/25 transition-all hover:bg-orange-600 hover:shadow-orange-600/30 active:scale-95"
                                 >
                                     Order Now
@@ -359,7 +359,7 @@ const Banner = () => {
                                 </Link>
 
                                 <Link
-                                    href="/offers"
+                                    href="/dishes?featured=true"
                                     className="inline-flex items-center justify-center gap-2 rounded-full border-2 border-gray-200 bg-white px-8 py-4 text-base font-semibold text-gray-700 transition-all hover:border-orange-300 hover:bg-orange-50/50 hover:text-orange-600 active:scale-95"
                                 >
                                     Explore Offers

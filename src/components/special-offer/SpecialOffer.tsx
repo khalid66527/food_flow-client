@@ -175,7 +175,7 @@ const SpecialOffer = () => {
                                 variants={itemVariants}
                                 className="flex flex-wrap items-center gap-4 pt-2"
                             >
-                                <Link href="/offers">
+                                <Link href="/dishes">
                                     <motion.span
                                         whileHover={{ scale: 1.03 }}
                                         whileTap={{ scale: 0.97 }}

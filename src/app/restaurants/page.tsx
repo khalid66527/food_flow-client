@@ -141,7 +141,16 @@ function ExploreFoodContent() {
   });
 
   // Filters — sidebar
-  const [selectedCategory, setSelectedCategory] = useState('all');
+  // Initialize selectedCategory state synchronously from URL parameter to eliminate initial render race conditions
+  const [selectedCategory, setSelectedCategory] = useState<string>(() => {
+    if (urlCategory) return urlCategory.trim().toLowerCase();
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      const cat = params.get('category') || params.get('cuisine');
+      if (cat) return cat.trim().toLowerCase();
+    }
+    return 'all';
+  });
   const [isVegetarian, setIsVegetarian] = useState(false);
   const [isSpicy, setIsSpicy] = useState(false);
 
@@ -205,11 +214,9 @@ function ExploreFoodContent() {
   // SYNC URL CATEGORY PARAMETER
   // ---------------------------------------------------------------------------
   useEffect(() => {
-    if (urlCategory) {
-      const normCat = urlCategory.trim().toLowerCase();
-      setSelectedCategory(normCat);
-      setCurrentPage(1);
-    }
+    const activeUrlCat = (urlCategory || '').trim().toLowerCase() || 'all';
+    setSelectedCategory(activeUrlCat);
+    setCurrentPage(1);
   }, [urlCategory]);
 
   // ---------------------------------------------------------------------------
@@ -297,6 +304,25 @@ function ExploreFoodContent() {
     setCurrentPage(1);
   }, [responsiveLimit]);
 
+  // Helper to ensure strict category filtering on returned food items
+  const isMatchingCategory = (itemCategory: string, filterCategory: string): boolean => {
+    if (!filterCategory || filterCategory === 'all') return true;
+    const itemCat = (itemCategory || '').trim().toLowerCase();
+    const filterCat = filterCategory.trim().toLowerCase();
+
+    if (itemCat === filterCat) return true;
+    if (itemCat.includes(filterCat) || filterCat.includes(itemCat)) return true;
+
+    const itemBase = itemCat.replace(/s$/i, '');
+    const filterBase = filterCat.replace(/s$/i, '');
+    return itemBase === filterBase;
+  };
+
+  const filterBySelectedCategory = (items: IGlobalFoodItem[]) => {
+    if (!selectedCategory || selectedCategory === 'all') return items;
+    return items.filter((item) => isMatchingCategory(item.category, selectedCategory));
+  };
+
   // ---------------------------------------------------------------------------
   // CASCADING HIERARCHICAL FETCH ALGORITHM (উপজেলা -> জেলা -> বিভাগ -> All)
   // ---------------------------------------------------------------------------
@@ -326,7 +352,7 @@ function ExploreFoodContent() {
         const query = { ...baseQuery, upazila: locationInfo.upazila || locationInfo.area || '' };
         const res = await getAllGlobalFoodItems(query);
         if (res.success && Array.isArray(res.data) && res.data.length > 0) {
-          setFoodItems(res.data);
+          setFoodItems(filterBySelectedCategory(res.data));
           setActiveMatchedTier('upazila');
           setFallbackNotice({
             tier: 'upazila',
@@ -350,7 +376,7 @@ function ExploreFoodContent() {
         const query = { ...baseQuery, district: locationInfo.district || locationInfo.city || '' };
         const res = await getAllGlobalFoodItems(query);
         if (res.success && Array.isArray(res.data) && res.data.length > 0) {
-          setFoodItems(res.data);
+          setFoodItems(filterBySelectedCategory(res.data));
           setActiveMatchedTier('district');
           setFallbackNotice({
             tier: 'district',
@@ -374,7 +400,7 @@ function ExploreFoodContent() {
         const query = { ...baseQuery, division: locationInfo.division || locationInfo.city || '' };
         const res = await getAllGlobalFoodItems(query);
         if (res.success && Array.isArray(res.data) && res.data.length > 0) {
-          setFoodItems(res.data);
+          setFoodItems(filterBySelectedCategory(res.data));
           setActiveMatchedTier('division');
           setFallbackNotice({
             tier: 'division',
@@ -397,7 +423,7 @@ function ExploreFoodContent() {
       if (locationFilterMode === 'all') {
         const res = await getAllGlobalFoodItems(baseQuery);
         if (res.success && Array.isArray(res.data)) {
-          setFoodItems(res.data);
+          setFoodItems(filterBySelectedCategory(res.data));
           setActiveMatchedTier('all');
           setFallbackNotice(null);
           if ((res as unknown as { pagination?: typeof pagination }).pagination) {
@@ -445,7 +471,7 @@ function ExploreFoodContent() {
             }).length;
           }
 
-          setFoodItems(sortedList);
+          setFoodItems(filterBySelectedCategory(sortedList));
           setActiveMatchedTier(upazilaMatchesCount > 0 ? 'upazila' : 'district');
           setFallbackNotice({
             tier: upazilaMatchesCount > 0 ? 'upazila' : 'district',
@@ -469,7 +495,7 @@ function ExploreFoodContent() {
         });
 
         if (divisionRes.success && Array.isArray(divisionRes.data) && divisionRes.data.length > 0) {
-          setFoodItems(divisionRes.data);
+          setFoodItems(filterBySelectedCategory(divisionRes.data));
           setActiveMatchedTier('division');
           setFallbackNotice({
             tier: 'division',
@@ -486,7 +512,21 @@ function ExploreFoodContent() {
         }
       }
 
-      // Step D: If no restaurants exist in the user's division, do not mix unrelated cities
+      // Step D: Fallback to global category fetch if district/division return 0 items for the requested category
+      const globalRes = await getAllGlobalFoodItems(baseQuery);
+      if (globalRes.success && Array.isArray(globalRes.data) && globalRes.data.length > 0) {
+        const filteredGlobal = filterBySelectedCategory(globalRes.data);
+        if (filteredGlobal.length > 0) {
+          setFoodItems(filteredGlobal);
+          setActiveMatchedTier('all');
+          setFallbackNotice(null);
+          if ((globalRes as unknown as { pagination?: typeof pagination }).pagination) {
+            setPagination((globalRes as unknown as { pagination: typeof pagination }).pagination);
+          }
+          return;
+        }
+      }
+
       setFoodItems([]);
       setActiveMatchedTier('all');
       setFallbackNotice(null);
