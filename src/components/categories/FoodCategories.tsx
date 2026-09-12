@@ -160,7 +160,7 @@ const FoodCategories = () => {
                                 }}
                             >
                                 <Link
-                                    href={`/restaurants?category=${category.name.toLowerCase()}`}
+                                    href={`/dishes?category=${category.name.toLowerCase()}`}
                                     className="group relative block aspect-[4/5] overflow-hidden rounded-2xl border border-gray-100 shadow-sm transition-shadow duration-300 hover:shadow-xl"
                                 >
                                     {/* Food Image */}
@@ -212,7 +212,7 @@ const FoodCategories = () => {
                     className="mt-10 text-center"
                 >
                     <Link
-                        href="/restaurants"
+                        href="/dishes"
                         className="group inline-flex items-center gap-2 rounded-full border border-gray-200 bg-white px-6 py-3 text-sm font-semibold text-gray-700 shadow-sm transition-all duration-300 hover:border-orange-200 hover:bg-orange-50 hover:text-orange-600 hover:shadow-md"
                     >
                         View All Cuisines

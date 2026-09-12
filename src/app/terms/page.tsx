@@ -164,8 +164,12 @@ const sections = [
     title: "Coupons & Promotions",
     content: [
       {
-        subtitle: "",
+        subtitle: "General Promotion Rules",
         text: "Food Flow may offer coupons, discount codes and promotional offers from time to time. These promotions are subject to their specific terms and conditions, including expiry dates, minimum order amounts and applicable restaurants. Coupons are non-transferable, cannot be combined with other offers (unless stated) and have no cash value. We reserve the right to modify, suspend or terminate any promotion at any time. Abuse of promotional offers, including creating multiple accounts to redeem the same promotion, may result in account suspension.",
+      },
+      {
+        subtitle: "First Order 20% Discount (WELCOME20)",
+        text: "The 20% Welcome Discount (coupon code 'WELCOME20') is exclusively valid for newly registered users placing their very first order on Food Flow. The discount is applied to the food subtotal (excluding delivery fees and taxes). This offer is strictly single-use per customer/account. Once a user completes their first order or redeems the WELCOME20 coupon, it will be automatically removed from their available coupon list and cannot be re-applied to subsequent orders.",
       },
     ],
   },

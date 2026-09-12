@@ -23,9 +23,15 @@ export interface TApplyCouponResponse {
   message: string;
 }
 
-export async function getCoupons(mode?: 'active'): Promise<{ success: boolean; data?: TCoupon[]; message?: string }> {
+export async function getCoupons(
+  mode?: 'active',
+  userId?: string
+): Promise<{ success: boolean; data?: TCoupon[]; message?: string }> {
   try {
-    const qs = mode ? `?mode=${mode}` : '';
+    const params = new URLSearchParams();
+    if (mode) params.append('mode', mode);
+    if (userId) params.append('userId', userId);
+    const qs = params.toString() ? `?${params.toString()}` : '';
     const res = await fetch(`/api/coupons${qs}`, {
       cache: 'no-store',
     });
@@ -73,6 +79,28 @@ export async function toggleCouponStatus(id: string, isActive: boolean): Promise
     return {
       success: false,
       message: err?.message || 'Failed to toggle coupon status.',
+    };
+  }
+}
+
+export async function updateCoupon(
+  id: string,
+  payload: Partial<TCoupon>
+): Promise<{ success: boolean; data?: TCoupon; message?: string }> {
+  try {
+    const res = await fetch('/api/coupons', {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ id, ...payload }),
+    });
+    const json = await res.json();
+    return json;
+  } catch (err: any) {
+    return {
+      success: false,
+      message: err?.message || 'Failed to update coupon.',
     };
   }
 }
