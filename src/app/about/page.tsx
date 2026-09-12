@@ -124,13 +124,13 @@ export default function AboutPage() {
             </p>
             <div className="mt-8 flex flex-col gap-3 sm:flex-row">
               <Link
-                href="/restaurants"
+                href="/dishes"
                 className="inline-flex items-center justify-center rounded-full bg-orange-500 px-6 py-3 text-sm font-semibold text-white shadow-lg shadow-orange-500/25 transition-colors hover:bg-orange-600"
               >
                 Order now
               </Link>
               <Link
-                href="/offers"
+                href="/dishes?featured=true"
                 className="inline-flex items-center justify-center rounded-full border border-gray-200 px-6 py-3 text-sm font-semibold text-gray-700 transition-colors hover:bg-gray-50"
               >
                 See today&apos;s offers

@@ -97,7 +97,7 @@ const Footer = () => {
 
               <li>
                 <Link
-                  href="/restaurants"
+                  href="/dishes"
                   className="text-gray-500 transition-colors hover:text-orange-500"
                 >
                   Dishes
@@ -106,7 +106,7 @@ const Footer = () => {
 
               <li>
                 <Link
-                  href="/offers"
+                  href="/dishes?featured=true"
                   className="text-gray-500 transition-colors hover:text-orange-500"
                 >
                   Offers
