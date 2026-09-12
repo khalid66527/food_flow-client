@@ -3,6 +3,7 @@
 import React, { useEffect, useState } from "react";
 import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
+import { getCoupons } from "@/lib/api/coupon";
 import { Lottie } from "lottie-react";
 import {
     ArrowRight,
@@ -291,6 +292,30 @@ const itemVariants = {
 
 const Banner = () => {
     const [activeSlide, setActiveSlide] = useState(0);
+    const [dynamicOfferBadgeText, setDynamicOfferBadgeText] = useState<string>("20% OFF");
+
+    useEffect(() => {
+        const loadOfferBadge = async () => {
+            try {
+                const res = await getCoupons("active");
+                if (res.success && Array.isArray(res.data) && res.data.length > 0) {
+                    const welcomeCoupon = res.data.find(
+                        (c) => c.isFirstOrderOnly || (c.code || "").toUpperCase().startsWith("WELCOME")
+                    );
+                    if (welcomeCoupon) {
+                        const label =
+                            welcomeCoupon.discountType === "percentage"
+                                ? `${welcomeCoupon.discountValue}% OFF`
+                                : `৳${welcomeCoupon.discountValue} OFF`;
+                        setDynamicOfferBadgeText(label);
+                    }
+                }
+            } catch (err) {
+                console.warn("Failed to fetch dynamic offer badge for hero banner:", err);
+            }
+        };
+        loadOfferBadge();
+    }, []);
 
     useEffect(() => {
         const interval = heroSlides[activeSlide].duration + SLIDE_DWELL;
@@ -458,7 +483,7 @@ const Banner = () => {
                                                             {card.title}
                                                         </p>
                                                         <p className="mt-0.5 text-2xl font-extrabold tracking-tight text-white">
-                                                            {card.value}
+                                                            {card.title === "Special Offer" ? dynamicOfferBadgeText : card.value}
                                                         </p>
                                                         {card.sub && (
                                                             <p className="mt-0.5 text-[10px] text-orange-100/90">
