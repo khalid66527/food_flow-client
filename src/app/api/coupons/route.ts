@@ -39,7 +39,7 @@ export async function GET(req: NextRequest) {
 
     let coupons = await col.find(query).sort({ createdAt: -1 }).toArray();
 
-    // REQUIREMENT 1: Used Welcome Coupon & Per-User Filtering
+    // Global Coupon Visibility: Return active coupons globally to all customers
     if (userId && mode === "active") {
       try {
         const ordersCol = await getOrdersCollection();
@@ -48,17 +48,10 @@ export async function GET(req: NextRequest) {
           .toArray();
 
         const hasPriorOrders = userOrders.length > 0;
-        const usedCouponCodes = new Set(
-          userOrders.map((o: any) => (o.couponCode || "").toString().trim().toUpperCase()).filter(Boolean)
-        );
 
         coupons = coupons.filter((c) => {
-          const upperCode = c.code.toUpperCase();
-          // Filter out if user already redeemed this specific coupon
-          if (usedCouponCodes.has(upperCode)) {
-            return false;
-          }
-          // Filter out first-order only / welcome coupons if user has prior orders
+          const upperCode = (c.code || "").toUpperCase();
+          // Filter out first-order only coupons ONLY if user has prior completed orders
           if (hasPriorOrders && (c.isFirstOrderOnly || upperCode.startsWith("WELCOME"))) {
             return false;
           }
