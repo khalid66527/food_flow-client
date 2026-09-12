@@ -1,18 +1,15 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import Link from "next/link";
 import { motion } from "framer-motion";
 import {
-    Copy,
-    Check,
     Clock3,
     ArrowRight,
     Sparkles,
-    Percent,
+    Tag,
 } from "lucide-react";
-
-const COUPON_CODE = "WELCOME30";
+import { getCoupons } from "@/lib/api/coupon";
 
 const containerVariants = {
     hidden: {},
@@ -60,24 +57,51 @@ const itemVariants = {
 };
 
 const SpecialOffer = () => {
-    const [copied, setCopied] = useState(false);
+    const [LottieComp, setLottieComp] = useState<any>(null);
+    const [discount20Data, setDiscount20Data] = useState<any>(null);
+    const [discountText, setDiscountText] = useState<string>("20% OFF");
+    const [discountShort, setDiscountShort] = useState<string>("20%");
 
-    const handleCopy = async () => {
-        try {
-            await navigator.clipboard.writeText(COUPON_CODE);
-            setCopied(true);
-            setTimeout(() => setCopied(false), 2000);
-        } catch {
-            const textarea = document.createElement("textarea");
-            textarea.value = COUPON_CODE;
-            document.body.appendChild(textarea);
-            textarea.select();
-            document.execCommand("copy");
-            document.body.removeChild(textarea);
-            setCopied(true);
-            setTimeout(() => setCopied(false), 2000);
-        }
-    };
+    useEffect(() => {
+        let isMounted = true;
+
+        getCoupons("active")
+            .then((res) => {
+                if (isMounted && res.success && Array.isArray(res.data) && res.data.length > 0) {
+                    const welcomeCoupon = res.data.find(
+                        (c) => c.isFirstOrderOnly || (c.code || "").toUpperCase().startsWith("WELCOME")
+                    );
+                    if (welcomeCoupon) {
+                        if (welcomeCoupon.discountType === "percentage") {
+                            setDiscountText(`${welcomeCoupon.discountValue}% OFF`);
+                            setDiscountShort(`${welcomeCoupon.discountValue}%`);
+                        } else {
+                            setDiscountText(`৳${welcomeCoupon.discountValue} OFF`);
+                            setDiscountShort(`৳${welcomeCoupon.discountValue}`);
+                        }
+                    }
+                }
+            })
+            .catch((err) => console.warn("Failed to fetch active coupon for SpecialOffer:", err));
+
+        import("lottie-react").then((mod: any) => {
+            if (isMounted) {
+                const Comp = mod.Lottie || mod.default;
+                if (Comp) setLottieComp(() => Comp);
+            }
+        }).catch((err) => console.warn("Lottie import error:", err));
+
+        fetch("/lottie/20-percent-off.json")
+            .then((res) => res.json())
+            .then((data) => {
+                if (isMounted) setDiscount20Data(data);
+            })
+            .catch((err) => console.warn("Failed to load 20-percent-off.json:", err));
+
+        return () => {
+            isMounted = false;
+        };
+    }, []);
 
     return (
         <section className="relative overflow-hidden bg-white py-16 sm:py-20 lg:py-24">
@@ -114,7 +138,7 @@ const SpecialOffer = () => {
                                     Get{" "}
                                     <span className="relative inline-block">
                                         <span className="relative z-10 text-orange-500">
-                                            30% OFF
+                                            {discountText}
                                         </span>
                                         <span className="absolute bottom-1 left-0 z-0 h-3 w-full bg-orange-200/60 sm:h-4" />
                                     </span>{" "}
@@ -131,44 +155,6 @@ const SpecialOffer = () => {
                                 very first order. Fresh meals, fast delivery, and
                                 unbeatable savings await!
                             </motion.p>
-
-                            {/* Coupon Code Box */}
-                            <motion.div variants={itemVariants}>
-                                <div className="flex max-w-sm items-center gap-3">
-                                    <div className="flex flex-1 items-center gap-2 rounded-xl border-2 border-dashed border-orange-300 bg-orange-50 px-4 py-3">
-                                        <Percent className="h-4 w-4 text-orange-500" />
-                                        <span className="font-mono text-lg font-bold tracking-widest text-gray-900 sm:text-xl">
-                                            {COUPON_CODE}
-                                        </span>
-                                    </div>
-                                    <motion.button
-                                        onClick={handleCopy}
-                                        whileHover={{ scale: 1.05 }}
-                                        whileTap={{ scale: 0.95 }}
-                                        className={`flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-xl border transition-all duration-300 ${
-                                            copied
-                                                ? "border-emerald-300 bg-emerald-100 text-emerald-600"
-                                                : "border-orange-200 bg-orange-100 text-orange-500 hover:bg-orange-200"
-                                        }`}
-                                        title="Copy coupon code"
-                                    >
-                                        {copied ? (
-                                            <Check className="h-5 w-5" />
-                                        ) : (
-                                            <Copy className="h-5 w-5" />
-                                        )}
-                                    </motion.button>
-                                </div>
-                                {copied && (
-                                    <motion.p
-                                        initial={{ opacity: 0, y: -4 }}
-                                        animate={{ opacity: 1, y: 0 }}
-                                        className="mt-2 text-xs font-medium text-emerald-600"
-                                    >
-                                        Copied to clipboard!
-                                    </motion.p>
-                                )}
-                            </motion.div>
 
                             {/* CTA Buttons */}
                             <motion.div
@@ -197,23 +183,37 @@ const SpecialOffer = () => {
                             </motion.div>
                         </motion.div>
 
-                        {/* ============ RIGHT IMAGE CARD ============ */}
+                        {/* ============ RIGHT LOTTIE ANIMATION & IMAGE CARD ============ */}
                         <motion.div
                             variants={rightVariants}
                             className="relative mx-6 my-6 sm:mx-10 sm:my-8 lg:mx-0 lg:my-0 lg:h-full"
                         >
-                            <div className="relative overflow-hidden rounded-3xl lg:h-[420px]">
-                                {/* Food Image */}
+                            <div className="relative overflow-hidden rounded-3xl lg:h-[420px] bg-gradient-to-tr from-orange-50 via-amber-50 to-orange-100 flex items-center justify-center p-4">
+                                {/* Food Image Background */}
                                 <img
                                     src="https://i.ibb.co.com/KxjqtRzs/food-img.jpg"
                                     alt="Delicious pizza with fresh toppings"
-                                    className="h-full w-full object-cover"
+                                    className="h-full w-full object-cover rounded-2xl opacity-90"
                                 />
 
-                                {/* Light overlay */}
-                                <div className="absolute inset-0 bg-gradient-to-t from-black/30 via-transparent to-transparent" />
+                                {/* Dark Gradient Overlay */}
+                                <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-black/10 to-transparent" />
 
-                                {/* Floating Discount Badge */}
+                                {/* 🎬 Integrated 20% OFF Lottie Animation Center Component */}
+                                {LottieComp && discount20Data && (
+                                    <div className="absolute inset-0 flex items-center justify-center pointer-events-none p-4">
+                                        <div className="w-56 h-56 sm:w-64 sm:h-64 drop-shadow-2xl">
+                                            <LottieComp
+                                                animationData={discount20Data}
+                                                loop={true}
+                                                autoplay={true}
+                                                className="w-full h-full"
+                                            />
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* Floating Dynamic Lottie Badge */}
                                 <motion.div
                                     animate={{
                                         y: [0, -8, 0],
@@ -223,30 +223,30 @@ const SpecialOffer = () => {
                                         repeat: Infinity,
                                         ease: "easeInOut",
                                     }}
-                                    className="absolute right-4 top-4 sm:right-6 sm:top-6"
+                                    className="absolute right-4 top-4 sm:right-6 sm:top-6 z-20"
                                 >
-                                    <div className="flex flex-col items-center rounded-2xl bg-orange-500 px-4 py-3 shadow-xl shadow-orange-500/30 sm:px-5 sm:py-4">
-                                        <Sparkles className="mb-1 h-4 w-4 text-orange-100 sm:h-5 sm:w-5" />
-                                        <span className="text-2xl font-extrabold leading-none text-white sm:text-3xl">
-                                            30%
+                                    <div className="flex flex-col items-center rounded-2xl bg-gradient-to-br from-orange-500 to-amber-600 px-4 py-3 shadow-xl shadow-orange-500/40 border border-white/20 backdrop-blur-xs sm:px-5 sm:py-4">
+                                        <Sparkles className="mb-1 h-4 w-4 text-amber-200 animate-spin sm:h-5 sm:w-5" />
+                                        <span className="text-2xl font-black leading-none text-white sm:text-3xl">
+                                            {discountShort}
                                         </span>
-                                        <span className="text-[10px] font-bold uppercase tracking-wider text-orange-100 sm:text-xs">
+                                        <span className="text-[10px] font-extrabold uppercase tracking-widest text-orange-100 sm:text-xs">
                                             OFF
                                         </span>
                                     </div>
                                 </motion.div>
 
                                 {/* Bottom info strip */}
-                                <div className="absolute bottom-0 left-0 right-0 flex items-center gap-3 bg-gradient-to-t from-black/50 to-transparent px-5 py-4 sm:px-6 sm:py-5">
-                                    <div className="flex h-10 w-10 items-center justify-center rounded-full bg-orange-500/90">
-                                        <Sparkles className="h-5 w-5 text-white" />
+                                <div className="absolute bottom-0 left-0 right-0 flex items-center gap-3 bg-gradient-to-t from-black/70 to-transparent px-5 py-4 sm:px-6 sm:py-5 z-10">
+                                    <div className="flex h-10 w-10 items-center justify-center rounded-full bg-orange-500/90 shadow-md">
+                                        <Tag className="h-5 w-5 text-white" />
                                     </div>
                                     <div>
                                         <p className="text-sm font-bold text-white">
-                                            Welcome Deal
+                                            Welcome {discountText} Deal
                                         </p>
                                         <p className="text-xs text-white/80">
-                                            Valid for new customers only
+                                            Valid for new customers on first order
                                         </p>
                                     </div>
                                 </div>
