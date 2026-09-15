@@ -1,64 +1,24 @@
 "use client";
 
 import React, { useState, useEffect, useCallback } from "react";
-import { usePathname } from "next/navigation";
 import {
   MapPin,
   Navigation,
   Loader2,
+  X,
   Sparkles,
-  AlertCircle,
-  ShieldAlert,
+  Info,
 } from "lucide-react";
 import {
-  updateRealTimeLocation,
+  detectRealTimeLocation,
   getRealTimeLocation,
   subscribeLocation,
-  parseBangladeshHierarchy,
 } from "@/lib/location";
-import LoadingSpinner from "@/components/LoadingSpinner";
-
-function isRouteLocationRequired(pathname: string): boolean {
-  if (!pathname) return false;
-  const path = pathname.toLowerCase();
-
-  // 1. PUBLIC WHITELIST ROUTES (LocationGuard modal is NEVER shown here)
-  if (
-    path === "/" ||
-    path === "/about" ||
-    path.startsWith("/about/") ||
-    path === "/contact" ||
-    path.startsWith("/contact/") ||
-    path === "/login" ||
-    path === "/register" ||
-    path.startsWith("/auth/")
-  ) {
-    return false;
-  }
-
-  // 2. PROTECTED & DISHES ROUTES (Mandatory GPS location required)
-  if (
-    path.startsWith("/dashboard") ||
-    path.startsWith("/dishes") ||
-    path.startsWith("/restaurants") ||
-    path.startsWith("/checkout") ||
-    path.includes("/cart") ||
-    path.includes("/order-tracking")
-  ) {
-    return true;
-  }
-
-  return false;
-}
 
 export default function LocationGuard({ children }: { children?: React.ReactNode }) {
-  const pathname = usePathname();
   const [mounted, setMounted] = useState<boolean>(false);
-  const isProtected = isRouteLocationRequired(pathname);
-
   const [hasLocation, setHasLocation] = useState<boolean>(false);
-  const [isChecking, setIsChecking] = useState<boolean>(false);
-  const [isOpen, setIsOpen] = useState<boolean>(false);
+  const [isDismissed, setIsDismissed] = useState<boolean>(false);
   const [isDetecting, setIsDetecting] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -66,123 +26,82 @@ export default function LocationGuard({ children }: { children?: React.ReactNode
     setMounted(true);
   }, []);
 
-  // Reverse geocode helper & in-memory location updater
-  const processCoordinates = useCallback(async (lat: number, lon: number) => {
-    try {
-      const res = await fetch(
-        `https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${lat}&longitude=${lon}&localityLanguage=en`
-      );
-      const data = await res.json();
-      const parsed = parseBangladeshHierarchy(data);
-
-      updateRealTimeLocation(parsed.city, parsed.area, lat, lon, {
-        division: parsed.division,
-        district: parsed.district,
-        upazila: parsed.upazila,
-      });
-    } catch {
-      updateRealTimeLocation("Chattogram", "Chattogram Central", lat, lon, {
-        division: "Chattogram",
-        district: "Chattogram",
-        upazila: "Chattogram GPO",
-      });
-    }
-
-    setHasLocation(true);
-    setIsOpen(false);
-    setIsDetecting(false);
-    setIsChecking(false);
-    setError(null);
-  }, []);
-
-  // Real-time GPS Scanner
-  const scanAndDetectLocation = useCallback((isManualClick: boolean = false) => {
-    if (typeof window === "undefined" || !navigator.geolocation) {
+  // Standard GPS Scanner triggering the native browser prompt with stabilized jitter filter
+  const scanAndDetectLocation = useCallback(
+    async (isManualClick: boolean = false) => {
       if (isManualClick) {
-        setError("Geolocation is not supported by your browser or device.");
+        setIsDetecting(true);
+        setError(null);
       }
-      setIsChecking(false);
-      return;
-    }
 
-    if (isManualClick) {
-      setIsDetecting(true);
-      setError(null);
-    }
-
-    navigator.geolocation.getCurrentPosition(
-      async (position) => {
-        const lat = position.coords.latitude;
-        const lon = position.coords.longitude;
-        await processCoordinates(lat, lon);
-        setIsChecking(false);
-      },
-      (err) => {
+      if (typeof window === "undefined" || !navigator.geolocation) {
         if (isManualClick) {
-          console.warn("GPS Permission error:", err.message);
-          setError(
-            "GPS access is required to view nearby dishes. Please allow location access in your browser or device settings to continue."
-          );
+          setError("Geolocation is not supported by your browser or device.");
           setIsDetecting(false);
         }
-        const loc = getRealTimeLocation();
-        if (!loc.hasRealLocation) {
-          setHasLocation(false);
-          setIsOpen(true);
-        }
-        setIsChecking(false);
-      },
-      { enableHighAccuracy: true, timeout: 8000, maximumAge: 0 }
-    );
-  }, [processCoordinates]);
+        return;
+      }
 
-  // Initial & route-change background scan
+      try {
+        const loc = await detectRealTimeLocation();
+        setHasLocation(loc.hasRealLocation);
+        setIsDetecting(false);
+        if (!loc.hasRealLocation && isManualClick) {
+          if (loc.error) {
+            setError("Location blocked. Click the lock 🔒 icon in your address bar to Allow Location.");
+          }
+        }
+      } catch (err: any) {
+        if (isManualClick) {
+          setError(
+            "Location blocked. Click the lock 🔒 icon in your address bar to Allow Location."
+          );
+        }
+        setIsDetecting(false);
+        const loc = getRealTimeLocation();
+        setHasLocation(loc.hasRealLocation);
+      }
+    },
+    []
+  );
+
+  // Initial auto-request on load (triggers browser native popup just like Google Maps)
   useEffect(() => {
     if (!mounted) return;
-
-    if (!isProtected) {
-      setIsOpen(false);
-      setIsChecking(false);
-      return;
-    }
 
     const loc = getRealTimeLocation();
     setHasLocation(loc.hasRealLocation);
 
-    if (loc.hasRealLocation) {
-      setIsOpen(false);
-      setIsChecking(false);
-    } else {
-      setIsChecking(true);
-      scanAndDetectLocation(false);
-    }
+    // Prompt browser geolocation directly on page load
+    scanAndDetectLocation(false);
 
     const unsubscribe = subscribeLocation(() => {
       const currentLoc = getRealTimeLocation();
       setHasLocation(currentLoc.hasRealLocation);
-      if (currentLoc.hasRealLocation) {
-        setIsOpen(false);
-        setIsChecking(false);
-      }
     });
 
-    // Auto-detect if browser permission changes to granted
+    // Auto-detect when browser permission state changes
     if (navigator.permissions && navigator.permissions.query) {
-      navigator.permissions.query({ name: "geolocation" as PermissionName }).then((status) => {
-        if (status.state === "granted") {
-          scanAndDetectLocation(false);
-        }
-        status.onchange = () => {
+      navigator.permissions
+        .query({ name: "geolocation" as PermissionName })
+        .then((status) => {
           if (status.state === "granted") {
             scanAndDetectLocation(false);
           }
-        };
-      }).catch(() => {});
+          status.onchange = () => {
+            if (status.state === "granted") {
+              scanAndDetectLocation(false);
+            } else if (status.state === "denied") {
+              setHasLocation(false);
+            }
+          };
+        })
+        .catch(() => {});
     }
 
     const handleFocus = () => {
       const currentLoc = getRealTimeLocation();
-      if (!currentLoc.hasRealLocation && isProtected) {
+      if (!currentLoc.hasRealLocation) {
         scanAndDetectLocation(false);
       }
     };
@@ -194,113 +113,82 @@ export default function LocationGuard({ children }: { children?: React.ReactNode
       window.removeEventListener("focus", handleFocus);
       window.removeEventListener("visibilitychange", handleFocus);
     };
-  }, [mounted, pathname, isProtected, scanAndDetectLocation]);
+  }, [mounted, scanAndDetectLocation]);
 
-  // Strict Guard: Prevent closing modal on Escape key press when open
-  useEffect(() => {
-    if (!isOpen) return;
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape") {
-        e.preventDefault();
-      }
-    };
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [isOpen]);
-
-  // 0. Pre-hydration SSR pass -> match server HTML output exactly
-  if (!mounted) {
-    return <>{children}</>;
-  }
-
-  // 1. Unprotected public route -> render children immediately
-  if (!isProtected) {
-    return <>{children}</>;
-  }
-
-  // 2. Location already confirmed -> render children
-  if (hasLocation) {
-    return <>{children}</>;
-  }
-
-  // 3. Initial checking state -> render clean LoadingSpinner (NO modal pop-up flicker!)
-  if (isChecking) {
-    return <LoadingSpinner fullScreen />;
-  }
-
-  // 4. Location OFF / Permission Denied -> render mandatory LocationGuard modal
   return (
     <>
-      <div className="hidden">{children}</div>
-      {isOpen && (
-        <div
-          className="fixed inset-0 z-[9999] bg-gray-950/85 backdrop-blur-md flex items-center justify-center p-4 sm:p-6 overflow-y-auto animate-fadeIn"
-          onClick={(e) => e.stopPropagation()}
+      {/* 1. Page content is ALWAYS fully accessible without blocking */}
+      {children}
+
+      {/* 2. Non-blocking floating location notification alert */}
+      {mounted && !hasLocation && !isDismissed && (
+        <aside 
+          aria-label="Location permission banner"
+          className="fixed bottom-5 right-4 sm:right-6 z-50 max-w-md w-[calc(100vw-2rem)] bg-white dark:bg-gray-900 border border-orange-200 dark:border-orange-950/60 shadow-2xl shadow-orange-500/10 rounded-2xl p-4 sm:p-4.5 animate-bounce-subtle"
         >
-          <div
-            className="relative w-full max-w-md bg-white dark:bg-gray-900 rounded-3xl shadow-2xl border border-gray-100 dark:border-gray-800 overflow-hidden transform transition-all duration-300 scale-100"
-            onClick={(e) => e.stopPropagation()}
-          >
-            {/* Top Decorative Gradient Header */}
-            <div className="bg-gradient-to-r from-orange-500 via-amber-500 to-orange-600 px-6 py-8 text-white text-center relative overflow-hidden">
-              <div className="absolute -top-10 -right-10 w-32 h-32 bg-white/10 rounded-full blur-2xl pointer-events-none" />
-              <div className="absolute -bottom-10 -left-10 w-32 h-32 bg-amber-400/20 rounded-full blur-2xl pointer-events-none" />
-
-              <div className="relative inline-flex items-center justify-center w-16 h-16 bg-white/20 backdrop-blur-md rounded-2xl mb-3 shadow-inner border border-white/30">
-                <MapPin className="w-8 h-8 text-white animate-bounce" />
-              </div>
-
-              <div className="mb-2">
-                <span className="inline-block px-3 py-1 bg-white/15 backdrop-blur-sm rounded-full text-[11px] font-extrabold tracking-widest text-amber-100 uppercase">
-                  Location Access Required
-                </span>
-              </div>
-
-              <h2 className="text-2xl font-black tracking-tight text-white">
-                GPS Access Required
-              </h2>
-              <p className="text-orange-100 text-xs sm:text-sm mt-1 max-w-xs mx-auto font-medium leading-relaxed">
-                FoodFlow requires your live GPS location to display nearby partner restaurants and dishes.
-              </p>
+          <div className="flex items-start gap-3.5">
+            <div className="w-10 h-10 rounded-xl bg-orange-100 dark:bg-orange-950/80 text-orange-600 flex items-center justify-center shrink-0 mt-0.5 shadow-xs">
+              <MapPin className="w-5 h-5 animate-pulse" />
             </div>
 
-            {/* Modal Body */}
-            <div className="p-6 sm:p-8 space-y-6">
-              {/* Error Box — Only rendered if user manually clicked button and permission was denied/failed */}
+            <div className="flex-1 min-w-0 space-y-1">
+              <div className="flex items-center justify-between gap-2">
+                <h4 className="text-xs sm:text-sm font-bold text-gray-900 dark:text-gray-100 flex items-center gap-1.5">
+                  <span>Turn on Location</span>
+                  <Sparkles className="w-3.5 h-3.5 text-amber-500" />
+                </h4>
+                <button
+                  type="button"
+                  onClick={() => setIsDismissed(true)}
+                  className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 p-1 -mr-1 -mt-1 rounded-lg transition-colors cursor-pointer"
+                  aria-label="Dismiss location alert"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              <p className="text-[11px] sm:text-xs text-gray-500 dark:text-gray-400 leading-relaxed">
+                Allow location to find delicious dishes and express delivery from restaurants closest to you.
+              </p>
+
               {error && (
-                <div className="flex items-start gap-3 p-3.5 bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-900/60 rounded-2xl text-red-700 dark:text-red-300 text-xs font-medium animate-fadeIn">
-                  <AlertCircle className="w-4 h-4 text-red-500 shrink-0 mt-0.5" />
+                <div className="flex items-start gap-1.5 p-2 rounded-xl bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-900/50 text-[11px] text-amber-800 dark:text-amber-200 font-medium mt-1.5">
+                  <Info className="w-3.5 h-3.5 shrink-0 mt-0.5 text-amber-600" />
                   <span>{error}</span>
                 </div>
               )}
 
-              {/* Single Prominent GPS Button */}
-              <button
-                onClick={() => scanAndDetectLocation(true)}
-                disabled={isDetecting}
-                className="w-full relative group overflow-hidden bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white font-bold py-4 px-5 rounded-2xl shadow-lg shadow-orange-500/25 hover:shadow-orange-500/40 transition-all duration-300 flex items-center justify-center gap-3 cursor-pointer disabled:opacity-75 disabled:cursor-not-allowed"
-              >
-                {isDetecting ? (
-                  <>
-                    <Loader2 className="w-5 h-5 animate-spin text-white" />
-                    <span className="text-sm font-bold">Requesting GPS Location...</span>
-                  </>
-                ) : (
-                  <>
-                    <Navigation className="w-5 h-5 text-white group-hover:scale-110 transition-transform" />
-                    <span className="text-base font-extrabold">Turn on GPS Location</span>
-                    <Sparkles className="w-4 h-4 text-amber-200 animate-pulse ml-auto" />
-                  </>
-                )}
-              </button>
+              <div className="pt-2 flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => scanAndDetectLocation(true)}
+                  disabled={isDetecting}
+                  className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-orange-500 hover:bg-orange-600 text-white text-xs font-bold shadow-md shadow-orange-500/20 active:scale-95 transition-all cursor-pointer disabled:opacity-60"
+                >
+                  {isDetecting ? (
+                    <>
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      <span>Requesting Permission...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Navigation className="w-3.5 h-3.5" />
+                      <span>Allow Location</span>
+                    </>
+                  )}
+                </button>
 
-              <div className="flex items-center justify-center gap-2 p-3 bg-gray-50 dark:bg-gray-800/40 border border-gray-100 dark:border-gray-800 rounded-2xl text-[11px] text-gray-500 dark:text-gray-400 text-center font-medium">
-                <ShieldAlert className="w-4 h-4 text-orange-500 shrink-0" />
-                <span>GPS access is required to view dishes and order from FoodFlow.</span>
+                <button
+                  type="button"
+                  onClick={() => setIsDismissed(true)}
+                  className="px-3 py-2 text-xs text-gray-500 hover:text-gray-800 dark:hover:text-gray-300 font-medium transition-colors cursor-pointer"
+                >
+                  Maybe Later
+                </button>
               </div>
             </div>
           </div>
-        </div>
+        </aside>
       )}
     </>
   );

@@ -154,6 +154,8 @@ const API_BASE_URL = `${SERVER_BASE_URL}/api`;
 /**
  * Fetch logged-in user's restaurant profile by owner email / id
  */
+import { getAuthHeaders } from "@/lib/jwt";
+
 export async function getMyRestaurantProfile(
   ownerEmail: string,
   ownerId?: string
@@ -165,11 +167,7 @@ export async function getMyRestaurantProfile(
 
     const res = await fetch(url.toString(), {
       method: "GET",
-      headers: {
-        "Content-Type": "application/json",
-        "x-user-email": ownerEmail,
-        ...(ownerId ? { "x-user-id": ownerId } : {}),
-      },
+      headers: getAuthHeaders(ownerId, ownerEmail),
       cache: "no-store",
     });
 

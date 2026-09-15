@@ -44,6 +44,8 @@ const API_BASE_URL = `${SERVER_BASE_URL}/api`;
 /**
  * Get all restaurants for Admin management with search, filter, pagination
  */
+import { getAuthHeaders } from "@/lib/jwt";
+
 export async function getAdminRestaurants(params: {
   status?: string;
   search?: string;
@@ -59,7 +61,7 @@ export async function getAdminRestaurants(params: {
 
     const res = await fetch(url.toString(), {
       method: "GET",
-      headers: { "Content-Type": "application/json" },
+      headers: getAuthHeaders(),
       cache: "no-store",
     });
 
@@ -92,7 +94,7 @@ export async function getAdminRiders(params: {
 
     const res = await fetch(url.toString(), {
       method: "GET",
-      headers: { "Content-Type": "application/json" },
+      headers: getAuthHeaders(),
       cache: "no-store",
     });
 
@@ -114,7 +116,7 @@ export async function getAdminRestaurantRiderStats(): Promise<ApiResponse<IAdmin
   try {
     const res = await fetch(`${API_BASE_URL}/admin/restaurant-rider-stats`, {
       method: "GET",
-      headers: { "Content-Type": "application/json" },
+      headers: getAuthHeaders(),
       cache: "no-store",
     });
 

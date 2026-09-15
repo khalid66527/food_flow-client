@@ -8,16 +8,10 @@ const SERVER_BASE_URL = (
 
 const API_BASE_URL = `${SERVER_BASE_URL}/api`;
 
-interface IdentityHeaders {
-  "x-user-id": string;
-  "x-user-email": string;
-}
+import { getAuthHeaders } from "@/lib/jwt";
 
-function buildIdentityHeaders(userId: string, userEmail: string): IdentityHeaders {
-  return {
-    "x-user-id": userId,
-    "x-user-email": userEmail,
-  };
+function buildIdentityHeaders(userId?: string, userEmail?: string): Record<string, string> {
+  return getAuthHeaders(userId, userEmail);
 }
 
 /**
