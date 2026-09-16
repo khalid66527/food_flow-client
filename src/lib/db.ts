@@ -79,4 +79,7 @@ export async function getFoodCollection() {
 export async function getRestaurantCollection() {
   const database = await getDb();
   return database.collection("restaurant");
+export async function getReviewsCollection() {
+  const database = await getDb();
+  return database.collection("reviews");
 }

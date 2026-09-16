@@ -97,8 +97,8 @@ export default function DashboardSideBar() {
           icon: ShoppingBag,
         },
         {
-          label: "Delivery History",
-          href: "/dashboard/customer/delivery-history",
+          label: "Order History",
+          href: "/dashboard/customer/order-history",
           icon: History,
           badge: "Delivered",
           badgeType: "success",

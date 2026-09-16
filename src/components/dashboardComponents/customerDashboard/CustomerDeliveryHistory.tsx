@@ -24,12 +24,14 @@ import {
   Layers,
   UtensilsCrossed,
   Receipt,
+  Star,
 } from "lucide-react";
 import { useSession } from "@/lib/auth-client";
 import { TOrder, TOrderItem } from "@/types/order";
 import LoadingSpinner from "@/lib/api/LoadingSpinner";
 import { downloadInvoicePdf } from "@/lib/pdf/generateInvoice";
 import OrderInvoiceModal from "@/components/common/OrderInvoiceModal";
+import PostDeliveryReviewModal from "@/components/reviews/PostDeliveryReviewModal";
 
 export default function CustomerDeliveryHistory() {
   const { data: session, isPending: sessionPending } = useSession();
@@ -42,6 +44,7 @@ export default function CustomerDeliveryHistory() {
   const [error, setError] = useState<string | null>(null);
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
   const [selectedInvoiceOrder, setSelectedInvoiceOrder] = useState<TOrder | null>(null);
+  const [reviewModalOrder, setReviewModalOrder] = useState<TOrder | null>(null);
 
   // Search & Filter
   const [searchQuery, setSearchQuery] = useState<string>("");
@@ -158,13 +161,13 @@ export default function CustomerDeliveryHistory() {
         <div className="relative z-10 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
             <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-white/20 backdrop-blur-md text-xs font-extrabold uppercase tracking-wider mb-2.5 text-white border border-white/25">
-              <ShoppingBag className="w-3.5 h-3.5 text-white" /> Customer History
+              <ShoppingBag className="w-3.5 h-3.5 text-white" /> Order History
             </div>
             <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-white">
-              Delivery History
+              Order History
             </h1>
             <p className="text-orange-100 text-sm mt-1">
-              Table view of all your successfully delivered meals, assigned rider partners, and invoices.
+              Table view of all your past and completed orders, assigned delivery partners, and downloadable invoices.
             </p>
           </div>
 
@@ -310,7 +313,7 @@ export default function CustomerDeliveryHistory() {
                   <th className="py-4 px-5">Delivery Address</th>
                   <th className="py-4 px-5">Payment & Total</th>
                   <th className="py-4 px-5">Delivered Time</th>
-                  <th className="py-4 px-5 text-center">Invoice</th>
+                  <th className="py-4 px-5 text-center">Actions & Invoice</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100 text-xs">
@@ -418,10 +421,19 @@ export default function CustomerDeliveryHistory() {
                         {formattedDelivered}
                       </td>
 
-                      {/* 8. Invoice View & Download (ONLY WHEN STATUS IS DELIVERED) */}
+                      {/* 8. Review, Invoice View & Download */}
                       <td className="py-4 px-5 align-top text-center">
                         {(order.orderStatus || "").toLowerCase() === "delivered" ? (
-                          <div className="inline-flex items-center gap-1.5 justify-center">
+                          <div className="inline-flex flex-wrap items-center gap-1.5 justify-center">
+                            <button
+                              type="button"
+                              onClick={() => setReviewModalOrder(order)}
+                              className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-amber-50 hover:bg-amber-100 text-amber-800 text-xs font-bold transition border border-amber-200 cursor-pointer shadow-2xs hover:scale-105 active:scale-95"
+                              title={(order as any).isReviewed ? "Update Your Review" : "Write a Review"}
+                            >
+                              <Star className="w-3.5 h-3.5 fill-amber-400 text-amber-500" />
+                              <span>{(order as any).isReviewed ? "Update Review" : "Review"}</span>
+                            </button>
                             <button
                               type="button"
                               onClick={() => setSelectedInvoiceOrder(order)}
@@ -512,6 +524,27 @@ export default function CustomerDeliveryHistory() {
         order={selectedInvoiceOrder}
         onClose={() => setSelectedInvoiceOrder(null)}
       />
+
+      {/* ⭐ POST DELIVERY REVIEW MODAL */}
+      {reviewModalOrder && (
+        <PostDeliveryReviewModal
+          isOpen={!!reviewModalOrder}
+          onClose={() => setReviewModalOrder(null)}
+          order={reviewModalOrder}
+          userId={userId || ""}
+          userName={user?.name || reviewModalOrder.userName}
+          userEmail={userEmail || reviewModalOrder.userEmail}
+          onSuccess={() => {
+            setOrders((prev) =>
+              prev.map((o) =>
+                (o._id || o.orderId) === (reviewModalOrder._id || reviewModalOrder.orderId)
+                  ? ({ ...o, isReviewed: true } as any)
+                  : o
+              )
+            );
+          }}
+        />
+      )}
 
     </div>
   );

@@ -23,6 +23,7 @@ import {
   Clock,
   Lock,
   Receipt,
+  Star,
 } from "lucide-react";
 import { useSession, signOut } from "@/lib/auth-client";
 
@@ -137,6 +138,13 @@ export default function DashboardSideBar() {
           label: "Sell History",
           href: "/dashboard/restaurant/sell-history",
           icon: Receipt,
+        },
+        {
+          label: "Customer Reviews",
+          href: "/dashboard/restaurant/reviews",
+          icon: Star,
+          badge: restaurantData?.rating ? `★ ${Number(restaurantData.rating).toFixed(1)}` : "Reviews",
+          badgeType: "accent",
         },
       ],
     },
@@ -466,8 +474,11 @@ export default function DashboardSideBar() {
                 <span>Partner Rating</span>
               </div>
               <div className="mt-1 flex items-center justify-between text-xs">
-                <span className="font-bold text-gray-800">4.9 / 5.0 (500+ Reviews)</span>
-                <span className="text-[10px] font-bold text-emerald-600">Top Rated</span>
+                <span className="font-bold text-gray-800">
+                  ★ {restaurantData?.rating ? Number(restaurantData.rating).toFixed(1) : "5.0"} / 5.0 (
+                  {restaurantData?.reviewCount || restaurantData?.totalReviews || 0} Reviews)
+                </span>
+                <span className="text-[10px] font-bold text-emerald-600">Verified</span>
               </div>
             </div>
           )}
