@@ -56,6 +56,10 @@ export function removeAuthToken(): void {
  * Generate client-side JWT token (or request from API)
  */
 export function generateClientToken(payload: TJwtUserPayload): string {
+  if (typeof window !== "undefined") {
+    // In browser, JWT signing is handled safely via /api/auth/jwt
+    return getAuthToken() || "";
+  }
   try {
     const cleanPayload = {
       id: String(payload.id || payload.userId || ""),
@@ -70,10 +74,9 @@ export function generateClientToken(payload: TJwtUserPayload): string {
       expiresIn: "7d",
     });
 
-    setAuthToken(token);
     return token;
   } catch (err) {
-    console.warn("Error signing client token:", err);
+    console.warn("Error signing token:", err);
     return "";
   }
 }

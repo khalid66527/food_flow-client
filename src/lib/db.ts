@@ -70,3 +70,13 @@ export async function getCouponsCollection() {
   const database = await getDb();
   return database.collection("coupons");
 }
+
+export async function getFoodCollection() {
+  const database = await getDb();
+  return database.collection("food");
+}
+
+export async function getRestaurantCollection() {
+  const database = await getDb();
+  return database.collection("restaurant");
+}
