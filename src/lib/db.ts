@@ -70,3 +70,8 @@ export async function getCouponsCollection() {
   const database = await getDb();
   return database.collection("coupons");
 }
+
+export async function getReviewsCollection() {
+  const database = await getDb();
+  return database.collection("reviews");
+}
