@@ -10,6 +10,14 @@ function formatPrice(price: number): string {
   return `Tk ${price.toFixed(2)}`;
 }
 
+// The API falls back to a placeholder when the restaurant join comes back empty —
+// show nothing rather than a bare "From " or "From Unknown Restaurant".
+function resolveRestaurantName(name?: string): string | null {
+  const trimmed = (name || '').trim();
+  if (!trimmed || trimmed.toLowerCase() === 'unknown restaurant') return null;
+  return trimmed;
+}
+
 interface FoodCardProps {
   item: IGlobalFoodItem;
   index?: number;
@@ -29,6 +37,7 @@ export default function FoodCard({
 }: FoodCardProps) {
   const isAdded = addedFeedbackId === item._id;
   const hasDiscount = !!item.discountPrice && item.discountPrice < item.price;
+  const restaurantLabel = resolveRestaurantName(item.restaurantName);
 
   const handleAddToCart = (e: React.MouseEvent) => {
     e.preventDefault();
@@ -85,7 +94,9 @@ export default function FoodCard({
             <h3 className="font-bold text-gray-900 text-[15px] group-hover:text-[#FF6B35] transition-colors line-clamp-1">
               {item.name}
             </h3>
-            <p className="text-xs text-gray-400 mt-1 font-medium">From {item.restaurantName}</p>
+            {restaurantLabel && (
+              <p className="text-xs text-gray-400 mt-1 font-medium">From {restaurantLabel}</p>
+            )}
             <div className="mt-2.5">
               {hasDiscount ? (
                 <div className="flex items-baseline gap-2">
@@ -201,7 +212,9 @@ export default function FoodCard({
           <h3 className="font-bold text-gray-900 text-[15px] group-hover:text-[#FF6B35] transition-colors line-clamp-1">
             {item.name}
           </h3>
-          <p className="text-xs text-gray-400 mt-1 font-medium">From {item.restaurantName}</p>
+          {restaurantLabel && (
+            <p className="text-xs text-gray-400 mt-1 font-medium">From {restaurantLabel}</p>
+          )}
           <div className="mt-2.5">
             {hasDiscount ? (
               <div className="flex items-baseline gap-2">
