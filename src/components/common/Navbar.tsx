@@ -14,7 +14,8 @@ import {
   ShieldCheck, 
   Menu, 
   X,
-  ChevronDown
+  ChevronDown,
+  Sparkles
 } from "lucide-react";
 import { useSession, signOut } from "@/lib/auth-client";
 import { useCart } from "@/contexts/CartContext";
@@ -190,6 +191,17 @@ export default function Navbar({
           >
             Contact
           </Link>
+          <Link 
+            href="/ai" 
+            className={`px-3.5 py-1.5 rounded-full transition-all flex items-center gap-1.5 ${
+              pathname === "/ai" || pathname.startsWith("/ai")
+                ? "bg-gradient-to-r from-orange-500 to-amber-500 text-white shadow-xs font-semibold" 
+                : "hover:bg-white text-orange-600 font-medium"
+            }`}
+          >
+            <Sparkles className="h-3.5 w-3.5 text-amber-500 shrink-0 animate-pulse" />
+            <span>AI Assistant</span>
+          </Link>
         </nav>
 
         {/* 3. Right Section: Location, Cart & Better Auth User Session */}
@@ -339,6 +351,18 @@ export default function Navbar({
             className={`block px-3 py-2 rounded-lg text-base font-medium transition-colors ${pathname.startsWith("/contact") ? "bg-orange-50 text-orange-600" : "text-gray-700 hover:bg-orange-50 hover:text-orange-600"}`}
           >
             Contact
+          </Link>
+          <Link 
+            href="/ai" 
+            onClick={() => setIsMobileMenuOpen(false)}
+            className={`flex items-center gap-2 px-3 py-2 rounded-lg text-base font-semibold transition-colors ${
+              pathname === "/ai" || pathname.startsWith("/ai")
+                ? "bg-gradient-to-r from-orange-500 to-amber-500 text-white" 
+                : "text-orange-600 hover:bg-orange-50"
+            }`}
+          >
+            <Sparkles className="h-4 w-4" />
+            <span>AI Assistant</span>
           </Link>
 
           {user ? (
