@@ -546,7 +546,7 @@ export default function RestaurantOverview() {
                           </td>
                           <td className="py-3 px-3">
                             <span className="font-semibold text-gray-800 block truncate max-w-[120px]">
-                              {order.userName || order.deliveryAddress?.street || "Customer"}
+                              {order.userName || (order.deliveryAddress as any)?.streetAddress || (order.deliveryAddress as any)?.street || "Customer"}
                             </span>
                             <span className="text-[10px] text-gray-400 block truncate max-w-[120px]">
                               {order.userEmail}
