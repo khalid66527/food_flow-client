@@ -402,7 +402,7 @@ function ExploreFoodContent() {
       const userDistrict = locationInfo.hasRealLocation ? (locationInfo.district || locationInfo.city || '').trim() : '';
       const userDivision = locationInfo.hasRealLocation ? (locationInfo.division || locationInfo.city || '').trim() : '';
 
-      // Step A: If user has a specific Upazila / Postal Area, check Upazila dishes first
+      // Step A: If user has a specific Upazila, try Upazila dishes first
       if (userUpazila) {
         const upazilaRes = await getAllGlobalFoodItems({
           ...baseQuery,
@@ -410,16 +410,19 @@ function ExploreFoodContent() {
         });
 
         if (upazilaRes.success && Array.isArray(upazilaRes.data) && upazilaRes.data.length > 0) {
-          setFoodItems(upazilaRes.data);
-          setActiveMatchedTier('upazila');
-          if ((upazilaRes as unknown as { pagination?: typeof pagination }).pagination) {
-            setPagination((upazilaRes as unknown as { pagination: typeof pagination }).pagination);
+          const filtered = filterBySelectedCategory(upazilaRes.data);
+          if (filtered.length > 0) {
+            setFoodItems(filtered);
+            setActiveMatchedTier('upazila');
+            if ((upazilaRes as unknown as { pagination?: typeof pagination }).pagination) {
+              setPagination((upazilaRes as unknown as { pagination: typeof pagination }).pagination);
+            }
+            return;
           }
-          return;
         }
       }
 
-      // Step B: Check User's District
+      // Step B: Try User's District
       if (userDistrict) {
         const districtRes = await getAllGlobalFoodItems({
           ...baseQuery,
@@ -427,39 +430,19 @@ function ExploreFoodContent() {
         });
 
         if (districtRes.success && Array.isArray(districtRes.data) && districtRes.data.length > 0) {
-          const sortedList = [...districtRes.data];
-
-          // If user has a specific Upazila, prioritize any matching restaurant at the top
-          let upazilaMatchesCount = 0;
-          if (userUpazila) {
-            const upazilaClean = userUpazila.toLowerCase();
-            sortedList.sort((a: any, b: any) => {
-              const aUpazila = (a.restaurantUpazila || a.restaurantLocation || a.restaurantAddress || a.restaurantName || '').toLowerCase();
-              const bUpazila = (b.restaurantUpazila || b.restaurantLocation || b.restaurantAddress || b.restaurantName || '').toLowerCase();
-              const aMatch = aUpazila.includes(upazilaClean);
-              const bMatch = bUpazila.includes(upazilaClean);
-
-              if (aMatch && !bMatch) return -1;
-              if (!aMatch && bMatch) return 1;
-              return 0;
-            });
-
-            upazilaMatchesCount = sortedList.filter((item: any) => {
-              const loc = (item.restaurantUpazila || item.restaurantLocation || item.restaurantAddress || item.restaurantName || '').toLowerCase();
-              return loc.includes(upazilaClean);
-            }).length;
+          const filtered = filterBySelectedCategory(districtRes.data);
+          if (filtered.length > 0) {
+            setFoodItems(filtered);
+            setActiveMatchedTier('district');
+            if ((districtRes as unknown as { pagination?: typeof pagination }).pagination) {
+              setPagination((districtRes as unknown as { pagination: typeof pagination }).pagination);
+            }
+            return;
           }
-
-          setFoodItems(filterBySelectedCategory(sortedList));
-          setActiveMatchedTier(upazilaMatchesCount > 0 ? 'upazila' : 'district');
-          if ((districtRes as unknown as { pagination?: typeof pagination }).pagination) {
-            setPagination((districtRes as unknown as { pagination: typeof pagination }).pagination);
-          }
-          return;
         }
       }
 
-      // Step C: Check Division if 0 items in District
+      // Step C: Try User's Division
       if (userDivision) {
         const divisionRes = await getAllGlobalFoodItems({
           ...baseQuery,
@@ -467,31 +450,30 @@ function ExploreFoodContent() {
         });
 
         if (divisionRes.success && Array.isArray(divisionRes.data) && divisionRes.data.length > 0) {
-          setFoodItems(filterBySelectedCategory(divisionRes.data));
-          setActiveMatchedTier('division');
-          if ((divisionRes as unknown as { pagination?: typeof pagination }).pagination) {
-            setPagination((divisionRes as unknown as { pagination: typeof pagination }).pagination);
+          const filtered = filterBySelectedCategory(divisionRes.data);
+          if (filtered.length > 0) {
+            setFoodItems(filtered);
+            setActiveMatchedTier('division');
+            if ((divisionRes as unknown as { pagination?: typeof pagination }).pagination) {
+              setPagination((divisionRes as unknown as { pagination: typeof pagination }).pagination);
+            }
+            return;
           }
-          return;
         }
       }
 
-      // Step D: Fallback to global category fetch if district/division return 0 items for the requested category
+      // Step D: Fallback to all global food items
       const globalRes = await getAllGlobalFoodItems(baseQuery);
-      if (globalRes.success && Array.isArray(globalRes.data) && globalRes.data.length > 0) {
-        const filteredGlobal = filterBySelectedCategory(globalRes.data);
-        if (filteredGlobal.length > 0) {
-          setFoodItems(filteredGlobal);
-          setActiveMatchedTier('all');
-          if ((globalRes as unknown as { pagination?: typeof pagination }).pagination) {
-            setPagination((globalRes as unknown as { pagination: typeof pagination }).pagination);
-          }
-          return;
+      if (globalRes.success && Array.isArray(globalRes.data)) {
+        setFoodItems(filterBySelectedCategory(globalRes.data));
+        setActiveMatchedTier('all');
+        if ((globalRes as unknown as { pagination?: typeof pagination }).pagination) {
+          setPagination((globalRes as unknown as { pagination: typeof pagination }).pagination);
         }
+      } else {
+        setFoodItems([]);
+        setActiveMatchedTier('all');
       }
-
-      setFoodItems([]);
-      setActiveMatchedTier('all');
     } catch {
       setFoodItems([]);
       setError('Something went wrong while fetching dishes. Please try again.');

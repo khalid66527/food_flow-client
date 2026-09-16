@@ -87,6 +87,8 @@ export interface IGlobalFoodItem {
   restaurantIsOpen: boolean;
   restaurantRating: number;
   restaurantReviewCount: number;
+  rating?: number;
+  reviewCount?: number;
   createdAt?: string;
   updatedAt?: string;
 }

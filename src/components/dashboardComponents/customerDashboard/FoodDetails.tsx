@@ -49,6 +49,7 @@ import {
 import { useCart } from "@/contexts/CartContext";
 import { IGlobalFoodItem } from "@/types/restaurant";
 import LoadingSpinner from "@/lib/api/LoadingSpinner";
+import { getFoodReviewsApi, IReviewSummary } from "@/lib/api/review";
 
 interface FoodDetailsProps {
   foodId?: string;
@@ -112,6 +113,7 @@ export default function FoodDetails({ foodId }: FoodDetailsProps) {
   const [loading, setLoading] = useState<boolean>(true);
   const [food, setFood] = useState<any>(DEFAULT_FOOD_DATA);
   const [restaurant, setRestaurant] = useState<any>(null);
+  const [reviewsData, setReviewsData] = useState<IReviewSummary | null>(null);
   const [activeImageIndex, setActiveImageIndex] = useState<number>(0);
   const [isAutoPlayPaused, setIsAutoPlayPaused] = useState<boolean>(false);
   const [quantity, setQuantity] = useState<number>(1);
@@ -160,26 +162,18 @@ export default function FoodDetails({ foodId }: FoodDetailsProps) {
               } else if (json.data.restaurantId) {
                 fetchRestaurant(json.data.restaurantId);
               }
-              setLoading(false);
-              setTimeout(() => AOS.refresh(), 100);
-              return;
             }
           }
-        }
-
-        // 2. If targetId is restaurant ID, check restaurant endpoint
-        const restRes = await fetch(`${API_BASE_URL}/restaurants/${targetId}`);
-        if (restRes.ok) {
-          const restJson = await restRes.json();
-          if (restJson.success && restJson.data) {
-            if (isMounted) {
+        } else {
+          // 2. If targetId is restaurant ID, check restaurant endpoint
+          const restRes = await fetch(`${API_BASE_URL}/restaurants/${targetId}`);
+          if (restRes.ok) {
+            const restJson = await restRes.json();
+            if (restJson.success && restJson.data && isMounted) {
               setRestaurant(restJson.data);
               if (Array.isArray(restJson.data.menu) && restJson.data.menu.length > 0) {
                 setFood(restJson.data.menu[0]);
               }
-              setLoading(false);
-              setTimeout(() => AOS.refresh(), 100);
-              return;
             }
           }
         }
@@ -190,6 +184,15 @@ export default function FoodDetails({ foodId }: FoodDetailsProps) {
           setLoading(false);
           setTimeout(() => AOS.refresh(), 100);
         }
+      }
+
+      // Unconditionally fetch real-time food reviews for targetId
+      if (targetId) {
+        getFoodReviewsApi(targetId).then((revRes) => {
+          if (revRes.success && revRes.data && isMounted) {
+            setReviewsData(revRes.data);
+          }
+        }).catch(() => {});
       }
     }
 
@@ -670,10 +673,14 @@ export default function FoodDetails({ foodId }: FoodDetailsProps) {
                 </Link>
 
                 <div className="flex items-center gap-1.5">
-                  <div className="flex items-center gap-1 text-xs font-black text-amber-500 bg-amber-50 border border-amber-200/80 px-2.5 py-1 rounded-lg">
-                    <Star className="w-3.5 h-3.5 fill-amber-400" />
-                    <span>{restaurant?.rating || 4.8}</span>
-                    <span className="text-gray-400 font-medium">({restaurant?.reviewCount || 142})</span>
+                  <div className="flex items-center gap-1 text-xs font-black text-amber-600 bg-amber-50 border border-amber-200/80 px-3 py-1.5 rounded-xl shadow-2xs">
+                    <Star className="w-4 h-4 fill-amber-400 text-amber-400" />
+                    <span>
+                      {reviewsData?.avgRating ? reviewsData.avgRating.toFixed(1) : food?.rating ? Number(food.rating).toFixed(1) : "New"}
+                    </span>
+                    <span className="text-gray-500 font-bold text-[11px]">
+                      ({reviewsData?.totalReviews ?? food?.reviewCount ?? 0} {((reviewsData?.totalReviews ?? food?.reviewCount ?? 0) === 1) ? "review" : "reviews"})
+                    </span>
                   </div>
 
                   {/* Favorite Like button */}
@@ -871,223 +878,84 @@ export default function FoodDetails({ foodId }: FoodDetailsProps) {
 
         </div>
 
-        {/* ======================================================= */}
-        {/* 🏪 RESTAURANT DETAILS & KITCHEN PROFILE with AOS (fade-up)*/}
-        {/* ======================================================= */}
+        {/* 🌟 CUSTOMER RATINGS & REVIEWS SECTION */}
         <div
           data-aos="fade-up"
-          data-aos-duration="700"
-          className="rounded-3xl bg-white border border-orange-100 shadow-md overflow-hidden space-y-6"
+          className="bg-white rounded-3xl border border-orange-100 shadow-xl overflow-hidden p-6 sm:p-8 space-y-6"
         >
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-6 border-b border-orange-100">
+            <div>
+              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-amber-500/10 text-amber-600 text-xs font-bold uppercase tracking-wider mb-1">
+                <Star className="w-3.5 h-3.5 fill-amber-400 text-amber-400" /> Customer Feedback
+              </div>
+              <h2 className="text-xl sm:text-2xl font-black text-gray-900 tracking-tight">
+                Customer Ratings & Reviews
+              </h2>
+            </div>
 
-          {/* Restaurant Banner & Brand Header */}
-          <div className="relative h-40 sm:h-52 bg-gray-900 overflow-hidden">
-            <img
-              src={
-                restaurant?.bannerImage ||
-                "https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?auto=format&fit=crop&w=1200&q=80"
-              }
-              alt={restaurantName || "Restaurant Banner"}
-              className="w-full h-full object-cover opacity-80"
-            />
-            <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/40 to-transparent" />
-
-            <div className="absolute bottom-4 left-4 sm:left-6 right-4 flex items-end justify-between gap-4 text-white">
-              <div className="flex items-center gap-3 sm:gap-4">
-                <div className="w-14 h-14 sm:w-18 sm:h-18 rounded-2xl border-2 border-white overflow-hidden bg-white shrink-0 shadow-lg">
-                  <img
-                    src={
-                      restaurant?.logo ||
-                      "https://images.unsplash.com/photo-1555396273-367ea4eb4db5?auto=format&fit=crop&w=300&q=80"
-                    }
-                    alt={restaurantName || "Logo"}
-                    className="w-full h-full object-cover"
-                  />
+            <div className="flex items-center gap-3">
+              <div className="p-3 rounded-2xl bg-amber-500/10 border border-amber-500/20 text-center">
+                <div className="flex items-center gap-1 text-2xl font-extrabold text-gray-900">
+                  <Star className="w-6 h-6 fill-amber-400 text-amber-400" />
+                  <span>{reviewsData?.avgRating ? reviewsData.avgRating.toFixed(1) : (food?.rating || 4.9)}</span>
                 </div>
-                <div>
-                  <h3 className="text-lg sm:text-2xl font-extrabold tracking-tight text-white">
-                    {restaurantName || "Kitchen"}
-                  </h3>
-                  <p className="text-xs text-orange-100 line-clamp-1 font-medium">
-                    {restaurant?.tagline || "Authentic culinary perfection prepared fresh daily"}
+                <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+                  {reviewsData?.totalReviews || food?.reviewCount || 0} Total Reviews
+                </span>
+              </div>
+            </div>
+          </div>
+
+          {/* List of Dish Reviews */}
+          {reviewsData?.reviews && reviewsData.reviews.length > 0 ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {reviewsData.reviews.map((rev, idx) => (
+                <div
+                  key={rev._id || idx}
+                  className="p-5 rounded-2xl bg-[#FFFDF8] border border-orange-100 space-y-3"
+                >
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className="w-9 h-9 rounded-full bg-gradient-to-br from-amber-400 to-orange-500 text-white flex items-center justify-center font-bold text-xs">
+                        {(rev.userName || "C")[0].toUpperCase()}
+                      </div>
+                      <div>
+                        <h4 className="font-bold text-sm text-gray-900">
+                          {rev.userName || "Verified Customer"}
+                        </h4>
+                        <span className="text-[10px] text-gray-400">
+                          {new Date(rev.createdAt).toLocaleDateString(undefined, {
+                            year: "numeric",
+                            month: "short",
+                            day: "numeric",
+                          })}
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-1 bg-amber-500/10 px-2.5 py-1 rounded-full text-amber-600 font-bold text-xs">
+                      <Star className="w-3.5 h-3.5 fill-amber-400 text-amber-400" />
+                      <span>{rev.rating} / 5</span>
+                    </div>
+                  </div>
+
+                  <p className="text-xs text-gray-700 italic bg-white p-3 rounded-xl border border-orange-100/60">
+                    "{rev.comment || "Extremely delicious and fresh!"}"
                   </p>
                 </div>
-              </div>
-
-              <div className="shrink-0 hidden sm:block">
-                <span
-                  className={`text-xs font-black px-3.5 py-1.5 rounded-xl shadow-xs ${restaurant?.isOpen !== false ? "bg-emerald-500 text-white" : "bg-rose-500 text-white"
-                    }`}
-                >
-                  {restaurant?.isOpen !== false ? "Open for Orders" : "Currently Closed"}
-                </span>
-              </div>
+              ))}
             </div>
-          </div>
-
-          {/* Restaurant Body Info */}
-          <div className="p-5 sm:p-7 space-y-6">
-
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-
-              {/* 1. Address & Location */}
-              <div
-                data-aos="fade-up"
-                data-aos-delay="100"
-                className="p-4 rounded-2xl bg-[#FFFDF8] border border-orange-100 space-y-1 hover:border-[#FF6B35]/40 transition-colors"
-              >
-                <div className="flex items-center gap-1.5 text-xs font-bold text-gray-500">
-                  <MapPin className="w-3.5 h-3.5 text-[#FF6B35]" />
-                  <span>Location</span>
-                </div>
-                <p className="text-xs font-bold text-gray-900 line-clamp-2">
-                  {restaurant?.address?.fullAddress ||
-                    `${restaurant?.address?.street || "Main Street"}, ${restaurant?.address?.city || "City Center"
-                    }`}
-                </p>
-              </div>
-
-              {/* 2. Timing & Delivery */}
-              <div
-                data-aos="fade-up"
-                data-aos-delay="200"
-                className="p-4 rounded-2xl bg-[#FFFDF8] border border-orange-100 space-y-1 hover:border-[#FF6B35]/40 transition-colors"
-              >
-                <div className="flex items-center gap-1.5 text-xs font-bold text-gray-500">
-                  <Clock className="w-3.5 h-3.5 text-[#FF6B35]" />
-                  <span>Operating Hours</span>
-                </div>
-                <p className="text-xs font-bold text-gray-900">
-                  {restaurant?.generalOpenTime || "10:00 AM"} – {restaurant?.generalCloseTime || "11:00 PM"}
-                </p>
-                <span className="text-[10px] text-gray-400 block font-medium">
-                  Delivery: {restaurant?.pricing?.estimatedDeliveryTime || "30 mins"}
-                </span>
-              </div>
-
-              {/* 3. Pricing & Minimums */}
-              <div
-                data-aos="fade-up"
-                data-aos-delay="300"
-                className="p-4 rounded-2xl bg-[#FFFDF8] border border-orange-100 space-y-1 hover:border-[#FF6B35]/40 transition-colors"
-              >
-                <div className="flex items-center gap-1.5 text-xs font-bold text-gray-500">
-                  <Percent className="w-3.5 h-3.5 text-[#FF6B35]" />
-                  <span>Order Policy</span>
-                </div>
-                <p className="text-xs font-bold text-gray-900">
-                  Min Order: Tk {restaurant?.pricing?.minOrderAmount || 0}
-                </p>
-                <span className="text-[10px] text-gray-400 block font-medium">
-                  Delivery Fee: Tk {restaurant?.pricing?.deliveryFee ?? 4}
-                </span>
-              </div>
-
-              {/* 4. Contact Details */}
-              <div
-                data-aos="fade-up"
-                data-aos-delay="400"
-                className="p-4 rounded-2xl bg-[#FFFDF8] border border-orange-100 space-y-1 hover:border-[#FF6B35]/40 transition-colors"
-              >
-                <div className="flex items-center gap-1.5 text-xs font-bold text-gray-500">
-                  <Phone className="w-3.5 h-3.5 text-[#FF6B35]" />
-                  <span>Direct Contact</span>
-                </div>
-                <p className="text-xs font-bold text-gray-900">
-                  {restaurant?.contactNumber || "+1 (217) 504-1313"}
-                </p>
-                <span className="text-[10px] text-gray-400 block line-clamp-1 font-medium">
-                  {restaurant?.contactEmail || "kitchen@foodflow.com"}
-                </span>
-              </div>
-
+          ) : (
+            <div className="py-12 text-center text-gray-400 space-y-2">
+              <Star className="w-8 h-8 text-amber-300 mx-auto opacity-50" />
+              <p className="text-sm font-bold text-gray-600">No Customer Reviews Yet</p>
+              <p className="text-xs text-gray-400 max-w-sm mx-auto">
+                Be the first to rate and review this recipe after your next delivery!
+              </p>
             </div>
-
-            {/* Features & Social Media Bar */}
-            <div className="flex flex-wrap items-center justify-between gap-4 pt-4 border-t border-orange-100">
-
-              {/* Features Tags */}
-              <div className="flex flex-wrap items-center gap-2">
-                {restaurant?.features?.hasDelivery !== false && (
-                  <span className="px-3 py-1 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs font-bold flex items-center gap-1">
-                    <Check className="w-3 h-3" /> Delivery
-                  </span>
-                )}
-                {restaurant?.features?.hasTakeaway && (
-                  <span className="px-3 py-1 rounded-xl bg-blue-50 border border-blue-200 text-blue-700 text-xs font-bold flex items-center gap-1">
-                    <Check className="w-3 h-3" /> Takeaway
-                  </span>
-                )}
-                {restaurant?.features?.hasDineIn && (
-                  <span className="px-3 py-1 rounded-xl bg-purple-50 border border-purple-200 text-purple-700 text-xs font-bold flex items-center gap-1">
-                    <Check className="w-3 h-3" /> Dine-In
-                  </span>
-                )}
-                {restaurant?.features?.isHalal && (
-                  <span className="px-3 py-1 rounded-xl bg-amber-50 border border-amber-200 text-amber-800 text-xs font-bold flex items-center gap-1">
-                    <Check className="w-3 h-3" /> 100% Halal
-                  </span>
-                )}
-                {restaurant?.features?.isPureVeg && (
-                  <span className="px-3 py-1 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs font-bold flex items-center gap-1">
-                    <Leaf className="w-3 h-3" /> Pure Veg
-                  </span>
-                )}
-              </div>
-
-              {/* Social Links & Visit Page Button */}
-              <div className="flex items-center gap-2.5">
-                {restaurant?.socialLinks?.facebook && (
-                  <a
-                    href={restaurant.socialLinks.facebook}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="px-3 py-1.5 rounded-xl bg-[#FFFDF8] hover:bg-blue-50 text-gray-700 hover:text-blue-600 text-xs font-bold transition flex items-center gap-1 border border-orange-100"
-                  >
-                    <span>Facebook</span>
-                    <ExternalLink className="w-3 h-3" />
-                  </a>
-                )}
-                {restaurant?.socialLinks?.instagram && (
-                  <a
-                    href={restaurant.socialLinks.instagram}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="px-3 py-1.5 rounded-xl bg-[#FFFDF8] hover:bg-rose-50 text-gray-700 hover:text-rose-600 text-xs font-bold transition flex items-center gap-1 border border-orange-100"
-                  >
-                    <span>Instagram</span>
-                    <ExternalLink className="w-3 h-3" />
-                  </a>
-                )}
-                {restaurant?.socialLinks?.website && (
-                  <a
-                    href={restaurant.socialLinks.website}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="px-3 py-1.5 rounded-xl bg-[#FFFDF8] hover:bg-orange-50 text-gray-700 hover:text-[#FF6B35] text-xs font-bold transition flex items-center gap-1 border border-orange-100"
-                  >
-                    <Globe className="w-3.5 h-3.5 text-[#FF6B35]" />
-                    <span>Website</span>
-                  </a>
-                )}
-
-                <Link
-                  href={`/restaurants/${restaurant?._id || restaurant?.id || food.restaurantId}`}
-                  className="px-4 py-2 rounded-xl bg-gradient-to-r from-orange-500 to-amber-500 hover:brightness-105 text-white text-xs font-black transition flex items-center gap-1.5 shadow-sm shadow-orange-500/20"
-                >
-                  <span>View Full Menu</span>
-                  <ChevronRight className="w-3.5 h-3.5" />
-                </Link>
-              </div>
-
-            </div>
-
-          </div>
-
+          )}
         </div>
-
       </div>
-
     </div>
   );
 }

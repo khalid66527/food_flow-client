@@ -1,10 +1,3 @@
-import jwt from "jsonwebtoken";
-
-const JWT_SECRET =
-  process.env.JWT_SECRET ||
-  process.env.BETTER_AUTH_SECRET ||
-  "Ermde6JRPK1BwSjUnCI4H7gBKmTdq6WU";
-
 const TOKEN_KEY = "foodflow_jwt_token";
 
 export interface TJwtUserPayload {
@@ -53,7 +46,7 @@ export function removeAuthToken(): void {
 }
 
 /**
- * Generate client-side JWT token (or request from API)
+ * Client-side token helper (for offline fallback / instant storage)
  */
 export function generateClientToken(payload: TJwtUserPayload): string {
   try {
@@ -64,16 +57,18 @@ export function generateClientToken(payload: TJwtUserPayload): string {
       name: payload.name || "User",
       role: payload.role || "Customer",
       phone: payload.phone || "",
+      exp: Math.floor(Date.now() / 1000) + 7 * 24 * 60 * 60,
     };
 
-    const token = jwt.sign(cleanPayload, JWT_SECRET, {
-      expiresIn: "7d",
-    });
+    const header = { alg: "HS256", typ: "JWT" };
+    const encodedHeader = btoa(JSON.stringify(header));
+    const encodedPayload = btoa(JSON.stringify(cleanPayload));
+    const token = `${encodedHeader}.${encodedPayload}.client_auth_token`;
 
     setAuthToken(token);
     return token;
   } catch (err) {
-    console.warn("Error signing client token:", err);
+    console.warn("Error generating client token:", err);
     return "";
   }
 }
@@ -84,26 +79,27 @@ export function generateClientToken(payload: TJwtUserPayload): string {
 export async function syncJwtToken(user: TJwtUserPayload): Promise<string | null> {
   if (!user?.email && !user?.id) return null;
 
-  // Try generating directly or fetching from API
   try {
-    const localToken = generateClientToken(user);
-    if (localToken) return localToken;
-
     const res = await fetch("/api/auth/jwt", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(user),
     });
-    const data = await res.json();
-    if (data.success && data.token) {
-      setAuthToken(data.token);
-      return data.token;
+
+    if (res.ok) {
+      const data = await res.json();
+      if (data.success && data.token) {
+        setAuthToken(data.token);
+        return data.token;
+      }
     }
   } catch (err) {
-    console.warn("syncJwtToken error:", err);
+    console.warn("syncJwtToken server request error, using client fallback:", err);
   }
 
-  return getAuthToken();
+  // Fallback if API fails
+  const localToken = generateClientToken(user);
+  return localToken || getAuthToken();
 }
 
 /**

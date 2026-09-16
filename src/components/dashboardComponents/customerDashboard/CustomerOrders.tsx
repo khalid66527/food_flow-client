@@ -481,11 +481,11 @@ export default function CustomerOrders() {
           </div>
           <div className="flex flex-wrap items-center justify-center gap-3 pt-2">
             <Link
-              href="/dashboard/customer/delivery-history"
+              href="/dashboard/customer/order-history"
               className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 text-xs font-extrabold hover:bg-emerald-100 transition shadow-2xs"
             >
               <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-              <span>View Delivery History</span>
+              <span>View Order History</span>
             </Link>
             <Link
               href="/dishes"
@@ -724,12 +724,12 @@ export default function CustomerOrders() {
                     {/* 📍 2. Track Order / Delivery History Button */}
                     {isDelivered ? (
                       <Link
-                        href="/dashboard/customer/delivery-history"
+                        href="/dashboard/customer/order-history"
                         className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 text-xs font-black transition shadow-2xs cursor-pointer hover:scale-102 active:scale-98"
-                        title="View Delivery History Record"
+                        title="View Order History Record"
                       >
                         <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
-                        <span>Delivered (View History)</span>
+                        <span>Delivered (Order History)</span>
                       </Link>
                     ) : isTrackEnabled ? (
                       <Link
