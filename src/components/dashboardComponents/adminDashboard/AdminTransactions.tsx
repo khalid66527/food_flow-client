@@ -275,17 +275,17 @@ export default function AdminTransactions() {
   return (
     <div className="space-y-8 pb-16">
       {/* Header Banner */}
-      <div className="bg-gradient-to-r from-slate-900 via-zinc-900 to-slate-950 rounded-3xl p-6 sm:p-8 text-white shadow-xl relative overflow-hidden">
-        <div className="absolute right-0 top-0 translate-x-12 -translate-y-12 w-64 h-64 rounded-full bg-[#FF6B35]/20 blur-3xl pointer-events-none" />
+      <div className="bg-gradient-to-r from-orange-600 via-[#FF6B35] to-amber-500 rounded-3xl p-6 sm:p-8 text-white shadow-xl shadow-orange-500/10 relative overflow-hidden">
+        <div className="absolute right-0 top-0 translate-x-12 -translate-y-12 w-64 h-64 rounded-full bg-white/10 blur-3xl pointer-events-none" />
         <div className="relative z-10 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
           <div>
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/10 backdrop-blur-md border border-white/15 text-xs font-bold uppercase tracking-wider text-orange-400 mb-2">
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/20 backdrop-blur-md border border-white/25 text-xs font-bold uppercase tracking-wider text-white mb-2">
               <ShieldCheck className="w-3.5 h-3.5" /> Financial Hub &amp; Settlements
             </div>
             <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-white">
               Payment Transactions &amp; Refunds
             </h1>
-            <p className="text-slate-300 text-sm mt-1 max-w-xl">
+            <p className="text-orange-50 text-sm mt-1 max-w-xl font-medium">
               Real-time audit log of all online payments (Stripe &amp; Mobile Wallets), COD collections, automated refund dispatches, and platform commission shares.
             </p>
           </div>
@@ -294,14 +294,14 @@ export default function AdminTransactions() {
             <button
               onClick={() => fetchTransactions(true)}
               disabled={refreshing}
-              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-white/10 hover:bg-white/20 text-white text-xs font-bold transition backdrop-blur-md border border-white/20 cursor-pointer disabled:opacity-50"
+              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-white/20 hover:bg-white/30 text-white text-xs font-bold transition backdrop-blur-md border border-white/30 cursor-pointer disabled:opacity-50"
             >
-              <RefreshCw className={`w-3.5 h-3.5 ${refreshing ? "animate-spin text-orange-400" : ""}`} />
+              <RefreshCw className={`w-3.5 h-3.5 ${refreshing ? "animate-spin" : ""}`} />
               <span>Refresh Log</span>
             </button>
             <button
               onClick={handleExportCSV}
-              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-[#FF6B35] hover:bg-[#e85b27] text-white text-xs font-bold shadow-lg shadow-[#FF6B35]/30 transition cursor-pointer"
+              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-white hover:bg-orange-50 text-[#FF6B35] hover:text-[#e85b27] text-xs font-black shadow-lg shadow-black/10 transition cursor-pointer"
             >
               <Download className="w-3.5 h-3.5" />
               <span>Export CSV</span>

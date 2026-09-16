@@ -41,7 +41,7 @@ export function getSocket(): Socket {
   return socket;
 }
 
-export function getOrderSocket(orderId: string): Socket {
+export function getOrderSocket(orderId?: string): Socket {
   const s = getSocket();
   if (orderId) {
     joinOrderRoom(orderId);
