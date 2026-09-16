@@ -238,7 +238,7 @@ export default function RestaurantOverview() {
   return (
     <div className="max-w-7xl mx-auto space-y-6 pb-12">
       {/* 1. Header Banner & Quick Actions */}
-      <div className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-orange-600 via-[#FF6B35] to-amber-500 text-white p-6 md:p-8 shadow-xl shadow-orange-500/15">
+      <div className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-[#FF6B35] via-[#FF7843] to-[#FF8C42] text-white p-6 md:p-8 shadow-xl shadow-orange-500/15">
         <div className="absolute top-0 right-0 -mr-16 -mt-16 w-64 h-64 bg-white/10 rounded-full blur-3xl pointer-events-none" />
         <div className="absolute bottom-0 left-1/3 -mb-16 w-56 h-56 bg-amber-400/20 rounded-full blur-2xl pointer-events-none" />
 
@@ -300,10 +300,17 @@ export default function RestaurantOverview() {
                     {restaurant.contactNumber}
                   </span>
                 )}
-                <span className="flex items-center gap-1 text-white font-bold bg-white/15 px-2 py-0.5 rounded-full border border-white/20">
+                <Link
+                  href="/dashboard/restaurant/reviews"
+                  className="flex items-center gap-1 text-white font-bold bg-white/20 hover:bg-white/30 px-2.5 py-0.5 rounded-full border border-white/25 transition cursor-pointer"
+                  title="View Customer Feedback & Reviews"
+                >
                   <Star className="w-3.5 h-3.5 fill-amber-300 text-amber-300" />
-                  4.9 (500+ Reviews)
-                </span>
+                  <span>
+                    {restaurant?.rating ? Number(restaurant.rating).toFixed(1) : "4.8"} (
+                    {(restaurant as any)?.reviewCount || (restaurant as any)?.totalReviews || 0} Reviews)
+                  </span>
+                </Link>
               </div>
             </div>
           </div>
@@ -546,7 +553,7 @@ export default function RestaurantOverview() {
                           </td>
                           <td className="py-3 px-3">
                             <span className="font-semibold text-gray-800 block truncate max-w-[120px]">
-                              {order.userName || order.deliveryAddress?.street || "Customer"}
+                              {order.userName || order.deliveryAddress?.streetAddress || order.deliveryAddress?.area || "Customer"}
                             </span>
                             <span className="text-[10px] text-gray-400 block truncate max-w-[120px]">
                               {order.userEmail}
