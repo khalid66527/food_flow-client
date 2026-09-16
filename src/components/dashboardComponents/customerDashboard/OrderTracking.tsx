@@ -28,7 +28,9 @@ import {
   ShieldCheck,
   Key,
   Lock,
+  Loader2,
 } from "lucide-react";
+import { toast } from "react-toastify";
 import { useSession } from "@/lib/auth-client";
 import { getOrderByIdApi, getUserOrdersApi } from "@/lib/api/order";
 import { getOrderSocket, joinOrderRoom, disconnectOrderSocket } from "@/lib/socket";
@@ -37,6 +39,8 @@ import OrderStatusStepper, { resolveStepIndex } from "@/components/tracking/Orde
 import OrderTrackingMap from "@/components/tracking/OrderTrackingMap";
 import LoadingSpinner from "@/lib/api/LoadingSpinner";
 import { TOrder } from "@/types/order";
+import PostDeliveryReviewModal from "@/components/reviews/PostDeliveryReviewModal";
+import { Star, ThumbsUp } from "lucide-react";
 
 interface OrderStatusUpdateEvent {
   orderId?: string;
@@ -141,6 +145,25 @@ export default function OrderTracking() {
   const [error, setError] = useState<string | null>(null);
   const [connected, setConnected] = useState<boolean>(false);
   const [copiedOtp, setCopiedOtp] = useState<boolean>(false);
+  const [isReviewModalOpen, setIsReviewModalOpen] = useState<boolean>(false);
+  const [hasAutoTriggeredReview, setHasAutoTriggeredReview] = useState<boolean>(false);
+  const [isRedirecting, setIsRedirecting] = useState<boolean>(false);
+
+  // Handle Review Modal close & auto redirection to delivery history page
+  const handleReviewModalClose = useCallback(() => {
+    setIsReviewModalOpen(false);
+    const st = (liveStatus || order?.orderStatus || "").toLowerCase();
+    if (st === "delivered" || st === "completed" || hasAutoTriggeredReview) {
+      setIsRedirecting(true);
+      toast.info("Redirecting to your order history in 2 seconds...", {
+        position: "top-center",
+        autoClose: 2500,
+      });
+      setTimeout(() => {
+        router.push("/dashboard/customer/order-history");
+      }, 2500);
+    }
+  }, [liveStatus, order, hasAutoTriggeredReview, router]);
 
   // Derive active view mode and target tracking ID
   const isListView = viewMode === "list" || (!explicitOrderId && !selectedOrderId);
@@ -177,7 +200,15 @@ export default function OrderTracking() {
       if (activeTrackId) {
         const res = await getOrderByIdApi(activeTrackId, userId, userEmail);
         if (res.success && res.data) {
-          setOrder(res.data as TOrder);
+          const loadedOrder = res.data as TOrder;
+          setOrder(loadedOrder);
+
+          // Auto-trigger post-delivery review modal if order is delivered and not yet reviewed
+          const st = (loadedOrder.orderStatus || "").toLowerCase();
+          if ((st === "delivered" || st === "completed") && !(loadedOrder as any).isReviewed && !hasAutoTriggeredReview) {
+            setIsReviewModalOpen(true);
+            setHasAutoTriggeredReview(true);
+          }
         } else {
           setError(res.message || "Could not load specified order details.");
           setOrder(null);
@@ -193,7 +224,7 @@ export default function OrderTracking() {
     } finally {
       setLoading(false);
     }
-  }, [activeTrackId, userId, userEmail, sessionPending]);
+  }, [activeTrackId, userId, userEmail, sessionPending, hasAutoTriggeredReview]);
 
   useEffect(() => {
     fetchOrderData();
@@ -245,6 +276,13 @@ export default function OrderTracking() {
         setLiveStatus(newStatus);
         const location = readLocationPayload(payload as unknown as RiderLocationEvent);
         if (location) setRiderLocation(location);
+
+        const stLower = newStatus.toLowerCase();
+        // Auto-trigger post-delivery review modal when order transitions to delivered via OTP verification
+        if ((stLower === "delivered" || stLower === "completed") && !(payload.order as any)?.isReviewed && !hasAutoTriggeredReview) {
+          setIsReviewModalOpen(true);
+          setHasAutoTriggeredReview(true);
+        }
 
         if (!isOrderActive(newStatus)) {
           const updatedId = payload.orderId || payload.order?._id || payload.order?.orderId;
@@ -643,6 +681,77 @@ export default function OrderTracking() {
                 </div>
               </div>
             </div>
+          )}
+
+          {/* ⭐ Post-Delivery Review Prompt Card (When Order is Delivered) */}
+          {completed && (
+            <div className="bg-gradient-to-r from-amber-500/10 via-orange-500/10 to-amber-500/10 rounded-3xl border border-amber-500/30 p-5 sm:p-7 shadow-sm">
+              <div className="flex flex-col sm:flex-row items-center justify-between gap-5">
+                <div className="flex items-center gap-4 text-center sm:text-left">
+                  <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-amber-500 to-orange-600 text-white flex items-center justify-center shadow-lg shadow-amber-500/25 shrink-0">
+                    <Star className="w-7 h-7 fill-white" />
+                  </div>
+                  <div>
+                    <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md bg-amber-500/20 text-amber-700 dark:text-amber-400 text-[10px] font-extrabold uppercase tracking-wider mb-1">
+                      <ThumbsUp className="w-3 h-3" /> Post-Delivery Feedback
+                    </div>
+                    <h3 className="text-base sm:text-lg font-black text-gray-900 dark:text-white">
+                      {(order as any)?.isReviewed ? "Order Reviewed — Thank You!" : "Rate & Review Your Delivery Experience"}
+                    </h3>
+                    <p className="text-xs text-gray-600 dark:text-gray-400 font-medium max-w-md">
+                      {(order as any)?.isReviewed
+                        ? "You've already submitted reviews for your delivery partner, restaurant, and dishes."
+                        : "Rate your delivery rider, restaurant service, and food dishes to help us stay delicious!"}
+                    </p>
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => setIsReviewModalOpen(true)}
+                  className="px-6 py-3 rounded-2xl bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 text-white font-black text-xs uppercase tracking-wider shadow-lg shadow-amber-500/25 transition shrink-0 flex items-center gap-2 cursor-pointer"
+                >
+                  <Star className="w-4 h-4 fill-white" />
+                  {(order as any)?.isReviewed ? "Update Review" : "Rate & Review Now"}
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Redirection Notice Banner */}
+          {isRedirecting && (
+            <div className="bg-gradient-to-r from-orange-500 to-amber-500 text-white rounded-2xl p-4 shadow-lg flex items-center justify-between gap-4 animate-bounce">
+              <div className="flex items-center gap-3">
+                <Loader2 className="w-5 h-5 animate-spin text-white" />
+                <div>
+                  <h4 className="text-xs font-black uppercase tracking-wider">Redirecting</h4>
+                  <p className="text-xs font-bold text-orange-100">
+                    Taking you to your Order History page in 2 seconds...
+                  </p>
+                </div>
+              </div>
+              <Link
+                href="/dashboard/customer/order-history"
+                className="px-4 py-2 rounded-xl bg-white text-orange-600 text-xs font-black hover:bg-orange-50 transition shrink-0 shadow-xs"
+              >
+                Go Now
+              </Link>
+            </div>
+          )}
+
+          {/* Post Delivery Review Modal */}
+          {order && (
+            <PostDeliveryReviewModal
+              isOpen={isReviewModalOpen}
+              onClose={handleReviewModalClose}
+              order={order}
+              userId={userId || ""}
+              userName={user?.name || order.userName}
+              userEmail={userEmail || order.userEmail}
+              onSuccess={() => {
+                setOrder((prev) => (prev ? ({ ...prev, isReviewed: true } as any) : null));
+              }}
+            />
           )}
 
           {/* 3. Live Rider Location Map */}
