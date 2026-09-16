@@ -39,6 +39,9 @@ export default function FoodCard({
   const hasDiscount = !!item.discountPrice && item.discountPrice < item.price;
   const restaurantLabel = resolveRestaurantName(item.restaurantName);
 
+  const displayRating = (item.rating && item.rating > 0) ? item.rating : (item.restaurantRating || 0);
+  const displayReviewCount = item.reviewCount || 0;
+
   const handleAddToCart = (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
@@ -80,10 +83,13 @@ export default function FoodCard({
             {item.isAvailable ? 'Available' : 'Unavailable'}
           </span>
           {/* Rating badge */}
-          {item.restaurantRating > 0 && (
+          {displayRating > 0 && (
             <span className="absolute top-3 right-3 flex items-center gap-1 px-2 py-1 rounded-lg bg-white/90 backdrop-blur-md text-[11px] font-bold text-gray-800 shadow-sm">
               <Star className="w-3 h-3 text-amber-400 fill-amber-400" />
-              {item.restaurantRating.toFixed(1)}
+              <span>{displayRating.toFixed(1)}</span>
+              {displayReviewCount > 0 && (
+                <span className="text-[10px] text-gray-500 font-semibold">({displayReviewCount})</span>
+              )}
             </span>
           )}
         </div>
@@ -191,10 +197,13 @@ export default function FoodCard({
         </span>
 
         {/* Rating badge */}
-        {item.restaurantRating > 0 && (
+        {displayRating > 0 && (
           <span className="absolute top-3 right-3 flex items-center gap-1 px-2 py-1 rounded-lg bg-white/90 backdrop-blur-md text-[11px] font-bold text-gray-800 shadow-sm">
             <Star className="w-3 h-3 text-amber-400 fill-amber-400" />
-            {item.restaurantRating.toFixed(1)}
+            <span>{displayRating.toFixed(1)}</span>
+            {displayReviewCount > 0 && (
+              <span className="text-[10px] text-gray-500 font-semibold">({displayReviewCount})</span>
+            )}
           </span>
         )}
 
