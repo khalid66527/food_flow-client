@@ -1,4 +1,5 @@
 import { IMenuItem, IGlobalFoodItem } from "@/types/restaurant";
+import { getAuthHeaders } from "@/lib/jwt";
 
 export type TOpeningHoursDay = {
   open: string;
@@ -159,8 +160,6 @@ const API_BASE_URL = `${SERVER_BASE_URL}/api`;
 /**
  * Fetch logged-in user's restaurant profile by owner email / id
  */
-import { getAuthHeaders } from "@/lib/jwt";
-
 export async function getMyRestaurantProfile(
   ownerEmail: string,
   ownerId?: string
