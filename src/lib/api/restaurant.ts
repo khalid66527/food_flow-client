@@ -36,6 +36,8 @@ export type TPricing = {
   deliveryFee: number;
   estimatedDeliveryTime: string;
   costForTwo?: number;
+  priceRange?: string;
+  [key: string]: any;
 };
 
 export type TFeatures = {
@@ -44,6 +46,9 @@ export type TFeatures = {
   hasDineIn: boolean;
   isPureVeg: boolean;
   isHalal: boolean;
+  freeDelivery?: boolean;
+  openNow?: boolean;
+  [key: string]: any;
 };
 
 export type TSocialLinks = {
