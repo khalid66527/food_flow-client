@@ -31,6 +31,11 @@ import type {
   RoleRedirectMap,
 } from "@/types/auth";
 import { signUp, signIn, signOut } from "@/lib/auth-client";
+import {
+  saveRegisterDraft,
+  readRegisterDraft,
+  clearRegisterDraft,
+} from "@/lib/registerDraft";
 
 // ---------------------------------------------------------------------------
 // Role configuration displayed in the public registration UI.
@@ -280,6 +285,54 @@ export default function RegisterPage() {
   const [redirectCountdown, setRedirectCountdown] = useState(
     REDIRECT_COUNTDOWN_SECONDS
   );
+  const [draftRestored, setDraftRestored] = useState(false);
+  const [draftNotice, setDraftNotice] = useState<string | null>(null);
+
+  // Rehydrate the draft parked before the user clicked through to /terms or
+  // /privacy. This has to be a post-mount effect rather than a useState
+  // initialiser — reading sessionStorage during render would not match the
+  // server-rendered output. Same constraint (and same lint suppression) as
+  // AddFoodForm.
+  /* eslint-disable react-hooks/set-state-in-effect */
+  useEffect(() => {
+    const draft = readRegisterDraft();
+
+    if (draft) {
+      setForm((prev) => ({
+        ...prev,
+        fullName: draft.fullName,
+        email: draft.email,
+        phone: draft.phone,
+        role: draft.role,
+        agreeToTerms: draft.agreeToTerms,
+      }));
+      setDraftNotice(
+        "We restored your details — please re-enter your password."
+      );
+    }
+
+    // `touched` is intentionally not restored: it would immediately paint
+    // "Password is required" under the deliberately blank password fields.
+    // The draft is also not cleared here — autosave means it has to survive
+    // repeated round trips. It is cleared once registration succeeds.
+    setDraftRestored(true);
+  }, []);
+  /* eslint-enable react-hooks/set-state-in-effect */
+
+  // Autosave, debounced. Gated on `draftRestored` so the first render cannot
+  // write INITIAL_FORM over a stored draft before the effect above reads it.
+  useEffect(() => {
+    if (!draftRestored || isSuccess) return;
+    const timer = setTimeout(() => saveRegisterDraft(form), 300);
+    return () => clearTimeout(timer);
+  }, [form, draftRestored, isSuccess]);
+
+  // Restore notice auto-dismiss
+  useEffect(() => {
+    if (!draftNotice) return;
+    const timer = setTimeout(() => setDraftNotice(null), 4000);
+    return () => clearTimeout(timer);
+  }, [draftNotice]);
 
   // Shake animation reset
   useEffect(() => {
@@ -421,6 +474,9 @@ export default function RegisterPage() {
           } catch {
             // ignore
           }
+          // The account exists now — the draft is stale and must not resurface
+          // on a later visit to /auth/register in this tab.
+          clearRegisterDraft();
           router.push(`/auth/login?registered=true&email=${encodeURIComponent(form.email)}`);
         } else {
           setServerError("Could not complete registration.");
@@ -685,6 +741,13 @@ export default function RegisterPage() {
 
           {/* Form */}
           <form onSubmit={handleSubmit} className="space-y-4">
+            {draftNotice && (
+              <div className="flex items-center gap-2 p-3 rounded-xl bg-amber-50 border border-amber-200 text-xs sm:text-sm text-amber-700 animate-slide-down">
+                <CheckCircle2 className="h-4 w-4 shrink-0" />
+                <span>{draftNotice}</span>
+              </div>
+            )}
+
             {serverError && (
               <div className="flex items-center gap-2 p-3 rounded-xl bg-red-50 border border-red-200 text-xs sm:text-sm text-red-600 animate-slide-down">
                 <AlertCircle className="h-4 w-4 shrink-0" />
