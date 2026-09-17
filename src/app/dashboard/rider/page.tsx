@@ -1,12 +1,15 @@
-import RiderHome from '@/components/dashboardComponents/riderDashboard/RiderHome';
-import React from 'react';
+import { Metadata } from "next";
+import RiderHome from "@/components/dashboardComponents/riderDashboard/RiderHome";
 
-const page = () => {
-    return (
-        <div>
-            <RiderHome />
-        </div>
-    );
+export const metadata: Metadata = {
+  title: "Rider Overview & Duty Control | FoodFlow Partner",
+  description: "Live overview, online duty toggle, incoming orders, and daily performance for FoodFlow delivery riders.",
 };
 
-export default page;
+export default function RiderHomePage() {
+  return (
+    <div className="w-full">
+      <RiderHome />
+    </div>
+  );
+}

@@ -1,12 +1,15 @@
-import RiderEarnings from '@/components/dashboardComponents/riderDashboard/RiderEarnings';
-import React from 'react';
+import { Metadata } from "next";
+import RiderEarnings from "@/components/dashboardComponents/riderDashboard/RiderEarnings";
 
-const page = () => {
-    return (
-        <div>
-            <RiderEarnings />
-        </div>
-    );
+export const metadata: Metadata = {
+  title: "Rider Earnings & Payouts | FoodFlow Partner",
+  description: "View delivery fees, customer tips, wallet balance, and request mobile payouts (bKash/Nagad/Bank).",
 };
 
-export default page;
+export default function RiderEarningsPage() {
+  return (
+    <div className="w-full">
+      <RiderEarnings />
+    </div>
+  );
+}
