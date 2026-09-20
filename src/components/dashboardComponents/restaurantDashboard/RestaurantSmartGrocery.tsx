@@ -646,7 +646,7 @@ export default function RestaurantSmartGrocery() {
       const fileName = `${restaurantSlug}-grocery-manifest-${dateStr}.pdf`;
 
       const success = await exportGroceryListToPdf(
-        pdfTemplateRef.current || "pdf-grocery-manifest-template",
+        "grocery-pdf-manifest",
         fileName
       );
 
@@ -666,12 +666,12 @@ export default function RestaurantSmartGrocery() {
         });
       }
     } catch (err: any) {
-      console.error("PDF export error:", err);
+      console.error("PDF generation failed:", err);
       toast.update(toastId, {
         render: err?.message || "An error occurred while generating the PDF.",
         type: "error",
         isLoading: false,
-        autoClose: 3500,
+        autoClose: 4000,
       });
     } finally {
       setIsExportingPdf(false);
@@ -1538,7 +1538,7 @@ export default function RestaurantSmartGrocery() {
       {/* ============================================================ */}
       <div className="absolute -left-[9999px] top-0 w-[710px] bg-white text-slate-900 font-sans z-[-999] box-border">
         <div
-          id="pdf-grocery-manifest-template"
+          id="grocery-pdf-manifest"
           ref={pdfTemplateRef}
           className="p-4 bg-white text-slate-900 w-[710px] box-border"
         >
