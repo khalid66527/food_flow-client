@@ -646,7 +646,7 @@ export default function RestaurantSmartGrocery() {
       const fileName = `${restaurantSlug}-grocery-manifest-${dateStr}.pdf`;
 
       const success = await exportGroceryListToPdf(
-        pdfTemplateRef.current || "pdf-grocery-manifest-template",
+        "grocery-pdf-manifest",
         fileName
       );
 
@@ -666,12 +666,12 @@ export default function RestaurantSmartGrocery() {
         });
       }
     } catch (err: any) {
-      console.error("PDF export error:", err);
+      console.error("PDF generation failed:", err);
       toast.update(toastId, {
         render: err?.message || "An error occurred while generating the PDF.",
         type: "error",
         isLoading: false,
-        autoClose: 3500,
+        autoClose: 4000,
       });
     } finally {
       setIsExportingPdf(false);
@@ -1534,18 +1534,18 @@ export default function RestaurantSmartGrocery() {
       {/* ============================================================ */}
       {/* ============================================================ */}
       {/* 📄 HIGH-RESOLUTION EXECUTIVE PRINT MANIFEST (html2pdf.js) */}
-      {/* Positioned cleanly offscreen with Tailwind CSS utility styling */}
+      {/* Positioned cleanly offscreen with 100% Hex colors to prevent lab() parsing errors */}
       {/* ============================================================ */}
-      <div className="absolute -left-[9999px] top-0 w-[710px] bg-white text-slate-900 font-sans z-[-999] box-border">
+      <div className="absolute -left-[9999px] top-0 w-[710px] bg-[#ffffff] text-[#0f172a] font-sans z-[-999] box-border">
         <div
-          id="pdf-grocery-manifest-template"
+          id="grocery-pdf-manifest"
           ref={pdfTemplateRef}
-          className="p-4 bg-white text-slate-900 w-[710px] box-border"
+          className="p-4 bg-[#ffffff] text-[#0f172a] w-[710px] box-border"
         >
           {/* ======================================================== */}
           {/* 1. LUXURY EXECUTIVE BRANDED DARK HEADER */}
           {/* ======================================================== */}
-          <div className="bg-gradient-to-br from-[#0B132B] via-[#1C2541] to-[#0B132B] rounded-xl p-4 mb-3 box-border text-white border-b-[3.5px] border-[#FF6B35]">
+          <div className="bg-gradient-to-br from-[#0B132B] via-[#1C2541] to-[#0B132B] rounded-xl p-4 mb-3 box-border text-[#ffffff] border-b-[3.5px] border-[#FF6B35]">
             <table className="w-full table-fixed border-collapse">
               <tbody>
                 <tr>
@@ -1555,27 +1555,27 @@ export default function RestaurantSmartGrocery() {
                       <span className="text-[22px] font-black text-[#FF6B35] tracking-tight leading-none inline-block">
                         FoodFlow
                       </span>
-                      <span className="bg-[#FF6B35] text-white text-[8px] font-extrabold px-2.5 py-1 rounded-full tracking-wider uppercase inline-flex items-center justify-center leading-none shadow-sm shadow-orange-500/30">
+                      <span className="bg-[#FF6B35] text-[#ffffff] text-[8px] font-extrabold px-2.5 py-1 rounded-full tracking-wider uppercase inline-flex items-center justify-center leading-none shadow-sm">
                         PROCUREMENT MANIFEST
                       </span>
                     </div>
-                    <p className="text-[9px] font-medium text-slate-400 mt-1.5 tracking-wide leading-tight">
+                    <p className="text-[9px] font-medium text-[#94a3b8] mt-1.5 tracking-wide leading-tight">
                       Smart Kitchen Operations &bull; Automated Requisition Schedule
                     </p>
                   </td>
 
                   {/* Right: Restaurant Name, Location & Reference ID (Vertically Centered) */}
                   <td className="w-[48%] align-middle text-right p-0">
-                    <p className="text-[15px] font-black text-white mb-0.5 leading-tight tracking-tight">
+                    <p className="text-[15px] font-black text-[#ffffff] mb-0.5 leading-tight tracking-tight">
                       {restaurantName}
                     </p>
-                    <p className="text-[9.5px] font-medium text-slate-300 mb-1 leading-tight">
+                    <p className="text-[9.5px] font-medium text-[#cbd5e1] mb-1 leading-tight">
                       📍 {restaurantAddress}
                     </p>
-                    <div className="mt-1 text-[8px] text-slate-400 leading-tight flex items-center justify-end gap-1.5 flex-wrap">
+                    <div className="mt-1 text-[8px] text-[#94a3b8] leading-tight flex items-center justify-end gap-1.5 flex-wrap">
                       <span>
                         Date:{" "}
-                        <strong className="text-slate-100">
+                        <strong className="text-[#f1f5f9]">
                           {new Date().toLocaleDateString("en-US", {
                             year: "numeric",
                             month: "short",
@@ -1586,7 +1586,7 @@ export default function RestaurantSmartGrocery() {
                         </strong>
                       </span>
                       <span>&bull;</span>
-                      <span className="bg-orange-500/20 border border-orange-500/45 text-[#FFA066] px-2 py-0.5 rounded font-extrabold text-[8px] tracking-wide inline-block leading-tight">
+                      <span className="bg-[#fff7ed] border border-[#fed7aa] text-[#ea580c] px-2 py-0.5 rounded font-extrabold text-[8px] tracking-wide inline-block leading-tight">
                         Ref: #FF-PROC-{(restaurantData?._id || "REST").slice(-6).toUpperCase()}-{Date.now().toString().slice(-4)}
                       </span>
                     </div>
@@ -1599,41 +1599,41 @@ export default function RestaurantSmartGrocery() {
           {/* ======================================================== */}
           {/* 2. EXECUTIVE KPI SUMMARY BAR */}
           {/* ======================================================== */}
-          <table className="w-full table-fixed border-collapse bg-slate-50 border-[1.5px] border-slate-200 rounded-lg mb-3 box-border text-center">
+          <table className="w-full table-fixed border-collapse bg-[#f8fafc] border-[1.5px] border-[#e2e8f0] rounded-lg mb-3 box-border text-center">
             <tbody>
               <tr>
-                <td className="p-2 border-r border-slate-200 w-1/4">
-                  <span className="text-[7.5px] font-extrabold text-slate-500 uppercase tracking-wider block">
+                <td className="p-2 border-r border-[#e2e8f0] w-1/4">
+                  <span className="text-[7.5px] font-extrabold text-[#64748b] uppercase tracking-wider block">
                     Planned Dishes
                   </span>
-                  <span className="text-[15px] font-black text-slate-900 block mt-0.5">
+                  <span className="text-[15px] font-black text-[#0f172a] block mt-0.5">
                     {totalDishesCount}
                   </span>
                 </td>
 
-                <td className="p-2 border-r border-slate-200 w-1/4">
-                  <span className="text-[7.5px] font-extrabold text-orange-600 uppercase tracking-wider block">
+                <td className="p-2 border-r border-[#e2e8f0] w-1/4">
+                  <span className="text-[7.5px] font-extrabold text-[#ea580c] uppercase tracking-wider block">
                     Total Portions
                   </span>
-                  <span className="text-[15px] font-black text-orange-600 block mt-0.5">
+                  <span className="text-[15px] font-black text-[#ea580c] block mt-0.5">
                     {totalPortionsCount}
                   </span>
                 </td>
 
-                <td className="p-2 border-r border-slate-200 w-1/4">
-                  <span className="text-[7.5px] font-extrabold text-emerald-600 uppercase tracking-wider block">
+                <td className="p-2 border-r border-[#e2e8f0] w-1/4">
+                  <span className="text-[7.5px] font-extrabold text-[#059669] uppercase tracking-wider block">
                     Unique Raw Items
                   </span>
-                  <span className="text-[15px] font-black text-emerald-600 block mt-0.5">
+                  <span className="text-[15px] font-black text-[#059669] block mt-0.5">
                     {totalUniqueIngredientsCount}
                   </span>
                 </td>
 
                 <td className="p-2 w-1/4">
-                  <span className="text-[7.5px] font-extrabold text-purple-600 uppercase tracking-wider block">
+                  <span className="text-[7.5px] font-extrabold text-[#9333ea] uppercase tracking-wider block">
                     Store Aisles
                   </span>
-                  <span className="text-[15px] font-black text-purple-600 block mt-0.5">
+                  <span className="text-[15px] font-black text-[#9333ea] block mt-0.5">
                     {aisleSections.length}
                   </span>
                 </td>
@@ -1645,31 +1645,31 @@ export default function RestaurantSmartGrocery() {
           {/* 3. SECTION 1: PRODUCTION MENU RECIPES & BATCH BREAKDOWN */}
           {/* ======================================================== */}
           <div className="mb-3 box-border">
-            <div className="flex items-center justify-between mb-1.5 border-b-[1.5px] border-slate-300 pb-1">
-              <h3 className="text-[10.5px] font-extrabold text-slate-900 uppercase tracking-wide m-0">
+            <div className="flex items-center justify-between mb-1.5 border-b-[1.5px] border-[#cbd5e1] pb-1">
+              <h3 className="text-[10.5px] font-extrabold text-[#0f172a] uppercase tracking-wide m-0">
                 1. Production Menu Recipes & Batch Breakdown
               </h3>
-              <span className="text-[8.5px] font-bold text-[#FF6B35] bg-orange-50 px-2 py-0.5 rounded-full border border-orange-200">
+              <span className="text-[8.5px] font-bold text-[#FF6B35] bg-[#fff7ed] px-2 py-0.5 rounded-full border border-[#fed7aa]">
                 {selectedDishesList.length} Recipes ({totalPortionsCount} Total Portions)
               </span>
             </div>
 
-            <table className="w-full table-fixed border-collapse text-[9px] box-border border border-slate-200 rounded-md overflow-hidden">
+            <table className="w-full table-fixed border-collapse text-[9px] box-border border border-[#e2e8f0] rounded-md overflow-hidden">
               <thead>
-                <tr className="bg-slate-900 text-white">
-                  <th className="p-2 px-1.5 border border-slate-900 text-center w-[6%] align-middle whitespace-nowrap">
+                <tr className="bg-[#0f172a] text-[#ffffff]">
+                  <th className="p-2 px-1.5 border border-[#0f172a] text-center w-[6%] align-middle whitespace-nowrap">
                     #
                   </th>
-                  <th className="p-2 px-2.5 border border-slate-900 text-left w-[44%] align-middle">
+                  <th className="p-2 px-2.5 border border-[#0f172a] text-left w-[44%] align-middle">
                     Dish & Required Recipe Ingredients
                   </th>
-                  <th className="p-2 px-2.5 border border-slate-900 text-left w-[18%] align-middle whitespace-nowrap">
+                  <th className="p-2 px-2.5 border border-[#0f172a] text-left w-[18%] align-middle whitespace-nowrap">
                     Category
                   </th>
-                  <th className="p-2 px-2.5 border border-slate-900 text-right w-[14%] align-middle whitespace-nowrap">
+                  <th className="p-2 px-2.5 border border-[#0f172a] text-right w-[14%] align-middle whitespace-nowrap">
                     Unit Price
                   </th>
-                  <th className="p-2 px-2.5 border border-slate-900 text-center w-[18%] align-middle whitespace-nowrap">
+                  <th className="p-2 px-2.5 border border-[#0f172a] text-center w-[18%] align-middle whitespace-nowrap">
                     Planned Portions
                   </th>
                 </tr>
@@ -1678,14 +1678,14 @@ export default function RestaurantSmartGrocery() {
                 {selectedDishesList.map((d, idx) => (
                   <tr
                     key={d.foodId}
-                    className={`border-b border-slate-200 ${idx % 2 === 0 ? "bg-white" : "bg-slate-50"}`}
+                    className={`border-b border-[#e2e8f0] ${idx % 2 === 0 ? "bg-[#ffffff]" : "bg-[#f8fafc]"}`}
                     style={{ pageBreakInside: "avoid" }}
                   >
-                    <td className="p-2 px-1.5 border border-slate-200 text-center text-slate-500 align-top font-semibold">
+                    <td className="p-2 px-1.5 border border-[#e2e8f0] text-center text-[#64748b] align-top font-semibold">
                       {idx + 1}
                     </td>
-                    <td className="p-2 px-2.5 border border-slate-200 align-top break-words">
-                      <div className="font-extrabold text-slate-900 text-[10.5px] mb-1">
+                    <td className="p-2 px-2.5 border border-[#e2e8f0] align-top break-words">
+                      <div className="font-extrabold text-[#0f172a] text-[10.5px] mb-1">
                         {d.name}
                       </div>
                       {d.ingredients && d.ingredients.length > 0 && (
@@ -1693,7 +1693,7 @@ export default function RestaurantSmartGrocery() {
                           {d.ingredients.map((ing, i) => (
                             <span
                               key={i}
-                              className="inline-block bg-slate-100 border border-slate-300 rounded px-1.5 py-0.5 text-[8px] font-semibold text-slate-800 leading-tight"
+                              className="inline-block bg-[#f1f5f9] border border-[#cbd5e1] rounded px-1.5 py-0.5 text-[8px] font-semibold text-[#1e293b] leading-tight"
                             >
                               {ing}
                             </span>
@@ -1701,26 +1701,26 @@ export default function RestaurantSmartGrocery() {
                         </div>
                       )}
                     </td>
-                    <td className="p-2 px-2.5 border border-slate-200 text-slate-600 align-top break-words font-medium">
+                    <td className="p-2 px-2.5 border border-[#e2e8f0] text-[#475569] align-top break-words font-medium">
                       {d.category}
                     </td>
-                    <td className="p-2 px-2.5 border border-slate-200 text-right text-slate-900 align-top font-bold whitespace-nowrap">
+                    <td className="p-2 px-2.5 border border-[#e2e8f0] text-right text-[#0f172a] align-top font-bold whitespace-nowrap">
                       Tk. {d.price}
                     </td>
-                    <td className="p-2 px-2.5 border border-slate-200 text-center font-extrabold text-orange-600 align-top text-[10px] whitespace-nowrap">
+                    <td className="p-2 px-2.5 border border-[#e2e8f0] text-center font-extrabold text-[#ea580c] align-top text-[10px] whitespace-nowrap">
                       {d.portions} servings
                     </td>
                   </tr>
                 ))}
                 {customItems.length > 0 && (
-                  <tr className="bg-amber-50" style={{ pageBreakInside: "avoid" }}>
-                    <td className="p-2 px-1.5 border border-amber-200 text-center text-orange-600 font-bold align-middle">
+                  <tr className="bg-[#fffbeb]" style={{ pageBreakInside: "avoid" }}>
+                    <td className="p-2 px-1.5 border border-[#fde68a] text-center text-[#ea580c] font-bold align-middle">
                       *
                     </td>
-                    <td colSpan={3} className="p-2 px-2.5 border border-amber-200 font-bold text-amber-900 align-middle">
+                    <td colSpan={3} className="p-2 px-2.5 border border-[#fde68a] font-bold text-[#78350f] align-middle">
                       + {customItems.length} Custom Kitchen Requisitions (Extra Supplies)
                     </td>
-                    <td className="p-2 px-2.5 border border-amber-200 text-center font-bold text-orange-600 align-middle">
+                    <td className="p-2 px-2.5 border border-[#fde68a] text-center font-bold text-[#ea580c] align-middle">
                       As Listed
                     </td>
                   </tr>
@@ -1733,27 +1733,27 @@ export default function RestaurantSmartGrocery() {
           {/* 4. SECTION 2: CATEGORIZED RAW MATERIALS PROCUREMENT MATRIX */}
           {/* ======================================================== */}
           <div className="mb-3 box-border w-full">
-            <div className="flex items-center justify-between mb-1.5 border-b-[1.5px] border-slate-300 pb-1">
-              <h3 className="text-[10.5px] font-extrabold text-slate-900 uppercase tracking-wide m-0">
+            <div className="flex items-center justify-between mb-1.5 border-b-[1.5px] border-[#cbd5e1] pb-1">
+              <h3 className="text-[10.5px] font-extrabold text-[#0f172a] uppercase tracking-wide m-0">
                 2. Categorized Raw Materials Procurement Schedule
               </h3>
-              <span className="text-[8.5px] font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
+              <span className="text-[8.5px] font-bold text-[#059669] bg-[#ecfdf5] px-2 py-0.5 rounded-full border border-[#a7f3d0]">
                 {totalUniqueIngredientsCount} Unique Raw Items &bull; {aisleSections.length} Store Aisles
               </span>
             </div>
 
             {/* UNIFIED ENTERPRISE PROCUREMENT MATRIX TABLE */}
-            <div className="border-[1.5px] border-slate-300 rounded-lg overflow-hidden box-border bg-white">
+            <div className="border-[1.5px] border-[#cbd5e1] rounded-lg overflow-hidden box-border bg-[#ffffff]">
               <table className="w-full table-fixed border-collapse text-[9px] box-border">
                 <thead>
-                  <tr className="bg-slate-900 text-white text-left">
-                    <th className="w-[6%] p-2 px-1 text-center align-middle font-extrabold tracking-wider whitespace-nowrap border-r border-slate-700">
+                  <tr className="bg-[#0f172a] text-[#ffffff] text-left">
+                    <th className="w-[6%] p-2 px-1 text-center align-middle font-extrabold tracking-wider whitespace-nowrap border-r border-[#334155]">
                       ✓
                     </th>
-                    <th className="w-[30%] p-2 px-2.5 text-left align-middle font-extrabold uppercase tracking-wider whitespace-nowrap border-r border-slate-700">
+                    <th className="w-[30%] p-2 px-2.5 text-left align-middle font-extrabold uppercase tracking-wider whitespace-nowrap border-r border-[#334155]">
                       INGREDIENT / RAW MATERIAL
                     </th>
-                    <th className="w-[18%] p-2 px-2.5 text-right align-middle font-extrabold uppercase tracking-wider whitespace-nowrap border-r border-slate-700">
+                    <th className="w-[18%] p-2 px-2.5 text-right align-middle font-extrabold uppercase tracking-wider whitespace-nowrap border-r border-[#334155]">
                       TOTAL REQUIRED
                     </th>
                     <th className="w-[46%] p-2 px-2.5 text-left align-middle font-extrabold uppercase tracking-wider whitespace-nowrap">
@@ -1766,15 +1766,15 @@ export default function RestaurantSmartGrocery() {
                     <React.Fragment key={aisle.id}>
                       {/* Aisle Category Banner Row */}
                       <tr
-                        className="pdf-aisle-group bg-slate-100 border-t-[1.5px] border-b-[1.5px] border-slate-300"
+                        className="pdf-aisle-group bg-[#f1f5f9] border-t-[1.5px] border-b-[1.5px] border-[#cbd5e1]"
                         style={{ pageBreakInside: "avoid" }}
                       >
                         <td colSpan={4} className="p-1.5 px-2.5 border-l-4 border-[#FF6B35] align-middle">
                           <div className="flex justify-between items-center">
-                            <span className="text-[10.5px] font-extrabold text-slate-900">
+                            <span className="text-[10.5px] font-extrabold text-[#0f172a]">
                               {aisle.icon} {aisle.name}
                             </span>
-                            <span className="text-[8.5px] text-slate-600 font-bold bg-white px-1.5 py-0.5 rounded border border-slate-300">
+                            <span className="text-[8.5px] text-[#475569] font-bold bg-[#ffffff] px-1.5 py-0.5 rounded border border-[#cbd5e1]">
                               {aisle.items.length} {aisle.items.length === 1 ? "item" : "items"}
                             </span>
                           </div>
@@ -1785,47 +1785,47 @@ export default function RestaurantSmartGrocery() {
                       {aisle.items.map((item, idx) => (
                         <tr
                           key={item.id}
-                          className={`border-b border-slate-200 ${idx % 2 === 0 ? "bg-white" : "bg-slate-50"}`}
+                          className={`border-b border-[#e2e8f0] ${idx % 2 === 0 ? "bg-[#ffffff]" : "bg-[#f8fafc]"}`}
                           style={{ pageBreakInside: "avoid" }}
                         >
                           {/* Clean Standard Square Checkbox */}
                           <td className="p-2 px-1 text-center align-middle">
-                            <span className="inline-block w-[13px] h-[13px] border-[1.5px] border-slate-500 rounded bg-white align-middle" />
+                            <span className="inline-block w-[13px] h-[13px] border-[1.5px] border-[#64748b] rounded bg-[#ffffff] align-middle" />
                           </td>
 
                           {/* Ingredient Name + Multiplier Tag */}
-                          <td className="p-2 px-2.5 font-bold text-slate-900 align-middle break-words">
+                          <td className="p-2 px-2.5 font-bold text-[#0f172a] align-middle break-words">
                             <span className="text-[10px]">{item.name}</span>
                             {item.dishes && item.dishes.length > 1 && (
-                              <span className="inline-flex items-center ml-1.5 bg-amber-100 border border-amber-300 text-amber-900 text-[7.5px] font-extrabold px-1 py-0.5 rounded align-middle">
+                              <span className="inline-flex items-center ml-1.5 bg-[#fef3c7] border border-[#fcd34d] text-[#78350f] text-[7.5px] font-extrabold px-1 py-0.5 rounded align-middle">
                                 x{item.dishes.length} Dishes
                               </span>
                             )}
                           </td>
 
                           {/* Total Quantity */}
-                          <td className="p-2 px-2.5 text-right font-black text-orange-600 align-middle whitespace-nowrap text-[10.5px]">
+                          <td className="p-2 px-2.5 text-right font-black text-[#ea580c] align-middle whitespace-nowrap text-[10.5px]">
                             {item.displayQuantity}
                           </td>
 
                           {/* Dish Requirement Breakdown with clean structured badge chips */}
-                          <td className="p-2 px-2.5 text-slate-600 align-middle break-words">
+                          <td className="p-2 px-2.5 text-[#475569] align-middle break-words">
                             {item.dishBreakdown && item.dishBreakdown.length > 0 ? (
                               <div className="flex flex-wrap gap-1">
                                 {item.dishBreakdown.map((db, i) => (
                                   <span
                                     key={i}
-                                    className="inline-block bg-slate-100 border border-slate-300 rounded px-1.5 py-0.5 text-[7.5px] text-slate-700 leading-tight"
+                                    className="inline-block bg-[#f1f5f9] border border-[#cbd5e1] rounded px-1.5 py-0.5 text-[7.5px] text-[#334155] leading-tight"
                                   >
                                     <strong>{db.dishName}</strong> ({db.portions}x):{" "}
-                                    <span className="text-orange-700 font-extrabold ml-0.5">
+                                    <span className="text-[#c2410c] font-extrabold ml-0.5">
                                       {db.displayQuantity}
                                     </span>
                                   </span>
                                 ))}
                               </div>
                             ) : (
-                              <span className="text-slate-500 text-[7.5px]">
+                              <span className="text-[#64748b] text-[7.5px]">
                                 For: {item.dishes.join(", ")}
                               </span>
                             )}
@@ -1842,36 +1842,36 @@ export default function RestaurantSmartGrocery() {
           {/* ======================================================== */}
           {/* 5. SECTION 3: OFFICIAL VERIFICATION & SIGNATURE LINES */}
           {/* ======================================================== */}
-          <div className="pdf-avoid-break mt-2.5 pt-2 border-t-[1.5px] border-slate-300 box-border" style={{ pageBreakInside: "avoid" }}>
-            <p className="text-[7.5px] text-slate-500 mb-2 leading-tight">
+          <div className="pdf-avoid-break mt-2.5 pt-2 border-t-[1.5px] border-[#cbd5e1] box-border" style={{ pageBreakInside: "avoid" }}>
+            <p className="text-[7.5px] text-[#64748b] mb-2 leading-tight">
               <strong>Official Notice:</strong> This document is an official kitchen procurement manifest generated via FoodFlow Smart Kitchen Operations. All raw materials must be inspected for freshness, correct quantities, and hygiene compliance prior to store sign-off.
             </p>
 
             <div className="flex justify-between items-end pt-1">
               <div>
-                <p className="mb-0.5 font-black text-slate-900 text-[10px]">
+                <p className="mb-0.5 font-black text-[#0f172a] text-[10px]">
                   FoodFlow Kitchen Operations
                 </p>
-                <p className="m-0 text-[8px] text-slate-500">
+                <p className="m-0 text-[8px] text-[#64748b]">
                   Strict Restaurant Scoping: <strong>{restaurantName}</strong> &bull; Verified Database Requisition
                 </p>
               </div>
 
               <div className="flex gap-6">
                 <div className="text-center">
-                  <div className="w-[120px] border-b-[1.5px] border-slate-400 mb-1" />
-                  <p className="m-0 text-[8px] font-bold text-slate-700">
+                  <div className="w-[120px] border-b-[1.5px] border-[#94a3b8] mb-1" />
+                  <p className="m-0 text-[8px] font-bold text-[#334155]">
                     Head Chef Signature
                   </p>
-                  <p className="mt-0.5 text-[7px] text-slate-400">Date: _______________</p>
+                  <p className="mt-0.5 text-[7px] text-[#94a3b8]">Date: _______________</p>
                 </div>
 
                 <div className="text-center">
-                  <div className="w-[120px] border-b-[1.5px] border-slate-400 mb-1" />
-                  <p className="m-0 text-[8px] font-bold text-slate-700">
+                  <div className="w-[120px] border-b-[1.5px] border-[#94a3b8] mb-1" />
+                  <p className="m-0 text-[8px] font-bold text-[#334155]">
                     Store / Procurement Officer
                   </p>
-                  <p className="mt-0.5 text-[7px] text-slate-400">Date: _______________</p>
+                  <p className="mt-0.5 text-[7px] text-[#94a3b8]">Date: _______________</p>
                 </div>
               </div>
             </div>

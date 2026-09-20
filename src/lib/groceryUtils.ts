@@ -647,26 +647,36 @@ export const aggregateIngredientsClient = (
 };
 
 /**
- * Generate PDF using html2pdf.js with bulletproof rendering options
+ * Client-Side Safe PDF Generator using html2pdf.js
+ * Strictly validates DOM elements and handles SSR / dynamic module imports safely.
  */
 export const exportGroceryListToPdf = async (
-  elementIdOrElement: string | HTMLElement,
+  elementIdOrElement: string | HTMLElement = "grocery-pdf-manifest",
   fileName: string = "FoodFlow-Smart-Grocery-List.pdf"
 ): Promise<boolean> => {
   try {
-    if (typeof window === "undefined") return false;
+    // 1. Client-Side Environment Guard (Prevent SSR crash)
+    if (typeof window === "undefined" || typeof document === "undefined") {
+      console.warn("[PDF Export] PDF generation can only be executed in a browser environment.");
+      return false;
+    }
 
+    // 2. DOM Element Validation
+    const elementId = typeof elementIdOrElement === "string" ? elementIdOrElement : "grocery-pdf-manifest";
     const sourceElement =
       typeof elementIdOrElement === "string"
         ? document.getElementById(elementIdOrElement)
         : elementIdOrElement;
 
     if (!sourceElement) {
-      console.error(`Element '${elementIdOrElement}' not found for PDF generation.`);
+      console.error(
+        `[PDF Export Error] Target element '#${elementId}' was not found in the DOM. ` +
+        `Please ensure the manifest preview template is rendered before exporting.`
+      );
       return false;
     }
 
-    // Dynamic import for html2pdf.js with full ESM / CJS interop fallback
+    // 3. Client-Side Safe Dynamic Import of html2pdf.js
     const html2pdfModule = await import("html2pdf.js");
     const html2pdf =
       (html2pdfModule as any).default?.default ||
@@ -674,10 +684,11 @@ export const exportGroceryListToPdf = async (
       html2pdfModule;
 
     if (typeof html2pdf !== "function") {
-      console.error("html2pdf is not a valid callable function:", html2pdfModule);
+      console.error("[PDF Export Error] html2pdf library could not be initialized properly:", html2pdfModule);
       return false;
     }
 
+    // 4. Executive Standard PDF Configuration with Lab/OKLCH Color Sanitizer
     const opt = {
       margin: [6, 6, 6, 6] as [number, number, number, number],
       filename: fileName,
@@ -688,6 +699,33 @@ export const exportGroceryListToPdf = async (
         letterRendering: true,
         logging: false,
         backgroundColor: "#ffffff",
+        onclone: (clonedDoc: Document) => {
+          // 1. Sanitize all <style> tags in cloned document (Tailwind v4 rules containing oklab/oklch/lab)
+          const styleTags = clonedDoc.querySelectorAll("style");
+          styleTags.forEach((styleTag) => {
+            if (styleTag.textContent) {
+              styleTag.textContent = styleTag.textContent
+                .replace(/oklab\([^)]*\)/gi, "#1e293b")
+                .replace(/oklch\([^)]*\)/gi, "#1e293b")
+                .replace(/lab\([^)]*\)/gi, "#1e293b")
+                .replace(/lch\([^)]*\)/gi, "#1e293b")
+                .replace(/color-mix\([^;}]*\)/gi, "#cbd5e1");
+            }
+          });
+
+          // 2. Sanitize all elements' inline styles and computed styles
+          const elements = clonedDoc.querySelectorAll<HTMLElement>("*");
+          elements.forEach((el) => {
+            if (el.style && el.style.cssText) {
+              el.style.cssText = el.style.cssText
+                .replace(/oklab\([^)]*\)/gi, "#1e293b")
+                .replace(/oklch\([^)]*\)/gi, "#1e293b")
+                .replace(/lab\([^)]*\)/gi, "#1e293b")
+                .replace(/lch\([^)]*\)/gi, "#1e293b")
+                .replace(/color-mix\([^;}]*\)/gi, "#cbd5e1");
+            }
+          });
+        },
       },
       jsPDF: {
         unit: "mm" as const,
@@ -697,10 +735,11 @@ export const exportGroceryListToPdf = async (
       pagebreak: { mode: ["css", "legacy"], avoid: ["tr", ".pdf-aisle-group", ".pdf-avoid-break"] },
     };
 
-    await html2pdf(sourceElement, opt);
+    // 5. Execute Async PDF Render and Save
+    await html2pdf().set(opt).from(sourceElement).save();
     return true;
   } catch (error) {
-    console.error("Error exporting grocery list as PDF:", error);
+    console.error("[PDF Export Exception] An unexpected error occurred while generating the PDF:", error);
     return false;
   }
 };
