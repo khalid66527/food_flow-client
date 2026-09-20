@@ -363,3 +363,111 @@ export async function getRestaurantMenuItems(
     };
   }
 }
+
+/**
+ * Get Grocery Food Items strictly for a specific Restaurant
+ */
+export async function getRestaurantGroceryItems(
+  restaurantId: string
+): Promise<ApiResponse<any[]>> {
+  try {
+    if (!restaurantId) {
+      return { success: false, message: "Restaurant ID is required." };
+    }
+
+    const res = await fetch(
+      `${API_BASE_URL}/restaurants/grocery/${restaurantId}`,
+      {
+        method: "GET",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        cache: "no-store",
+      }
+    );
+
+    const data = await res.json();
+    return { ...data, data: Array.isArray(data?.data) ? data.data : [] };
+  } catch (err) {
+    return {
+      success: false,
+      message:
+        err instanceof Error ? err.message : "Failed to fetch restaurant grocery items.",
+      data: [],
+    };
+  }
+}
+
+/**
+ * Aggregate Grocery Ingredient List for a specific Restaurant
+ */
+export async function aggregateRestaurantGroceryList(
+  restaurantId: string,
+  selectedItems: Array<{ foodId: string; portions: number }>
+): Promise<ApiResponse<any>> {
+  try {
+    if (!restaurantId) {
+      return { success: false, message: "Restaurant ID is required." };
+    }
+
+    const res = await fetch(
+      `${API_BASE_URL}/restaurants/grocery/aggregate`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          restaurantId,
+          selectedItems,
+        }),
+      }
+    );
+
+    const data = await res.json();
+    return data;
+  } catch (err) {
+    return {
+      success: false,
+      message:
+        err instanceof Error ? err.message : "Failed to aggregate grocery list.",
+    };
+  }
+}
+
+/**
+ * Update Secret Grocery Ingredients / Raw Materials for a specific food item
+ */
+export async function updateFoodSecretRecipe(
+  foodId: string,
+  ingredients: string[]
+): Promise<ApiResponse<any>> {
+  try {
+    if (!foodId) {
+      return { success: false, message: "Food ID is required." };
+    }
+
+    const res = await fetch(
+      `${API_BASE_URL}/restaurants/grocery/food/${foodId}/recipe`,
+      {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          ingredients,
+        }),
+      }
+    );
+
+    const data = await res.json();
+    return data;
+  } catch (err) {
+    return {
+      success: false,
+      message:
+        err instanceof Error ? err.message : "Failed to save secret recipe ingredients.",
+    };
+  }
+}
+

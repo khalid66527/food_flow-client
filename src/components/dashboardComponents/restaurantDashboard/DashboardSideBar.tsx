@@ -8,6 +8,7 @@ import {
   ClipboardList,
   UtensilsCrossed,
   PlusCircle,
+  ShoppingBag,
   User,
   Settings,
   LogOut,
@@ -163,8 +164,16 @@ export default function DashboardSideBar() {
           badge: "New",
           badgeType: "success",
         },
+        {
+          label: "Smart Grocery",
+          href: "/dashboard/restaurant/grocery",
+          icon: ShoppingBag,
+          badge: "Smart",
+          badgeType: "brand",
+        },
       ],
     },
+
     {
       title: "Account & System",
       items: [
