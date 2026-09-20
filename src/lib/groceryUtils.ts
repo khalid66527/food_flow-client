@@ -688,7 +688,7 @@ export const exportGroceryListToPdf = async (
       return false;
     }
 
-    // 4. Executive Standard PDF Configuration
+    // 4. Executive Standard PDF Configuration with Lab/OKLCH Color Sanitizer
     const opt = {
       margin: [6, 6, 6, 6] as [number, number, number, number],
       filename: fileName,
@@ -699,6 +699,33 @@ export const exportGroceryListToPdf = async (
         letterRendering: true,
         logging: false,
         backgroundColor: "#ffffff",
+        onclone: (clonedDoc: Document) => {
+          // 1. Sanitize all <style> tags in cloned document (Tailwind v4 rules containing oklab/oklch/lab)
+          const styleTags = clonedDoc.querySelectorAll("style");
+          styleTags.forEach((styleTag) => {
+            if (styleTag.textContent) {
+              styleTag.textContent = styleTag.textContent
+                .replace(/oklab\([^)]*\)/gi, "#1e293b")
+                .replace(/oklch\([^)]*\)/gi, "#1e293b")
+                .replace(/lab\([^)]*\)/gi, "#1e293b")
+                .replace(/lch\([^)]*\)/gi, "#1e293b")
+                .replace(/color-mix\([^;}]*\)/gi, "#cbd5e1");
+            }
+          });
+
+          // 2. Sanitize all elements' inline styles and computed styles
+          const elements = clonedDoc.querySelectorAll<HTMLElement>("*");
+          elements.forEach((el) => {
+            if (el.style && el.style.cssText) {
+              el.style.cssText = el.style.cssText
+                .replace(/oklab\([^)]*\)/gi, "#1e293b")
+                .replace(/oklch\([^)]*\)/gi, "#1e293b")
+                .replace(/lab\([^)]*\)/gi, "#1e293b")
+                .replace(/lch\([^)]*\)/gi, "#1e293b")
+                .replace(/color-mix\([^;}]*\)/gi, "#cbd5e1");
+            }
+          });
+        },
       },
       jsPDF: {
         unit: "mm" as const,
