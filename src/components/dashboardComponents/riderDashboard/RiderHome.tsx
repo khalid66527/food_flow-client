@@ -175,11 +175,15 @@ export default function RiderHome() {
     };
 
     socket.on("order:created", onOrderEvent);
+    socket.on("new_order_placed", onOrderEvent);
+    socket.on("new_delivery_available", onOrderEvent);
     socket.on("order:status_updated", onOrderEvent);
     socket.on("order_status_updated", onOrderEvent);
 
     return () => {
       socket.off("order:created", onOrderEvent);
+      socket.off("new_order_placed", onOrderEvent);
+      socket.off("new_delivery_available", onOrderEvent);
       socket.off("order:status_updated", onOrderEvent);
       socket.off("order_status_updated", onOrderEvent);
     };

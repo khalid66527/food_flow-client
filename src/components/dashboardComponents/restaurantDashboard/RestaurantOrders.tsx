@@ -222,20 +222,46 @@ export default function RestaurantOrders() {
       }
     };
 
+    const onNewOrder = (newOrder: any) => {
+      if (!newOrder || !newOrder.orderId) return;
+
+      const items = Array.isArray(newOrder.items) ? newOrder.items : [];
+      const matchesRestaurant =
+        !profile?._id ||
+        newOrder.restaurantId === profile._id ||
+        items.some(
+          (it: any) =>
+            it.restaurantId === profile._id ||
+            (profile.restaurantName &&
+              it.restaurantName?.toLowerCase() === profile.restaurantName.toLowerCase())
+        );
+
+      if (matchesRestaurant) {
+        setOrders((prev) => {
+          if (prev.some((o) => o.orderId === newOrder.orderId || o._id === newOrder._id)) {
+            return prev;
+          }
+          return [newOrder, ...prev];
+        });
+      }
+    };
+
     socket.on("connect", onConnect);
     socket.on("disconnect", onDisconnect);
+    socket.on("new_order_placed", onNewOrder);
+    socket.on("order:created", onNewOrder);
     socket.on("order_status_updated", onStatusUpdated);
     socket.on("update_rider_location", onRiderLocation);
 
     return () => {
       socket.off("connect", onConnect);
       socket.off("disconnect", onDisconnect);
+      socket.off("new_order_placed", onNewOrder);
+      socket.off("order:created", onNewOrder);
       socket.off("order_status_updated", onStatusUpdated);
       socket.off("update_rider_location", onRiderLocation);
     };
-  }, [sessionPending, user?.id]);
-
-  useEffect(() => () => disconnectOrderSocket(), []);
+  }, [sessionPending, user?.id, profile?._id, profile?.restaurantName]);
 
   // ─── Status progression actions (Restaurant Kitchen Flow) ───
   const updateStatus = async (order: TOrder, newStatus: string) => {

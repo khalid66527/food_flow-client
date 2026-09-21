@@ -5,11 +5,22 @@ let socket: Socket | null = null;
 const activeRooms = new Set<string>();
 
 export function getSocket(): Socket {
+  if (typeof window === "undefined") {
+    // Server-side stub to prevent SSR breakages
+    return {
+      connected: false,
+      on: () => {},
+      off: () => {},
+      emit: () => {},
+      disconnect: () => {},
+    } as unknown as Socket;
+  }
+
   if (!socket) {
     socket = io(getServerBaseUrl(), {
       transports: ["polling", "websocket"],
       reconnection: true,
-      reconnectionAttempts: 10,
+      reconnectionAttempts: 15,
       reconnectionDelay: 1000,
       reconnectionDelayMax: 5000,
       timeout: 10000,
@@ -17,6 +28,7 @@ export function getSocket(): Socket {
     });
 
     socket.on("connect", () => {
+      console.log("🟢 Connected to FoodFlow Real-time Socket Server");
       // Re-join all active rooms on reconnect
       activeRooms.forEach((room) => {
         socket?.emit("join_order_room", { orderId: room });
@@ -25,7 +37,7 @@ export function getSocket(): Socket {
     });
 
     socket.on("connect_error", () => {
-      // Silently retry connection
+      // Silently retry connection in background
     });
   }
 
@@ -41,7 +53,7 @@ export function getOrderSocket(orderId?: string): Socket {
 }
 
 export function joinOrderRoom(orderId: string): void {
-  if (!orderId) return;
+  if (!orderId || typeof window === "undefined") return;
   activeRooms.add(orderId);
   const s = getSocket();
   if (s.connected) {
@@ -56,10 +68,26 @@ export function leaveOrderRoom(orderId: string): void {
 }
 
 export function disconnectOrderSocket(): void {
-  if (socket) {
-    socket.removeAllListeners();
-    socket.disconnect();
-    socket = null;
-    activeRooms.clear();
+  // We keep the singleton socket alive for global notifications across pages.
+  // Individual components should remove their event listeners via socket.off(...)
+}
+
+export function emitNewOrderEvent(order: any): void {
+  if (!order) return;
+  try {
+    const s = getSocket();
+    s.emit("new_order_placed", order);
+  } catch (err) {
+    console.warn("Could not emit new_order_placed:", err);
+  }
+}
+
+export function emitOrderStatusUpdateEvent(payload: any): void {
+  if (!payload) return;
+  try {
+    const s = getSocket();
+    s.emit("order_status_updated", payload);
+  } catch (err) {
+    console.warn("Could not emit order_status_updated:", err);
   }
 }

@@ -36,6 +36,8 @@ export const metadata: Metadata = {
   },
 };
 
+import OrderNotificationManager from "@/components/notifications/OrderNotificationManager";
+
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -62,6 +64,7 @@ export default function RootLayout({
             <CartSidebar />
             <AIChatbot />
             <ToastProvider />
+            <OrderNotificationManager />
           </CartProvider>
         </LocationGuard>
       </body>
