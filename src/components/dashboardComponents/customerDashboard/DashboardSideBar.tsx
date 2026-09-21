@@ -19,6 +19,7 @@ import {
   ShoppingBag,
   History,
   Key,
+  Heart,
 } from "lucide-react";
 import { useSession, signOut } from "@/lib/auth-client";
 import { useCart } from "@/contexts/CartContext";
@@ -78,6 +79,13 @@ export default function DashboardSideBar() {
           label: "Dishes",
           href: "/restaurants",
           icon: Store,
+        },
+        {
+          label: "Favorites",
+          href: "/dashboard/customer/favorites",
+          icon: Heart,
+          badge: "Saved",
+          badgeType: "accent",
         },
       ],
     },

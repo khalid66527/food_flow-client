@@ -47,9 +47,12 @@ import {
   Lock,
 } from "lucide-react";
 import { useCart } from "@/contexts/CartContext";
+import { useSession } from "@/lib/auth-client";
 import { IGlobalFoodItem } from "@/types/restaurant";
 import LoadingSpinner from "@/lib/api/LoadingSpinner";
 import { getFoodReviewsApi, IReviewSummary } from "@/lib/api/review";
+import { toggleFavoriteApi, checkIsFavoriteApi } from "@/lib/api/favorite";
+import { toast } from "react-toastify";
 
 interface FoodDetailsProps {
   foodId?: string;
@@ -110,6 +113,11 @@ export default function FoodDetails({ foodId }: FoodDetailsProps) {
     searchParams.get("foodId") ||
     "";
 
+  const { data: session } = useSession();
+  const user = session?.user as { id?: string; email?: string; name?: string } | undefined;
+  const userId = user?.id;
+  const userEmail = user?.email;
+
   const [loading, setLoading] = useState<boolean>(true);
   const [food, setFood] = useState<any>(DEFAULT_FOOD_DATA);
   const [restaurant, setRestaurant] = useState<any>(null);
@@ -118,7 +126,54 @@ export default function FoodDetails({ foodId }: FoodDetailsProps) {
   const [isAutoPlayPaused, setIsAutoPlayPaused] = useState<boolean>(false);
   const [quantity, setQuantity] = useState<number>(1);
   const [isLiked, setIsLiked] = useState<boolean>(false);
+  const [isLiking, setIsLiking] = useState<boolean>(false);
   const [addedToast, setAddedToast] = useState<boolean>(false);
+
+  // Check initial favorite status for current logged-in user
+  useEffect(() => {
+    let isSubscribed = true;
+    if (targetId && userId) {
+      checkIsFavoriteApi(targetId, userId, userEmail)
+        .then((res) => {
+          if (isSubscribed && res.success) {
+            setIsLiked(res.isFavorite);
+          }
+        })
+        .catch(() => {});
+    }
+    return () => {
+      isSubscribed = false;
+    };
+  }, [targetId, userId, userEmail]);
+
+  const handleToggleFavorite = async () => {
+    if (!userId) {
+      toast.info("Please log in to add dishes to your favorites!");
+      router.push(`/auth/login?callbackUrl=/dashboard/customer/food-details?id=${targetId}`);
+      return;
+    }
+    if (isLiking) return;
+
+    setIsLiking(true);
+    try {
+      const res = await toggleFavoriteApi(targetId, userId, userEmail);
+      if (res.success) {
+        const nextState = !!res.isFavorite;
+        setIsLiked(nextState);
+        if (nextState) {
+          toast.success("Added to your favorites! ❤️");
+        } else {
+          toast.info("Removed from your favorites.");
+        }
+      } else {
+        toast.error(res.message || "Failed to update favorites");
+      }
+    } catch {
+      toast.error("An error occurred while updating favorites.");
+    } finally {
+      setIsLiking(false);
+    }
+  };
 
   // Initialize and refresh AOS
   useEffect(() => {
@@ -686,14 +741,20 @@ export default function FoodDetails({ foodId }: FoodDetailsProps) {
                   {/* Favorite Like button */}
                   <button
                     type="button"
-                    onClick={() => setIsLiked((p) => !p)}
-                    className={`p-1.5 rounded-lg border transition cursor-pointer ${isLiked
-                        ? "bg-rose-50 border-rose-200 text-rose-500"
-                        : "bg-white border-gray-200 text-gray-400 hover:text-rose-500"
-                      }`}
-                    title="Save to Favorites"
+                    onClick={handleToggleFavorite}
+                    disabled={isLiking}
+                    className={`p-2 rounded-xl border transition-all duration-300 shadow-xs cursor-pointer active:scale-95 ${
+                      isLiked
+                        ? "bg-rose-50 border-rose-200 text-rose-500 shadow-rose-100"
+                        : "bg-white border-gray-200 text-gray-400 hover:text-rose-500 hover:border-rose-200 hover:bg-rose-50/50"
+                    } ${isLiking ? "opacity-70 cursor-wait" : ""}`}
+                    title={isLiked ? "Remove from Favorites" : "Save to Favorites"}
                   >
-                    <Heart className={`w-4 h-4 ${isLiked ? "fill-rose-500" : ""}`} />
+                    <Heart
+                      className={`w-4 h-4 transition-transform duration-300 ${
+                        isLiked ? "fill-rose-500 text-rose-500 scale-110" : "text-gray-400"
+                      }`}
+                    />
                   </button>
                 </div>
               </div>
