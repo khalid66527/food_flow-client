@@ -229,7 +229,7 @@ const HowItWorks = () => {
                                     </div>
 
                                     {/* Content */}
-                                    <div className="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm transition-shadow hover:shadow-md">
+                                    <div className="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm">
                                         <p className="text-[11px] font-bold uppercase tracking-widest text-orange-400">
                                             Step {step.number}
                                         </p>
