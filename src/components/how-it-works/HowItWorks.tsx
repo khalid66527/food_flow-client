@@ -256,7 +256,7 @@ const HowItWorks = () => {
                 >
                     <a
                         href="/restaurants"
-                        className="inline-flex items-center gap-2 rounded-full bg-orange-500 px-7 py-3.5 text-sm font-semibold text-white shadow-md shadow-orange-500/20 transition-all hover:bg-orange-600 hover:shadow-lg hover:shadow-orange-500/30"
+                        className="inline-flex items-center gap-2 rounded-full bg-orange-500 px-7 py-3.5 text-sm font-semibold text-white shadow-md shadow-orange-500/20"
                     >
                         Start Ordering Now
                         <UtensilsCrossed className="h-4 w-4" />
