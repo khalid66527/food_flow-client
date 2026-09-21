@@ -31,6 +31,7 @@ export interface IReview {
   targetName?: string;
   rating: number;
   comment: string;
+  isFeatured?: boolean;
   createdAt: string;
 }
 
@@ -202,5 +203,82 @@ export async function getAllAdminReviewsApi(params?: {
   } catch (err: any) {
     console.error("getAllAdminReviewsApi error:", err);
     return { success: false, message: err.message || "Failed to fetch admin reviews" };
+  }
+}
+
+/**
+ * Toggle Admin Featured Status for a Customer Review
+ */
+export async function toggleFeaturedReviewApi(
+  reviewId: string,
+  isFeatured?: boolean
+): Promise<{
+  success: boolean;
+  isFeatured?: boolean;
+  message?: string;
+}> {
+  try {
+    const res = await fetch(`/api/reviews/feature/${reviewId}`, {
+      method: "PATCH",
+      headers: {
+        "Content-Type": "application/json",
+        ...getAuthHeaders(),
+      },
+      body: JSON.stringify({ isFeatured }),
+    });
+    const data = await res.json();
+    return data;
+  } catch (err: any) {
+    console.error("toggleFeaturedReviewApi error:", err);
+    return { success: false, message: err.message || "Failed to toggle feature status." };
+  }
+}
+
+export interface IPublicTestimonialsData {
+  reviews: IReview[];
+  avgRating: number;
+  happyCustomers: number;
+  totalReviews: number;
+}
+
+/**
+ * Fetch DB-Driven Featured Testimonials & Rating Stats for Homepage
+ */
+export async function getPublicTestimonialsApi(starFilter?: string | number): Promise<{
+  success: boolean;
+  data?: IPublicTestimonialsData;
+  message?: string;
+}> {
+  try {
+    const query = new URLSearchParams();
+    if (starFilter && starFilter !== "all") {
+      query.set("starFilter", String(starFilter));
+    }
+
+    const res = await fetch(`/api/reviews/testimonials?${query.toString()}`, {
+      method: "GET",
+      headers: { ...getAuthHeaders() },
+      cache: "no-store",
+    });
+    if (res.ok) {
+      const data = await res.json();
+      if (data.success && data.data) return data;
+    }
+
+    // Fallback: Fetch directly from Express server endpoint
+    const fallbackRes = await fetch(`${SERVER_BASE_URL}/api/reviews/testimonials?${query.toString()}`, {
+      method: "GET",
+      headers: { ...getAuthHeaders() },
+      cache: "no-store",
+    });
+    if (fallbackRes.ok) {
+      const fallbackData = await fallbackRes.json();
+      if (fallbackData.success && fallbackData.data) return fallbackData;
+    }
+
+    return { success: false, message: "Failed to fetch homepage testimonials." };
+  } catch (err: any) {
+    console.error("getPublicTestimonialsApi error:", err);
+    return { success: false, message: err.message || "Failed to fetch homepage testimonials." };
   }
 }

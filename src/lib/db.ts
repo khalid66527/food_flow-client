@@ -1,4 +1,14 @@
 import { MongoClient, Db, Collection } from "mongodb";
+import dns from "node:dns";
+
+try {
+  dns.setServers(["8.8.8.8", "8.8.4.4", "1.1.1.1"]);
+  if (dns.setDefaultResultOrder) {
+    dns.setDefaultResultOrder("ipv4first");
+  }
+} catch (e) {
+  // Ignore
+}
 
 const uri = process.env.MONGODB_URI || "mongodb://localhost:27017";
 const dbName = process.env.DB_NAME || "food-delivery-platform";
