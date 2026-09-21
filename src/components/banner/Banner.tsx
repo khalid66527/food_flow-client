@@ -4,6 +4,8 @@ import React, { useEffect, useState } from "react";
 import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
 import { getCoupons } from "@/lib/api/coupon";
+import { getPublicStatsApi, IPublicStatsData } from "@/lib/api/stats";
+import { formatNumber } from "@/lib/utils/formatNumber";
 import { Lottie } from "lottie-react";
 import {
     ArrowRight,
@@ -290,11 +292,80 @@ const itemVariants = {
     },
 };
 
+function useCountUp(end: number, duration: number = 1800, startAnimate: boolean = true) {
+    const [count, setCount] = useState(0);
+
+    useEffect(() => {
+        if (!startAnimate || end <= 0) {
+            setCount(0);
+            return;
+        }
+
+        let startTime: number | null = null;
+        let animationFrame: number;
+
+        const easeOut = (t: number) => 1 - Math.pow(1 - t, 3);
+
+        const animate = (timestamp: number) => {
+            if (!startTime) startTime = timestamp;
+            const elapsed = timestamp - startTime;
+            const progress = Math.min(elapsed / duration, 1);
+            const easedProgress = easeOut(progress);
+
+            setCount(Math.floor(easedProgress * end));
+
+            if (progress < 1) {
+                animationFrame = requestAnimationFrame(animate);
+            }
+        };
+
+        animationFrame = requestAnimationFrame(animate);
+
+        return () => cancelAnimationFrame(animationFrame);
+    }, [end, duration, startAnimate]);
+
+    return count;
+}
+
+const AnimatedHeroStat = ({ value, label }: { value: number; label: string }) => {
+    const animatedValue = useCountUp(value, 1800, value > 0);
+    return (
+        <div>
+            <p className="text-2xl font-bold text-gray-900">
+                {formatNumber(animatedValue > 0 ? animatedValue : value)}
+            </p>
+            <p className="text-xs font-medium text-gray-400">{label}</p>
+        </div>
+    );
+};
+
 const Banner = () => {
     const [activeSlide, setActiveSlide] = useState(0);
     const [dynamicOfferBadgeText, setDynamicOfferBadgeText] = useState<string>("20% OFF");
+    const [heroStats, setHeroStats] = useState<{
+        partnerRestaurants: number;
+        happyCustomers: number;
+        avgRating: string;
+    }>({
+        partnerRestaurants: 0,
+        happyCustomers: 0,
+        avgRating: "4.5",
+    });
 
     useEffect(() => {
+        let isMounted = true;
+        getPublicStatsApi()
+            .then((res) => {
+                if (isMounted && res.success && res.data) {
+                    setHeroStats({
+                        partnerRestaurants: res.data.partnerRestaurants || 0,
+                        happyCustomers: res.data.happyCustomers || 0,
+                        avgRating: (res.data.avgRating || 4.8).toFixed(1),
+                    });
+                }
+            })
+            .catch((err) => console.warn("Failed to fetch stats for hero banner:", err));
+
         const loadOfferBadge = async () => {
             try {
                 const res = await getCoupons("active");
@@ -315,6 +386,10 @@ const Banner = () => {
             }
         };
         loadOfferBadge();
+
+        return () => {
+            isMounted = false;
+        };
     }, []);
 
     useEffect(() => {
@@ -395,23 +470,17 @@ const Banner = () => {
                         {/* Trust Stats */}
                         <motion.div variants={itemVariants}>
                             <div className="mt-10 flex flex-wrap items-center gap-x-8 gap-y-4 border-t border-gray-100 pt-8">
-                                <div>
-                                    <p className="text-2xl font-bold text-gray-900">500+</p>
-                                    <p className="text-xs font-medium text-gray-400">Restaurants</p>
-                                </div>
+                                <AnimatedHeroStat value={heroStats.partnerRestaurants} label="Restaurants" />
                                 <div className="h-10 w-px bg-gray-200" />
-                                <div>
-                                    <p className="text-2xl font-bold text-gray-900">10K+</p>
-                                    <p className="text-xs font-medium text-gray-400">Happy Customers</p>
-                                </div>
+                                <AnimatedHeroStat value={heroStats.happyCustomers} label="Happy Customers" />
                                 <div className="h-10 w-px bg-gray-200" />
                                 <div className="flex items-center gap-2">
                                     <div className="flex h-8 w-8 items-center justify-center rounded-full bg-orange-100">
                                         <Star className="h-4 w-4 fill-orange-500 text-orange-500" />
                                     </div>
                                     <div>
-                                        <p className="text-2xl font-bold text-gray-900">4.8</p>
-                                        <p className="text-xs font-medium text-gray-400">Customer Rating</p>
+                                        <p className="text-2xl font-bold text-gray-900">{heroStats.avgRating}</p>
+                                        <p className="text-xs font-medium text-gray-400">Global Rating</p>
                                     </div>
                                 </div>
                             </div>
