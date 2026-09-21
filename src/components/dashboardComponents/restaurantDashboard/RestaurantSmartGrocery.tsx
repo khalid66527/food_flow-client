@@ -253,7 +253,17 @@ export default function RestaurantSmartGrocery() {
     const fetchFoods = async () => {
       setIsLoadingFoods(true);
       try {
-        const res = await getRestaurantGroceryItems(restId);
+        const ownerEmail =
+          session?.user?.email ||
+          (typeof window !== "undefined"
+            ? localStorage.getItem("restaurant_owner_email")
+            : "") ||
+          "";
+        const ownerId =
+          (session?.user as any)?.id ||
+          (session?.user as any)?.userId ||
+          "";
+        const res = await getRestaurantGroceryItems(restId, ownerId, ownerEmail);
         if (isMounted) {
           if (res?.success && Array.isArray(res.data)) {
             setFoods(res.data);
@@ -604,7 +614,17 @@ export default function RestaurantSmartGrocery() {
 
     setIsSavingRecipe(true);
     try {
-      const res = await updateFoodSecretRecipe(foodId, formattedIngredients);
+      const ownerEmail =
+        session?.user?.email ||
+        (typeof window !== "undefined"
+          ? localStorage.getItem("restaurant_owner_email")
+          : "") ||
+        "";
+      const ownerId =
+        (session?.user as any)?.id ||
+        (session?.user as any)?.userId ||
+        "";
+      const res = await updateFoodSecretRecipe(foodId, formattedIngredients, ownerId, ownerEmail);
       if (res?.success) {
         // Optimistically update local foods state
         setFoods((prev) =>
@@ -1001,21 +1021,21 @@ export default function RestaurantSmartGrocery() {
                       <div className="mt-2.5 pt-2 border-t border-gray-150/80 flex items-center justify-between gap-2.5 flex-wrap">
                         <div className="flex flex-wrap gap-1 flex-1 min-w-0 items-center">
                           {ingredients.length > 0 ? (
-                            <>
+                            <div className="text-[11px] text-gray-600 font-medium leading-relaxed truncate max-w-full flex flex-wrap items-center">
                               {ingredients.slice(0, 3).map((ing: string, i: number) => (
-                                <span
-                                  key={i}
-                                  className="text-[10px] px-2 py-0.5 rounded-md bg-gray-50 text-gray-700 border border-gray-200 font-medium truncate max-w-[125px]"
-                                >
-                                  {ing}
+                                <span key={i} className="inline-flex items-center">
+                                  <span>{ing}</span>
+                                  {i < Math.min(ingredients.length, 3) - 1 && (
+                                    <span className="text-gray-300 mx-1.5">•</span>
+                                  )}
                                 </span>
                               ))}
                               {ingredients.length > 3 && (
-                                <span className="text-[10px] text-gray-500 font-bold self-center px-1">
+                                <span className="text-[10px] text-gray-400 font-bold ml-1.5">
                                   +{ingredients.length - 3} more
                                 </span>
                               )}
-                            </>
+                            </div>
                           ) : (
                             <span className="text-[11px] text-amber-700 font-medium italic flex items-center gap-1">
                               <span>⚠️ Needs recipe setup</span>
@@ -1334,23 +1354,23 @@ export default function RestaurantSmartGrocery() {
                             </div>
                           </div>
 
-                          {/* Ingredients Tag / Chips Grid */}
+                          {/* Ingredients Clean Text Format (No badge backgrounds) */}
                           <div className="pt-0.5">
-                            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-2">
+                            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1.5">
                               Recipe Raw Materials ({dish.portions} Servings):
                             </p>
-                            <div className="flex flex-wrap gap-2">
+                            <div className="text-xs text-gray-700 font-medium leading-relaxed flex flex-wrap items-center gap-x-2.5 gap-y-1">
                               {dish.ingredients.map((ing, i) => (
-                                <div
-                                  key={i}
-                                  className="inline-flex items-center gap-2 px-2.5 py-1.5 rounded-xl bg-gray-50/90 border border-gray-200 hover:bg-orange-50/50 hover:border-orange-200 text-xs text-gray-800 font-medium transition-colors shadow-2xs"
-                                >
+                                <span key={i} className="inline-flex items-center gap-1">
                                   <span className="text-xs leading-none">{ing.aisleIcon}</span>
                                   <span className="font-semibold text-gray-800">{ing.name}</span>
-                                  <span className="px-2 py-0.5 rounded-md bg-white border border-gray-200/90 text-[#FF6B35] font-black text-[10.5px] leading-none ml-0.5">
-                                    {ing.displayQuantity}
+                                  <span className="text-[#FF6B35] font-black text-[11px] leading-none">
+                                    [{ing.displayQuantity}]
                                   </span>
-                                </div>
+                                  {i < dish.ingredients.length - 1 && (
+                                    <span className="text-gray-300 ml-1.5">•</span>
+                                  )}
+                                </span>
                               ))}
                             </div>
                           </div>
@@ -1416,16 +1436,16 @@ export default function RestaurantSmartGrocery() {
                                 <div
                                   key={item.id}
                                   onClick={() => handleToggleCheckItem(item.id)}
-                                  className={`px-3.5 py-2.5 flex items-center justify-between gap-3 transition-colors cursor-pointer select-none ${
+                                  className={`px-3.5 py-3 flex items-center justify-between gap-3 transition-colors cursor-pointer select-none ${
                                     isChecked
                                       ? "bg-gray-50/70 text-gray-400"
                                       : "hover:bg-gray-50/50"
                                   }`}
                                 >
-                                  <div className="flex items-center gap-2.5 min-w-0 flex-1">
-                                    {/* Checkbox */}
+                                  <div className="flex items-center gap-3 min-w-0 flex-1">
+                                    {/* Checkbox (Strictly Vertically Centered) */}
                                     <div
-                                      className={`w-4 h-4 rounded-md flex items-center justify-center shrink-0 transition-colors ${
+                                      className={`w-4 h-4 rounded-md flex items-center justify-center shrink-0 self-center transition-colors ${
                                         isChecked
                                           ? "bg-emerald-600 text-white"
                                           : "border border-gray-300 bg-white hover:border-emerald-500"
@@ -1436,7 +1456,8 @@ export default function RestaurantSmartGrocery() {
                                       )}
                                     </div>
 
-                                    <div className="min-w-0 flex-1">
+                                    {/* Item Name & Breakdown (Vertically Centered) */}
+                                    <div className="min-w-0 flex-1 flex flex-col justify-center">
                                       <div className="flex items-center gap-1.5 flex-wrap">
                                         <p
                                           className={`text-xs font-bold truncate ${
@@ -1460,35 +1481,32 @@ export default function RestaurantSmartGrocery() {
                                         )}
                                       </div>
 
-                                      {/* Detailed dish breakdown tag */}
-                                      <div className="flex flex-wrap gap-1 mt-0.5">
+                                      {/* Detailed dish breakdown clean text */}
+                                      <div className="text-[10.5px] text-gray-500 mt-0.5 leading-snug flex flex-wrap items-center gap-x-2 gap-y-0.5">
                                         {item.dishBreakdown && item.dishBreakdown.length > 0 ? (
                                           item.dishBreakdown.map((db, i) => (
-                                            <span
-                                              key={i}
-                                              className={`text-[9px] px-1.5 py-0.2 rounded border transition-colors ${
-                                                isChecked
-                                                  ? "bg-gray-100 text-gray-400 border-gray-200"
-                                                  : "bg-gray-50 text-gray-600 border-gray-200"
-                                              }`}
-                                            >
-                                              {db.dishName} ({db.portions}x):{" "}
-                                              <strong className={isChecked ? "text-gray-400" : "text-gray-900"}>
+                                            <span key={i} className="inline-flex items-center">
+                                              <span className={isChecked ? "text-gray-400" : "font-medium text-gray-700"}>
+                                                {db.dishName}
+                                              </span>
+                                              <span className="text-gray-400"> ({db.portions}x)</span>:{" "}
+                                              <strong className={isChecked ? "text-gray-400 font-normal" : "text-gray-800 font-semibold ml-0.5"}>
                                                 {db.displayQuantity}
                                               </strong>
+                                              {i < (item.dishBreakdown?.length || 0) - 1 && (
+                                                <span className="text-gray-300 ml-2">•</span>
+                                              )}
                                             </span>
                                           ))
                                         ) : (
-                                          <span className="text-[10px] text-gray-500">
-                                            For: {item.dishes.join(", ")}
-                                          </span>
+                                          <span>For: {item.dishes.join(", ")}</span>
                                         )}
                                       </div>
                                     </div>
                                   </div>
 
-                                  {/* Total Scaled Quantity Badge */}
-                                  <div className="flex items-center gap-2 shrink-0">
+                                  {/* Total Scaled Quantity Badge & Custom Delete (Centered) */}
+                                  <div className="flex items-center gap-2 shrink-0 self-center">
                                     <span
                                       className={`text-xs font-extrabold px-2.5 py-1 rounded-xl border transition-colors ${
                                         isChecked
@@ -1543,20 +1561,20 @@ export default function RestaurantSmartGrocery() {
           className="p-4 bg-[#ffffff] text-[#0f172a] w-[710px] box-border"
         >
           {/* ======================================================== */}
-          {/* 1. LUXURY EXECUTIVE BRANDED DARK HEADER */}
+          {/* 1. LUXURY EXECUTIVE BRANDED DARK HEADER (Clean Text Format) */}
           {/* ======================================================== */}
           <div className="bg-gradient-to-br from-[#0B132B] via-[#1C2541] to-[#0B132B] rounded-xl p-4 mb-3 box-border text-[#ffffff] border-b-[3.5px] border-[#FF6B35]">
             <table className="w-full table-fixed border-collapse">
               <tbody>
                 <tr>
-                  {/* Left: FoodFlow Branding + Manifest Badge (Vertically Centered) */}
-                  <td className="w-[52%] align-middle p-0">
-                    <div className="flex items-center gap-2.5 flex-wrap">
+                  {/* Left: FoodFlow Branding + Manifest Title (No background badge) */}
+                  <td className="w-[52%] align-middle p-0" style={{ verticalAlign: "middle" }}>
+                    <div className="flex items-center gap-2 flex-wrap">
                       <span className="text-[22px] font-black text-[#FF6B35] tracking-tight leading-none inline-block">
                         FoodFlow
                       </span>
-                      <span className="bg-[#FF6B35] text-[#ffffff] text-[8px] font-extrabold px-2.5 py-1 rounded-full tracking-wider uppercase inline-flex items-center justify-center leading-none shadow-sm">
-                        PROCUREMENT MANIFEST
+                      <span className="text-[10px] font-extrabold text-[#94A3B8] tracking-widest uppercase inline-block leading-none">
+                        &bull;&nbsp;&nbsp;PROCUREMENT MANIFEST
                       </span>
                     </div>
                     <p className="text-[9px] font-medium text-[#94a3b8] mt-1.5 tracking-wide leading-tight">
@@ -1564,8 +1582,8 @@ export default function RestaurantSmartGrocery() {
                     </p>
                   </td>
 
-                  {/* Right: Restaurant Name, Location & Reference ID (Vertically Centered) */}
-                  <td className="w-[48%] align-middle text-right p-0">
+                  {/* Right: Restaurant Name, Location & Clean Reference ID (No background badge) */}
+                  <td className="w-[48%] align-middle text-right p-0" style={{ verticalAlign: "middle" }}>
                     <p className="text-[15px] font-black text-[#ffffff] mb-0.5 leading-tight tracking-tight">
                       {restaurantName}
                     </p>
@@ -1586,7 +1604,7 @@ export default function RestaurantSmartGrocery() {
                         </strong>
                       </span>
                       <span>&bull;</span>
-                      <span className="bg-[#fff7ed] border border-[#fed7aa] text-[#ea580c] px-2 py-0.5 rounded font-extrabold text-[8px] tracking-wide inline-block leading-tight">
+                      <span className="text-[#FF6B35] font-extrabold text-[8.5px] tracking-wide inline-block leading-tight">
                         Ref: #FF-PROC-{(restaurantData?._id || "REST").slice(-6).toUpperCase()}-{Date.now().toString().slice(-4)}
                       </span>
                     </div>
@@ -1597,12 +1615,12 @@ export default function RestaurantSmartGrocery() {
           </div>
 
           {/* ======================================================== */}
-          {/* 2. EXECUTIVE KPI SUMMARY BAR */}
+          {/* 2. EXECUTIVE KPI SUMMARY BAR (Vertically Centered) */}
           {/* ======================================================== */}
           <table className="w-full table-fixed border-collapse bg-[#f8fafc] border-[1.5px] border-[#e2e8f0] rounded-lg mb-3 box-border text-center">
             <tbody>
               <tr>
-                <td className="p-2 border-r border-[#e2e8f0] w-1/4">
+                <td className="p-2 border-r border-[#e2e8f0] w-1/4 align-middle" style={{ verticalAlign: "middle" }}>
                   <span className="text-[7.5px] font-extrabold text-[#64748b] uppercase tracking-wider block">
                     Planned Dishes
                   </span>
@@ -1611,7 +1629,7 @@ export default function RestaurantSmartGrocery() {
                   </span>
                 </td>
 
-                <td className="p-2 border-r border-[#e2e8f0] w-1/4">
+                <td className="p-2 border-r border-[#e2e8f0] w-1/4 align-middle" style={{ verticalAlign: "middle" }}>
                   <span className="text-[7.5px] font-extrabold text-[#ea580c] uppercase tracking-wider block">
                     Total Portions
                   </span>
@@ -1620,7 +1638,7 @@ export default function RestaurantSmartGrocery() {
                   </span>
                 </td>
 
-                <td className="p-2 border-r border-[#e2e8f0] w-1/4">
+                <td className="p-2 border-r border-[#e2e8f0] w-1/4 align-middle" style={{ verticalAlign: "middle" }}>
                   <span className="text-[7.5px] font-extrabold text-[#059669] uppercase tracking-wider block">
                     Unique Raw Items
                   </span>
@@ -1629,7 +1647,7 @@ export default function RestaurantSmartGrocery() {
                   </span>
                 </td>
 
-                <td className="p-2 w-1/4">
+                <td className="p-2 w-1/4 align-middle" style={{ verticalAlign: "middle" }}>
                   <span className="text-[7.5px] font-extrabold text-[#9333ea] uppercase tracking-wider block">
                     Store Aisles
                   </span>
@@ -1649,7 +1667,7 @@ export default function RestaurantSmartGrocery() {
               <h3 className="text-[10.5px] font-extrabold text-[#0f172a] uppercase tracking-wide m-0">
                 1. Production Menu Recipes & Batch Breakdown
               </h3>
-              <span className="text-[8.5px] font-bold text-[#FF6B35] bg-[#fff7ed] px-2 py-0.5 rounded-full border border-[#fed7aa]">
+              <span className="text-[8.5px] font-bold text-[#FF6B35]">
                 {selectedDishesList.length} Recipes ({totalPortionsCount} Total Portions)
               </span>
             </div>
@@ -1657,19 +1675,19 @@ export default function RestaurantSmartGrocery() {
             <table className="w-full table-fixed border-collapse text-[9px] box-border border border-[#e2e8f0] rounded-md overflow-hidden">
               <thead>
                 <tr className="bg-[#0f172a] text-[#ffffff]">
-                  <th className="p-2 px-1.5 border border-[#0f172a] text-center w-[6%] align-middle whitespace-nowrap">
+                  <th className="p-2 px-1.5 border border-[#0f172a] text-center w-[6%] align-middle whitespace-nowrap" style={{ verticalAlign: "middle" }}>
                     #
                   </th>
-                  <th className="p-2 px-2.5 border border-[#0f172a] text-left w-[44%] align-middle">
+                  <th className="p-2 px-2.5 border border-[#0f172a] text-left w-[44%] align-middle" style={{ verticalAlign: "middle" }}>
                     Dish & Required Recipe Ingredients
                   </th>
-                  <th className="p-2 px-2.5 border border-[#0f172a] text-left w-[18%] align-middle whitespace-nowrap">
+                  <th className="p-2 px-2.5 border border-[#0f172a] text-left w-[18%] align-middle whitespace-nowrap" style={{ verticalAlign: "middle" }}>
                     Category
                   </th>
-                  <th className="p-2 px-2.5 border border-[#0f172a] text-right w-[14%] align-middle whitespace-nowrap">
+                  <th className="p-2 px-2.5 border border-[#0f172a] text-right w-[14%] align-middle whitespace-nowrap" style={{ verticalAlign: "middle" }}>
                     Unit Price
                   </th>
-                  <th className="p-2 px-2.5 border border-[#0f172a] text-center w-[18%] align-middle whitespace-nowrap">
+                  <th className="p-2 px-2.5 border border-[#0f172a] text-center w-[18%] align-middle whitespace-nowrap" style={{ verticalAlign: "middle" }}>
                     Planned Portions
                   </th>
                 </tr>
@@ -1681,46 +1699,40 @@ export default function RestaurantSmartGrocery() {
                     className={`border-b border-[#e2e8f0] ${idx % 2 === 0 ? "bg-[#ffffff]" : "bg-[#f8fafc]"}`}
                     style={{ pageBreakInside: "avoid" }}
                   >
-                    <td className="p-2 px-1.5 border border-[#e2e8f0] text-center text-[#64748b] align-top font-semibold">
+                    <td className="p-2.5 px-1.5 border border-[#e2e8f0] text-center text-[#64748b] align-middle font-semibold" style={{ verticalAlign: "middle" }}>
                       {idx + 1}
                     </td>
-                    <td className="p-2 px-2.5 border border-[#e2e8f0] align-top break-words">
-                      <div className="font-extrabold text-[#0f172a] text-[10.5px] mb-1">
+                    <td className="p-2.5 px-2.5 border border-[#e2e8f0] align-middle break-words" style={{ verticalAlign: "middle" }}>
+                      <div className="font-extrabold text-[#0f172a] text-[10.5px] mb-0.5">
                         {d.name}
                       </div>
                       {d.ingredients && d.ingredients.length > 0 && (
-                        <div className="flex flex-wrap gap-1">
-                          {d.ingredients.map((ing, i) => (
-                            <span
-                              key={i}
-                              className="inline-block bg-[#f1f5f9] border border-[#cbd5e1] rounded px-1.5 py-0.5 text-[8px] font-semibold text-[#1e293b] leading-tight"
-                            >
-                              {ing}
-                            </span>
-                          ))}
+                        <div className="text-[8px] text-[#475569] leading-relaxed">
+                          <span className="font-bold text-[#0f172a]">Ingredients: </span>
+                          {d.ingredients.join(" • ")}
                         </div>
                       )}
                     </td>
-                    <td className="p-2 px-2.5 border border-[#e2e8f0] text-[#475569] align-top break-words font-medium">
+                    <td className="p-2.5 px-2.5 border border-[#e2e8f0] text-[#475569] align-middle break-words font-medium" style={{ verticalAlign: "middle" }}>
                       {d.category}
                     </td>
-                    <td className="p-2 px-2.5 border border-[#e2e8f0] text-right text-[#0f172a] align-top font-bold whitespace-nowrap">
+                    <td className="p-2.5 px-2.5 border border-[#e2e8f0] text-right text-[#0f172a] align-middle font-bold whitespace-nowrap" style={{ verticalAlign: "middle" }}>
                       Tk. {d.price}
                     </td>
-                    <td className="p-2 px-2.5 border border-[#e2e8f0] text-center font-extrabold text-[#ea580c] align-top text-[10px] whitespace-nowrap">
+                    <td className="p-2.5 px-2.5 border border-[#e2e8f0] text-center font-extrabold text-[#ea580c] align-middle text-[10px] whitespace-nowrap" style={{ verticalAlign: "middle" }}>
                       {d.portions} servings
                     </td>
                   </tr>
                 ))}
                 {customItems.length > 0 && (
                   <tr className="bg-[#fffbeb]" style={{ pageBreakInside: "avoid" }}>
-                    <td className="p-2 px-1.5 border border-[#fde68a] text-center text-[#ea580c] font-bold align-middle">
+                    <td className="p-2.5 px-1.5 border border-[#fde68a] text-center text-[#ea580c] font-bold align-middle" style={{ verticalAlign: "middle" }}>
                       *
                     </td>
-                    <td colSpan={3} className="p-2 px-2.5 border border-[#fde68a] font-bold text-[#78350f] align-middle">
+                    <td colSpan={3} className="p-2.5 px-2.5 border border-[#fde68a] font-bold text-[#78350f] align-middle" style={{ verticalAlign: "middle" }}>
                       + {customItems.length} Custom Kitchen Requisitions (Extra Supplies)
                     </td>
-                    <td className="p-2 px-2.5 border border-[#fde68a] text-center font-bold text-[#ea580c] align-middle">
+                    <td className="p-2.5 px-2.5 border border-[#fde68a] text-center font-bold text-[#ea580c] align-middle" style={{ verticalAlign: "middle" }}>
                       As Listed
                     </td>
                   </tr>
@@ -1737,26 +1749,26 @@ export default function RestaurantSmartGrocery() {
               <h3 className="text-[10.5px] font-extrabold text-[#0f172a] uppercase tracking-wide m-0">
                 2. Categorized Raw Materials Procurement Schedule
               </h3>
-              <span className="text-[8.5px] font-bold text-[#059669] bg-[#ecfdf5] px-2 py-0.5 rounded-full border border-[#a7f3d0]">
+              <span className="text-[8.5px] font-bold text-[#059669]">
                 {totalUniqueIngredientsCount} Unique Raw Items &bull; {aisleSections.length} Store Aisles
               </span>
             </div>
 
-            {/* UNIFIED ENTERPRISE PROCUREMENT MATRIX TABLE */}
+            {/* UNIFIED ENTERPRISE PROCUREMENT MATRIX TABLE (Vertically Centered) */}
             <div className="border-[1.5px] border-[#cbd5e1] rounded-lg overflow-hidden box-border bg-[#ffffff]">
               <table className="w-full table-fixed border-collapse text-[9px] box-border">
                 <thead>
                   <tr className="bg-[#0f172a] text-[#ffffff] text-left">
-                    <th className="w-[6%] p-2 px-1 text-center align-middle font-extrabold tracking-wider whitespace-nowrap border-r border-[#334155]">
+                    <th className="w-[6%] p-2 px-1 text-center align-middle font-extrabold tracking-wider whitespace-nowrap border-r border-[#334155]" style={{ verticalAlign: "middle" }}>
                       ✓
                     </th>
-                    <th className="w-[30%] p-2 px-2.5 text-left align-middle font-extrabold uppercase tracking-wider whitespace-nowrap border-r border-[#334155]">
+                    <th className="w-[30%] p-2 px-2.5 text-left align-middle font-extrabold uppercase tracking-wider whitespace-nowrap border-r border-[#334155]" style={{ verticalAlign: "middle" }}>
                       INGREDIENT / RAW MATERIAL
                     </th>
-                    <th className="w-[18%] p-2 px-2.5 text-right align-middle font-extrabold uppercase tracking-wider whitespace-nowrap border-r border-[#334155]">
+                    <th className="w-[18%] p-2 px-2.5 text-right align-middle font-extrabold uppercase tracking-wider whitespace-nowrap border-r border-[#334155]" style={{ verticalAlign: "middle" }}>
                       TOTAL REQUIRED
                     </th>
-                    <th className="w-[46%] p-2 px-2.5 text-left align-middle font-extrabold uppercase tracking-wider whitespace-nowrap">
+                    <th className="w-[46%] p-2 px-2.5 text-left align-middle font-extrabold uppercase tracking-wider whitespace-nowrap" style={{ verticalAlign: "middle" }}>
                       REQUIRED FOR PRODUCTION BATCHES
                     </th>
                   </tr>
@@ -1769,63 +1781,67 @@ export default function RestaurantSmartGrocery() {
                         className="pdf-aisle-group bg-[#f1f5f9] border-t-[1.5px] border-b-[1.5px] border-[#cbd5e1]"
                         style={{ pageBreakInside: "avoid" }}
                       >
-                        <td colSpan={4} className="p-1.5 px-2.5 border-l-4 border-[#FF6B35] align-middle">
+                        <td colSpan={4} className="p-1.5 px-2.5 border-l-4 border-[#FF6B35] align-middle" style={{ verticalAlign: "middle" }}>
                           <div className="flex justify-between items-center">
                             <span className="text-[10.5px] font-extrabold text-[#0f172a]">
                               {aisle.icon} {aisle.name}
                             </span>
-                            <span className="text-[8.5px] text-[#475569] font-bold bg-[#ffffff] px-1.5 py-0.5 rounded border border-[#cbd5e1]">
+                            <span className="text-[8.5px] text-[#475569] font-bold">
                               {aisle.items.length} {aisle.items.length === 1 ? "item" : "items"}
                             </span>
                           </div>
                         </td>
                       </tr>
 
-                      {/* Aisle Items */}
+                      {/* Aisle Items (Strictly Vertically Centered Across All Columns) */}
                       {aisle.items.map((item, idx) => (
                         <tr
                           key={item.id}
                           className={`border-b border-[#e2e8f0] ${idx % 2 === 0 ? "bg-[#ffffff]" : "bg-[#f8fafc]"}`}
-                          style={{ pageBreakInside: "avoid" }}
+                          style={{ pageBreakInside: "avoid", verticalAlign: "middle" }}
                         >
-                          {/* Clean Standard Square Checkbox */}
-                          <td className="p-2 px-1 text-center align-middle">
-                            <span className="inline-block w-[13px] h-[13px] border-[1.5px] border-[#64748b] rounded bg-[#ffffff] align-middle" />
+                          {/* Clean Standard Square Checkbox (Vertically Centered) */}
+                          <td className="p-2.5 px-1 text-center align-middle" style={{ verticalAlign: "middle" }}>
+                            <div style={{ display: "flex", alignItems: "center", justifyContent: "center", minHeight: "22px" }}>
+                              <span className="inline-block w-[13px] h-[13px] border-[1.5px] border-[#64748b] rounded bg-[#ffffff]" />
+                            </div>
                           </td>
 
-                          {/* Ingredient Name + Multiplier Tag */}
-                          <td className="p-2 px-2.5 font-bold text-[#0f172a] align-middle break-words">
-                            <span className="text-[10px]">{item.name}</span>
-                            {item.dishes && item.dishes.length > 1 && (
-                              <span className="inline-flex items-center ml-1.5 bg-[#fef3c7] border border-[#fcd34d] text-[#78350f] text-[7.5px] font-extrabold px-1 py-0.5 rounded align-middle">
-                                x{item.dishes.length} Dishes
-                              </span>
-                            )}
+                          {/* Ingredient Name + Multiplier Tag (Vertically Centered) */}
+                          <td className="p-2.5 px-2.5 font-bold text-[#0f172a] align-middle break-words" style={{ verticalAlign: "middle" }}>
+                            <div style={{ display: "flex", alignItems: "center", flexWrap: "wrap", gap: "4px" }}>
+                              <span className="text-[10px] leading-snug">{item.name}</span>
+                              {item.dishes && item.dishes.length > 1 && (
+                                <span className="text-[#b45309] text-[8px] font-bold">
+                                  x{item.dishes.length} Dishes
+                                </span>
+                              )}
+                            </div>
                           </td>
 
-                          {/* Total Quantity */}
-                          <td className="p-2 px-2.5 text-right font-black text-[#ea580c] align-middle whitespace-nowrap text-[10.5px]">
-                            {item.displayQuantity}
+                          {/* Total Quantity (Vertically Centered) */}
+                          <td className="p-2.5 px-2.5 text-right font-black text-[#ea580c] align-middle whitespace-nowrap text-[10.5px]" style={{ verticalAlign: "middle" }}>
+                            <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", minHeight: "22px" }}>
+                              <span>{item.displayQuantity}</span>
+                            </div>
                           </td>
 
-                          {/* Dish Requirement Breakdown with clean structured badge chips */}
-                          <td className="p-2 px-2.5 text-[#475569] align-middle break-words">
+                          {/* Dish Requirement Breakdown with clean text (Vertically Centered) */}
+                          <td className="p-2.5 px-2.5 text-[#475569] align-middle break-words text-[8px] leading-snug" style={{ verticalAlign: "middle" }}>
                             {item.dishBreakdown && item.dishBreakdown.length > 0 ? (
-                              <div className="flex flex-wrap gap-1">
+                              <div style={{ display: "flex", alignItems: "center", flexWrap: "wrap", gap: "4px 8px" }}>
                                 {item.dishBreakdown.map((db, i) => (
-                                  <span
-                                    key={i}
-                                    className="inline-block bg-[#f1f5f9] border border-[#cbd5e1] rounded px-1.5 py-0.5 text-[7.5px] text-[#334155] leading-tight"
-                                  >
-                                    <strong>{db.dishName}</strong> ({db.portions}x):{" "}
-                                    <span className="text-[#c2410c] font-extrabold ml-0.5">
-                                      {db.displayQuantity}
-                                    </span>
+                                  <span key={i} className="inline-block">
+                                    <strong className="text-[#0f172a]">{db.dishName}</strong> ({db.portions}x):{" "}
+                                    <span className="text-[#c2410c] font-bold">{db.displayQuantity}</span>
+                                    {i < (item.dishBreakdown?.length || 0) - 1 && (
+                                      <span className="text-[#cbd5e1] ml-1.5">•</span>
+                                    )}
                                   </span>
                                 ))}
                               </div>
                             ) : (
-                              <span className="text-[#64748b] text-[7.5px]">
+                              <span className="text-[#64748b]">
                                 For: {item.dishes.join(", ")}
                               </span>
                             )}

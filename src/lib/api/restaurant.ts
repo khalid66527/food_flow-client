@@ -365,10 +365,12 @@ export async function getRestaurantMenuItems(
 }
 
 /**
- * Get Grocery Food Items strictly for a specific Restaurant
+ * Get Grocery Food Items strictly for a specific Restaurant (Protected)
  */
 export async function getRestaurantGroceryItems(
-  restaurantId: string
+  restaurantId: string,
+  ownerId?: string,
+  ownerEmail?: string
 ): Promise<ApiResponse<any[]>> {
   try {
     if (!restaurantId) {
@@ -379,9 +381,7 @@ export async function getRestaurantGroceryItems(
       `${API_BASE_URL}/restaurants/grocery/${restaurantId}`,
       {
         method: "GET",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers: getAuthHeaders(ownerId, ownerEmail),
         cache: "no-store",
       }
     );
@@ -399,11 +399,13 @@ export async function getRestaurantGroceryItems(
 }
 
 /**
- * Aggregate Grocery Ingredient List for a specific Restaurant
+ * Aggregate Grocery Ingredient List for a specific Restaurant (Protected)
  */
 export async function aggregateRestaurantGroceryList(
   restaurantId: string,
-  selectedItems: Array<{ foodId: string; portions: number }>
+  selectedItems: Array<{ foodId: string; portions: number }>,
+  ownerId?: string,
+  ownerEmail?: string
 ): Promise<ApiResponse<any>> {
   try {
     if (!restaurantId) {
@@ -414,9 +416,7 @@ export async function aggregateRestaurantGroceryList(
       `${API_BASE_URL}/restaurants/grocery/aggregate`,
       {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers: getAuthHeaders(ownerId, ownerEmail),
         body: JSON.stringify({
           restaurantId,
           selectedItems,
@@ -436,11 +436,13 @@ export async function aggregateRestaurantGroceryList(
 }
 
 /**
- * Update Secret Grocery Ingredients / Raw Materials for a specific food item
+ * Update Secret Grocery Ingredients / Raw Materials for a specific food item (Protected)
  */
 export async function updateFoodSecretRecipe(
   foodId: string,
-  ingredients: string[]
+  ingredients: string[],
+  ownerId?: string,
+  ownerEmail?: string
 ): Promise<ApiResponse<any>> {
   try {
     if (!foodId) {
@@ -451,9 +453,7 @@ export async function updateFoodSecretRecipe(
       `${API_BASE_URL}/restaurants/grocery/food/${foodId}/recipe`,
       {
         method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers: getAuthHeaders(ownerId, ownerEmail),
         body: JSON.stringify({
           ingredients,
         }),
@@ -470,4 +470,5 @@ export async function updateFoodSecretRecipe(
     };
   }
 }
+
 
