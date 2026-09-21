@@ -107,7 +107,7 @@ const HowItWorks = () => {
                         whileInView={{ opacity: 1, y: 0 }}
                         viewport={{ once: true }}
                         transition={{ duration: 0.4 }}
-                        className="inline-flex items-center gap-1.5 rounded-full border border-orange-100 bg-orange-50 px-3.5 py-1.5 text-xs font-semibold text-orange-600 sm:text-sm"
+                        className="inline-flex items-center gap-1.5 rounded-full border border-orange-100 bg-orange-50 px-3.5 py-1.5 text-xs font-semibold text-orange-600 sm:text-sm select-none"
                     >
                         <Zap className="h-3.5 w-3.5" />
                         How It Works
@@ -165,12 +165,6 @@ const HowItWorks = () => {
                                 <motion.div
                                     key={step.number}
                                     variants={cardVariants}
-                                    whileHover={{ y: -6 }}
-                                    transition={{
-                                        type: "spring",
-                                        stiffness: 300,
-                                        damping: 20,
-                                    }}
                                     className="relative flex flex-col items-center text-center"
                                 >
                                     {/* Number Badge */}
@@ -235,7 +229,7 @@ const HowItWorks = () => {
                                     </div>
 
                                     {/* Content */}
-                                    <div className="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm transition-shadow hover:shadow-md">
+                                    <div className="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm">
                                         <p className="text-[11px] font-bold uppercase tracking-widest text-orange-400">
                                             Step {step.number}
                                         </p>
@@ -262,7 +256,7 @@ const HowItWorks = () => {
                 >
                     <a
                         href="/restaurants"
-                        className="inline-flex items-center gap-2 rounded-full bg-orange-500 px-7 py-3.5 text-sm font-semibold text-white shadow-md shadow-orange-500/20 transition-all hover:bg-orange-600 hover:shadow-lg hover:shadow-orange-500/30"
+                        className="inline-flex items-center gap-2 rounded-full bg-orange-500 px-7 py-3.5 text-sm font-semibold text-white shadow-md shadow-orange-500/20"
                     >
                         Start Ordering Now
                         <UtensilsCrossed className="h-4 w-4" />
