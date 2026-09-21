@@ -197,7 +197,7 @@ const Footer = () => {
                     Location
                   </p>
                   <p className="mt-1 text-sm text-gray-500">
-                    Chattogram, Bangladesh
+                    Dhaka, Bangladesh
                   </p>
                 </div>
               </div>
@@ -212,7 +212,7 @@ const Footer = () => {
                     Phone
                   </p>
                   <p className="mt-1 text-sm text-gray-500">
-                    +880 1XXX-XXXXXX
+                    0156866527
                   </p>
                 </div>
               </div>
@@ -227,7 +227,7 @@ const Footer = () => {
                     Email
                   </p>
                   <p className="mt-1 text-sm text-gray-500">
-                    support@foodflow.com
+                    support.foodflow@gmail.com
                   </p>
                 </div>
               </div>
