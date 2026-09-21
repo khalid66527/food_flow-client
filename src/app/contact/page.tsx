@@ -61,9 +61,9 @@ const contactInfo = [
   {
     icon: Phone,
     title: "Call Us",
-    detail: "+880 1568-666-527",
+    detail: "0156866527",
     sub: "Available 24/7 for urgent issues",
-    href: "tel:+8801568666527",
+    href: "tel:0156866527",
   },
   {
     icon: MapPin,
@@ -623,7 +623,7 @@ export default function ContactPage() {
                   Food Flow Headquarters
                 </h3>
                 <p className="mt-1 text-sm text-gray-500">
-                  Agrabad, Chattogram 4100, Bangladesh
+                  Dhaka, Bangladesh
                 </p>
 
                 {/* Mini stylized map */}
