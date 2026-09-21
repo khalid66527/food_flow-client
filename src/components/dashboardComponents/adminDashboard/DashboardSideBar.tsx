@@ -26,6 +26,7 @@ import {
   ShieldCheck,
   Sparkles,
   MessageSquare,
+  MapPin,
 } from "lucide-react";
 import { useSession, signOut } from "@/lib/auth-client";
 
@@ -88,6 +89,13 @@ export default function DashboardSideBar() {
           label: "Restaurant & Rider Management",
           href: "/dashboard/admin/restaurant&rider",
           icon: Store,
+        },
+        {
+          label: "Delivery Zones & Radius Control",
+          href: "/dashboard/admin/zones",
+          icon: MapPin,
+          badge: "Geo",
+          badgeType: "brand",
         },
         {
           label: "Global Food Catalog",

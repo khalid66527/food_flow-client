@@ -1,5 +1,4 @@
-const API_BASE_URL =
-  process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000/api/v1";
+import { getApiBaseUrl } from "@/lib/api/config";
 
 export interface IGlobalCategory {
   _id: string;
@@ -26,7 +25,7 @@ export async function getGlobalCategories(
   all = false
 ): Promise<IApiResponse<IGlobalCategory[]>> {
   try {
-    const url = all ? `${API_BASE_URL}/categories?all=true` : `${API_BASE_URL}/categories`;
+    const url = all ? `${getApiBaseUrl()}/categories?all=true` : `${getApiBaseUrl()}/categories`;
     const res = await fetch(url, {
       method: "GET",
       headers: { "Content-Type": "application/json" },
@@ -59,7 +58,7 @@ export async function createGlobalCategory(payload: {
   displayOrder?: number;
 }): Promise<IApiResponse<IGlobalCategory>> {
   try {
-    const res = await fetch(`${API_BASE_URL}/categories`, {
+    const res = await fetch(`${getApiBaseUrl()}/categories`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
@@ -89,7 +88,7 @@ export async function updateGlobalCategory(
   }
 ): Promise<IApiResponse<IGlobalCategory>> {
   try {
-    const res = await fetch(`${API_BASE_URL}/categories/${id}`, {
+    const res = await fetch(`${getApiBaseUrl()}/categories/${id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
@@ -112,7 +111,7 @@ export async function deleteGlobalCategory(
   id: string
 ): Promise<IApiResponse<null>> {
   try {
-    const res = await fetch(`${API_BASE_URL}/categories/${id}`, {
+    const res = await fetch(`${getApiBaseUrl()}/categories/${id}`, {
       method: "DELETE",
       headers: { "Content-Type": "application/json" },
     });

@@ -28,6 +28,11 @@ export type TAddress = {
   country?: string;
   latitude?: number;
   longitude?: number;
+  coordinates?: {
+    latitude: number;
+    longitude: number;
+  };
+  zoneId?: string;
   fullAddress?: string;
   area?: string;
 };
@@ -97,6 +102,16 @@ export interface IRestaurant {
   status: "pending" | "active" | "suspended" | "closed";
   isFeatured?: boolean;
   discountOffer?: string;
+  zoneId?: string | number;
+  numericZoneId?: number;
+  zoneMongoId?: string;
+  zoneName?: string;
+  latitude?: number;
+  longitude?: number;
+  coordinates?: {
+    latitude: number;
+    longitude: number;
+  };
   createdAt?: string;
   updatedAt?: string;
 }
@@ -130,6 +145,11 @@ export type RestaurantFormData = {
   facebook: string;
   instagram: string;
   twitter: string;
+  latitude?: number;
+  longitude?: number;
+  zoneId?: string | number;
+  numericZoneId?: number;
+  zoneName?: string;
 };
 
 export interface ApiResponse<T> {
@@ -145,13 +165,7 @@ export interface ApiResponse<T> {
   error?: any;
 }
 
-const SERVER_BASE_URL = (
-  process.env.NEXT_PUBLIC_SERVER_API_URL ||
-  process.env.NEXT_PUBLIC_SERVER_URL ||
-  "http://localhost:5000"
-).replace(/\/api\/?$/, "").replace(/\/$/, "");
-
-const API_BASE_URL = `${SERVER_BASE_URL}/api`;
+import { getApiBaseUrl, getServerBaseUrl } from "@/lib/api/config";
 
 // -------------------------------------------------------------
 // GET Requests / Queries for Restaurant
@@ -165,7 +179,7 @@ export async function getMyRestaurantProfile(
   ownerId?: string
 ): Promise<ApiResponse<IRestaurant>> {
   try {
-    const url = new URL(`${API_BASE_URL}/restaurants/my-profile`);
+    const url = new URL(`${getApiBaseUrl()}/restaurants/my-profile`);
     if (ownerEmail) url.searchParams.append("ownerEmail", ownerEmail);
     if (ownerId) url.searchParams.append("ownerId", ownerId);
 
@@ -193,7 +207,7 @@ export async function getAllRestaurants(
   query: Record<string, string> = {}
 ): Promise<ApiResponse<IRestaurant[]>> {
   try {
-    const url = new URL(`${API_BASE_URL}/restaurants`);
+    const url = new URL(`${getApiBaseUrl()}/restaurants`);
     url.searchParams.append("limit", "100");
     Object.entries(query).forEach(([key, val]) => {
       if (val) url.searchParams.append(key, val);
@@ -225,7 +239,7 @@ export async function getAllGlobalFoodItems(
   query: Record<string, string> = {}
 ): Promise<ApiResponse<IGlobalFoodItem[]>> {
   try {
-    const url = new URL(`${API_BASE_URL}/food`);
+    const url = new URL(`${getApiBaseUrl()}/food`);
     Object.entries(query).forEach(([key, val]) => {
       if (val) url.searchParams.append(key, val);
     });
@@ -253,7 +267,7 @@ export async function getAllGlobalFoodItems(
  */
 export async function getFoodCategories(): Promise<ApiResponse<string[]>> {
   try {
-    const res = await fetch(`${API_BASE_URL}/food/categories`, {
+    const res = await fetch(`${getApiBaseUrl()}/food/categories`, {
       method: "GET",
       headers: {
         "Content-Type": "application/json",
@@ -283,7 +297,7 @@ export async function getSingleFoodItem(
       return { success: false, message: "Food ID is required." };
     }
 
-    const res = await fetch(`${API_BASE_URL}/food/${foodId}`, {
+    const res = await fetch(`${getApiBaseUrl()}/food/${foodId}`, {
       method: "GET",
       headers: {
         "Content-Type": "application/json",
@@ -312,7 +326,7 @@ export async function getSingleRestaurantById(
       return { success: false, message: "Restaurant ID is required." };
     }
 
-    const res = await fetch(`${API_BASE_URL}/restaurants/${restaurantId}`, {
+    const res = await fetch(`${getApiBaseUrl()}/restaurants/${restaurantId}`, {
       method: "GET",
       headers: {
         "Content-Type": "application/json",
@@ -342,7 +356,7 @@ export async function getRestaurantMenuItems(
     }
 
     const res = await fetch(
-      `${API_BASE_URL}/restaurants/food/${restaurantId}`,
+      `${getApiBaseUrl()}/restaurants/food/${restaurantId}`,
       {
         method: "GET",
         headers: {
@@ -378,7 +392,7 @@ export async function getRestaurantGroceryItems(
     }
 
     const res = await fetch(
-      `${API_BASE_URL}/restaurants/grocery/${restaurantId}`,
+      `${getApiBaseUrl()}/restaurants/grocery/${restaurantId}`,
       {
         method: "GET",
         headers: getAuthHeaders(ownerId, ownerEmail),
@@ -413,7 +427,7 @@ export async function aggregateRestaurantGroceryList(
     }
 
     const res = await fetch(
-      `${API_BASE_URL}/restaurants/grocery/aggregate`,
+      `${getApiBaseUrl()}/restaurants/grocery/aggregate`,
       {
         method: "POST",
         headers: getAuthHeaders(ownerId, ownerEmail),
@@ -450,7 +464,7 @@ export async function updateFoodSecretRecipe(
     }
 
     const res = await fetch(
-      `${API_BASE_URL}/restaurants/grocery/food/${foodId}/recipe`,
+      `${getApiBaseUrl()}/restaurants/grocery/food/${foodId}/recipe`,
       {
         method: "PATCH",
         headers: getAuthHeaders(ownerId, ownerEmail),
