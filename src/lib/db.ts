@@ -81,5 +81,22 @@ export async function getFoodCollection(): Promise<Collection> {
   return db.collection("food");
 }
 
+export async function getFavoritesCollection(): Promise<Collection> {
+  const db = await getDatabase();
+  return db.collection("favorites");
+}
+
+export async function getAddressCollection(): Promise<Collection> {
+  const db = await getDatabase();
+  return db.collection("address");
+}
+
+export async function getRiderCollection(): Promise<Collection> {
+  const db = await getDatabase();
+  return db.collection("rider");
+}
+
 export { clientPromise };
 export default getDatabase;
+
+
