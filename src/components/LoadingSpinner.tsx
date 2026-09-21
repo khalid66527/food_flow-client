@@ -26,7 +26,6 @@ export default function LoadingSpinner({
       style={{ minHeight: minHeight || '450px' }}
     >
       <HashLoader color={color} size={size} />
-      {message && <p className="mt-4 text-sm font-medium text-gray-600">{message}</p>}
     </div>
   );
 

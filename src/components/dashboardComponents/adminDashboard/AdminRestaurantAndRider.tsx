@@ -292,17 +292,17 @@ export default function AdminRestaurantAndRider() {
       )}
 
       {/* Header Banner */}
-      <div className="bg-gradient-to-br from-[#1E293B] via-[#0F172A] to-[#020617] rounded-3xl p-6 sm:p-8 text-white shadow-xl">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
+      <div className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-orange-600 via-[#FF6B35] to-amber-500 text-white p-6 sm:p-8 shadow-xl">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 relative z-10">
           <div className="space-y-2">
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/10 backdrop-blur-md text-orange-400 text-xs font-bold uppercase tracking-wider border border-white/10">
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/20 backdrop-blur-md text-white text-xs font-bold uppercase tracking-wider border border-white/20">
               <Sparkles className="w-3.5 h-3.5" />
               <span>Partner Approval &amp; Management</span>
             </div>
             <h1 className="text-2xl sm:text-3xl font-black tracking-tight">
               Restaurant &amp; Rider Control Center
             </h1>
-            <p className="text-slate-300 text-xs sm:text-sm max-w-2xl leading-relaxed">
+            <p className="text-orange-100 text-xs sm:text-sm max-w-2xl leading-relaxed">
               Review onboarding applications, verify vendor &amp; delivery partner credentials,
               approve newly created stores, and moderate platform active partners.
             </p>
@@ -495,7 +495,7 @@ export default function AdminRestaurantAndRider() {
       {/* Main Content Area */}
       {loading ? (
         <div className="min-h-[400px] flex items-center justify-center bg-white rounded-3xl border border-gray-100 p-12">
-          <LoadingSpinner size={50} color="#f97316" message="Loading partner applications..." />
+          <LoadingSpinner size={50} color="#f97316" />
         </div>
       ) : (
         <div className="space-y-8">
@@ -539,6 +539,7 @@ export default function AdminRestaurantAndRider() {
                         <th className="py-3 px-3">Restaurant</th>
                         <th className="py-3 px-3">Owner Contact</th>
                         <th className="py-3 px-3">Location</th>
+                        <th className="py-3 px-3">Rating &amp; Reviews</th>
                         <th className="py-3 px-3">Status</th>
                         <th className="py-3 px-3 text-right">Approval Actions</th>
                       </tr>
@@ -596,6 +597,15 @@ export default function AdminRestaurantAndRider() {
                               <span className="text-[11px] text-gray-400 block">
                                 {rest.address?.area || rest.address?.street || "Area not set"}
                               </span>
+                            </td>
+
+                            {/* Rating & Reviews */}
+                            <td className="py-3.5 px-3">
+                              <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-amber-50 border border-amber-200/80 text-amber-700 font-bold text-xs">
+                                <Star className="w-3.5 h-3.5 fill-amber-400 text-amber-400" />
+                                <span>{rest.rating ? Number(rest.rating).toFixed(1) : "New"}</span>
+                                <span className="text-gray-400 text-[10px]">({rest.reviewCount || 0})</span>
+                              </div>
                             </td>
 
                             {/* Status */}
@@ -720,6 +730,7 @@ export default function AdminRestaurantAndRider() {
                         <th className="py-3 px-3">Rider Name</th>
                         <th className="py-3 px-3">Vehicle &amp; License</th>
                         <th className="py-3 px-3">Zone &amp; City</th>
+                        <th className="py-3 px-3">Rating &amp; Reviews</th>
                         <th className="py-3 px-3">Status</th>
                         <th className="py-3 px-3 text-right">Approval Actions</th>
                       </tr>
@@ -780,6 +791,15 @@ export default function AdminRestaurantAndRider() {
                               <span className="text-[11px] text-gray-400 block">
                                 {rider.city || "Dhaka"}
                               </span>
+                            </td>
+
+                            {/* Rating & Reviews */}
+                            <td className="py-3.5 px-3">
+                              <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-amber-50 border border-amber-200/80 text-amber-700 font-bold text-xs">
+                                <Star className="w-3.5 h-3.5 fill-amber-400 text-amber-400" />
+                                <span>{rider.rating ? Number(rider.rating).toFixed(1) : "New"}</span>
+                                <span className="text-gray-400 text-[10px]">({(rider as any).reviewCount || (rider as any).totalReviews || 0})</span>
+                              </div>
                             </td>
 
                             {/* Status */}

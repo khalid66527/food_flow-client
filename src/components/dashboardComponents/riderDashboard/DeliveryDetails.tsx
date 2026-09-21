@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import LoadingSpinner from "@/lib/api/LoadingSpinner";
 import {
   Loader2,
@@ -16,11 +17,13 @@ import {
   Store,
   Navigation,
   ArrowRight,
+  User,
 } from "lucide-react";
 import { useSession } from "@/lib/auth-client";
 import { getRiderOrdersApi, updateOrderStatusApi } from "@/lib/api/order";
 import { getOrderSocket, joinOrderRoom, disconnectOrderSocket } from "@/lib/socket";
 import { TOrder } from "@/types/order";
+import { toast } from "react-toastify";
 
 function getRiderProfile() {
   if (typeof window === "undefined") return null;
@@ -35,6 +38,7 @@ function getRiderProfile() {
 }
 
 export default function DeliveryDetails() {
+  const router = useRouter();
   const { data: session, isPending: sessionPending } = useSession();
   const user = session?.user as { id?: string; email?: string; name?: string } | undefined;
 
@@ -137,19 +141,38 @@ export default function DeliveryDetails() {
         );
         const socket = getOrderSocket(orderId);
         socket.emit("order_status_updated", { orderId, orderStatus: "Out for Delivery" });
+
+        toast.success("🚴 Delivery accepted! Start your trip.", {
+          position: "top-center",
+          toastId: `rider-accept-${orderId}`,
+        });
+
+        router.push(`/dashboard/rider/active-delivery?orderId=${orderId}`);
       } else {
-        alert(res.message || "Could not accept order.");
+        toast.error(res.message || "Could not accept order.", { position: "top-center" });
       }
     } catch (err) {
       console.error("Accept order failed:", err);
+      toast.error("Accept order failed. Please try again.", { position: "top-center" });
     } finally {
       setActionLoadingId(null);
     }
   };
 
-  const availableOrders = orders.filter((o) => o.orderStatus === "Out for Delivery" && !o.riderInfo?.riderId);
-  const myOrders = orders.filter((o) => o.riderInfo?.riderId === user?.id && o.orderStatus !== "Delivered");
-  const deliveredOrders = orders.filter((o) => o.orderStatus === "Delivered" && o.riderInfo?.riderId === user?.id);
+  const availableOrders = orders.filter((o) => {
+    const s = (o.orderStatus || "").toLowerCase();
+    return (
+      ["ready", "ready for pickup", "out for delivery"].includes(s) &&
+      !o.riderInfo?.riderId
+    );
+  });
+  const myOrders = orders.filter(
+    (o) =>
+      o.riderInfo?.riderId === user?.id &&
+      !["delivered", "completed", "cancelled", "canceled", "rejected", "failed"].includes(
+        (o.orderStatus || "").toLowerCase()
+      )
+  );
 
   if (sessionPending || loading) {
     return <LoadingSpinner size={50} minHeight="60vh" />;
@@ -198,24 +221,62 @@ export default function DeliveryDetails() {
             <p className="text-xs sm:text-sm font-bold text-gray-800">{pickup}</p>
           </div>
 
-          <div className="space-y-2">
+          <div className="space-y-2.5">
             <h4 className="text-[11px] font-black text-gray-400 uppercase tracking-wider flex items-center gap-1.5">
-              <MapPin className="w-3.5 h-3.5 text-[#FF6B35]" /> Dropoff
+              <MapPin className="w-3.5 h-3.5 text-[#FF6B35]" /> Customer & Delivery Details
             </h4>
-            <p className="text-xs sm:text-sm font-bold text-gray-800">
-              {order.deliveryAddress?.streetAddress || "Address on file"}
-            </p>
-            <p className="text-[11px] text-gray-500 leading-relaxed">
-              {[order.deliveryAddress?.area, order.deliveryAddress?.postalCode].filter(Boolean).join(" • ")}
-            </p>
+            
+            {/* Customer Name */}
+            <div className="flex items-center gap-2">
+              <span className="w-6 h-6 rounded-lg bg-orange-100 text-[#FF6B35] flex items-center justify-center text-xs font-black shrink-0">
+                <User className="w-3.5 h-3.5" />
+              </span>
+              <div>
+                <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block">Customer Name</span>
+                <p className="text-xs sm:text-sm font-black text-gray-900 leading-tight">
+                  {order.deliveryAddress?.fullName || order.userName || "Customer"}
+                </p>
+              </div>
+            </div>
+
+            {/* Customer Phone Number */}
             {order.deliveryAddress?.phoneNumber && (
-              <a
-                href={`tel:${order.deliveryAddress.phoneNumber}`}
-                className="inline-flex items-center gap-1.5 text-xs font-bold text-[#FF6B35] hover:underline"
-              >
-                <Phone className="w-3.5 h-3.5" /> {order.deliveryAddress.phoneNumber}
-              </a>
+              <div className="flex items-center gap-2">
+                <span className="w-6 h-6 rounded-lg bg-emerald-100 text-emerald-700 flex items-center justify-center text-xs font-black shrink-0">
+                  <Phone className="w-3.5 h-3.5" />
+                </span>
+                <div>
+                  <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block">Phone Number</span>
+                  <a
+                    href={`tel:${order.deliveryAddress.phoneNumber}`}
+                    className="text-xs sm:text-sm font-black text-[#FF6B35] hover:underline inline-flex items-center gap-1"
+                  >
+                    {order.deliveryAddress.phoneNumber}
+                  </a>
+                </div>
+              </div>
             )}
+
+            {/* Customer Address */}
+            <div className="flex items-start gap-2">
+              <span className="w-6 h-6 rounded-lg bg-blue-100 text-blue-700 flex items-center justify-center text-xs font-black shrink-0 mt-0.5">
+                <MapPin className="w-3.5 h-3.5" />
+              </span>
+              <div>
+                <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block">Delivery Address</span>
+                <p className="text-xs font-bold text-gray-800 leading-snug">
+                  {[
+                    order.deliveryAddress?.streetAddress,
+                    order.deliveryAddress?.building,
+                    order.deliveryAddress?.area,
+                    (order.deliveryAddress as any)?.city,
+                    order.deliveryAddress?.postalCode,
+                  ]
+                    .filter(Boolean)
+                    .join(", ") || "Address on file"}
+                </p>
+              </div>
+            </div>
           </div>
         </div>
 
@@ -240,7 +301,7 @@ export default function DeliveryDetails() {
             </button>
           ) : (
             <Link
-              href="/dashboard/rider/active-delivery"
+              href={`/dashboard/rider/active-delivery?orderId=${orderId}`}
               className="inline-flex items-center gap-1.5 px-5 py-2.5 rounded-xl bg-gradient-to-r from-gray-900 to-black text-white text-xs font-extrabold transition shadow-xs cursor-pointer hover:brightness-125"
             >
               <ArrowRight className="w-3.5 h-3.5" /> Go to Active Delivery
@@ -323,26 +384,6 @@ export default function DeliveryDetails() {
           availableOrders.map((o) => renderOrderCard(o, "available"))
         )}
       </section>
-
-      {/* Delivered history (from this session) */}
-      {deliveredOrders.length > 0 && (
-        <section className="space-y-3">
-          <h2 className="text-sm font-black text-gray-900 flex items-center gap-2">
-            <CheckCircle2 className="w-4 h-4 text-emerald-600" /> Recently Completed ({deliveredOrders.length})
-          </h2>
-          {deliveredOrders.map((o) => (
-            <div key={o.orderId || o._id} className="bg-white rounded-2xl border border-gray-100 px-5 py-4 flex items-center justify-between gap-3">
-              <div>
-                <p className="text-sm font-extrabold text-gray-900">#{o.orderId}</p>
-                <p className="text-[11px] text-gray-400">{o.items?.length} items • {o.items?.[0]?.name}{o.items && o.items.length > 1 ? " +" + (o.items.length - 1) : ""}</p>
-              </div>
-              <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-emerald-50 text-emerald-700 text-[11px] font-extrabold border border-emerald-200">
-                <CheckCircle2 className="w-3 h-3" /> Delivered
-              </span>
-            </div>
-          ))}
-        </section>
-      )}
     </div>
   );
 }

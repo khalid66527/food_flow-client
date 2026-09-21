@@ -89,22 +89,18 @@ export interface ApiResponse<T = any> {
   error?: any;
 }
 
-const SERVER_BASE_URL = (
-  process.env.NEXT_PUBLIC_SERVER_API_URL ||
-  process.env.NEXT_PUBLIC_SERVER_URL ||
-  "http://localhost:5000"
-).replace(/\/api\/?$/, "").replace(/\/$/, "");
-
-const API_BASE_URL = `${SERVER_BASE_URL}/api`;
+import { getApiBaseUrl } from "@/lib/api/config";
 
 /**
  * Get All Users with role filtering, search, pagination, and stats
  */
+import { getAuthHeaders } from "@/lib/jwt";
+
 export async function getAllUsers(
   queryParams: IUserQueryParams = {}
 ): Promise<ApiResponse<IUser[]>> {
   try {
-    const url = new URL(`${API_BASE_URL}/admin/users`);
+    const url = new URL(`${getApiBaseUrl()}/admin/users`);
 
     if (queryParams.role && queryParams.role !== "all") {
       url.searchParams.append("role", queryParams.role);
@@ -130,9 +126,7 @@ export async function getAllUsers(
 
     const res = await fetch(url.toString(), {
       method: "GET",
-      headers: {
-        "Content-Type": "application/json",
-      },
+      headers: getAuthHeaders(),
       cache: "no-store",
     });
 
@@ -180,11 +174,9 @@ export async function getUserById(
       // Fall through to server API if local fetch is unavailable
     }
 
-    const res = await fetch(`${API_BASE_URL}/admin/users/${encodeURIComponent(userIdOrEmail)}`, {
+    const res = await fetch(`${getApiBaseUrl()}/admin/users/${encodeURIComponent(userIdOrEmail)}`, {
       method: "GET",
-      headers: {
-        "Content-Type": "application/json",
-      },
+      headers: getAuthHeaders(userIdOrEmail),
       cache: "no-store",
     });
 
@@ -211,12 +203,10 @@ export async function getUserRestaurantDetails(
     }
 
     const res = await fetch(
-      `${API_BASE_URL}/admin/restaurant-details/${encodeURIComponent(emailOrId)}`,
+      `${getApiBaseUrl()}/admin/restaurant-details/${encodeURIComponent(emailOrId)}`,
       {
         method: "GET",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers: getAuthHeaders(emailOrId),
         cache: "no-store",
       }
     );

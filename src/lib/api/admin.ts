@@ -33,17 +33,13 @@ export interface ApiResponse<T> {
   };
 }
 
-const SERVER_BASE_URL = (
-  process.env.NEXT_PUBLIC_SERVER_API_URL ||
-  process.env.NEXT_PUBLIC_SERVER_URL ||
-  "http://localhost:5000"
-).replace(/\/api\/?$/, "").replace(/\/$/, "");
-
-const API_BASE_URL = `${SERVER_BASE_URL}/api`;
+import { getApiBaseUrl } from "@/lib/api/config";
 
 /**
  * Get all restaurants for Admin management with search, filter, pagination
  */
+import { getAuthHeaders } from "@/lib/jwt";
+
 export async function getAdminRestaurants(params: {
   status?: string;
   search?: string;
@@ -51,7 +47,7 @@ export async function getAdminRestaurants(params: {
   limit?: number;
 }): Promise<ApiResponse<IRestaurant[]>> {
   try {
-    const url = new URL(`${API_BASE_URL}/admin/restaurants`);
+    const url = new URL(`${getApiBaseUrl()}/admin/restaurants`);
     if (params.status && params.status !== "all") url.searchParams.append("status", params.status);
     if (params.search && params.search.trim()) url.searchParams.append("search", params.search.trim());
     if (params.page) url.searchParams.append("page", String(params.page));
@@ -59,7 +55,7 @@ export async function getAdminRestaurants(params: {
 
     const res = await fetch(url.toString(), {
       method: "GET",
-      headers: { "Content-Type": "application/json" },
+      headers: getAuthHeaders(),
       cache: "no-store",
     });
 
@@ -84,7 +80,7 @@ export async function getAdminRiders(params: {
   limit?: number;
 }): Promise<ApiResponse<IRiderProfile[]>> {
   try {
-    const url = new URL(`${API_BASE_URL}/admin/riders`);
+    const url = new URL(`${getApiBaseUrl()}/admin/riders`);
     if (params.status && params.status !== "all") url.searchParams.append("status", params.status);
     if (params.search && params.search.trim()) url.searchParams.append("search", params.search.trim());
     if (params.page) url.searchParams.append("page", String(params.page));
@@ -92,7 +88,7 @@ export async function getAdminRiders(params: {
 
     const res = await fetch(url.toString(), {
       method: "GET",
-      headers: { "Content-Type": "application/json" },
+      headers: getAuthHeaders(),
       cache: "no-store",
     });
 
@@ -112,9 +108,9 @@ export async function getAdminRiders(params: {
  */
 export async function getAdminRestaurantRiderStats(): Promise<ApiResponse<IAdminRestaurantRiderStats>> {
   try {
-    const res = await fetch(`${API_BASE_URL}/admin/restaurant-rider-stats`, {
+    const res = await fetch(`${getApiBaseUrl()}/admin/restaurant-rider-stats`, {
       method: "GET",
-      headers: { "Content-Type": "application/json" },
+      headers: getAuthHeaders(),
       cache: "no-store",
     });
 

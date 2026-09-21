@@ -59,6 +59,8 @@ const API_BASE_URL = `${SERVER_BASE_URL}/api`;
 /**
  * Get the current rider's profile by email or user ID
  */
+import { getAuthHeaders } from "@/lib/jwt";
+
 export async function getMyRiderProfile(
   email?: string,
   userId?: string
@@ -75,9 +77,7 @@ export async function getMyRiderProfile(
 
     const res = await fetch(url.toString(), {
       method: "GET",
-      headers: {
-        "Content-Type": "application/json",
-      },
+      headers: getAuthHeaders(userId, email),
       cache: "no-store",
     });
 

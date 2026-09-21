@@ -26,6 +26,7 @@ import {
   ShieldCheck,
   Sparkles,
   MessageSquare,
+  MapPin,
 } from "lucide-react";
 import { useSession, signOut } from "@/lib/auth-client";
 
@@ -90,6 +91,13 @@ export default function DashboardSideBar() {
           icon: Store,
         },
         {
+          label: "Delivery Zones & Radius Control",
+          href: "/dashboard/admin/zones",
+          icon: MapPin,
+          badge: "Geo",
+          badgeType: "brand",
+        },
+        {
           label: "Global Food Catalog",
           href: "/dashboard/admin/foods",
           icon: Utensils,
@@ -109,6 +117,13 @@ export default function DashboardSideBar() {
           href: "/dashboard/admin/messages",
           icon: MessageSquare,
         },
+        {
+          label: "Payment Transactions",
+          href: "/dashboard/admin/transactions",
+          icon: CreditCard,
+          badge: "Live",
+          badgeType: "success",
+        },
       ],
     },
     {
@@ -126,6 +141,7 @@ export default function DashboardSideBar() {
         },
       ],
     },
+
   ];
 
   const getBadgeClass = (type?: "brand" | "accent" | "success" | "muted", isActive?: boolean) => {

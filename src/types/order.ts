@@ -2,7 +2,8 @@ import { TAddress } from './address';
 
 export type TPaymentMethod = 'COD' | 'STRIPE';
 
-export type TPaymentStatus = 'Pending' | 'Paid' | 'Failed';
+export type TPaymentStatus = 'Pending' | 'Paid' | 'Failed' | 'Refunded' | 'Partially Refunded';
+
 
 export type TOrderStatus =
   | 'Placed'
@@ -23,6 +24,16 @@ export interface TOrderItem {
   restaurantName?: string;
 }
 
+export interface TRefundInfo {
+  refundId: string;
+  amount: number;
+  reason?: string;
+  refundedAt: string;
+  status: 'Completed' | 'Pending' | 'Failed';
+  refundedBy?: string;
+  stripeRefundId?: string;
+}
+
 export interface TOrder {
   _id?: string;
   id?: string;
@@ -34,18 +45,40 @@ export interface TOrder {
   deliveryAddress: TAddress;
   subtotal: number;
   deliveryFee: number;
+  vatPercentage?: number;
+  vatAmount?: number;
+  restaurantCommissionPercentage?: number;
+  adminGrossCommission?: number;
+  adminNetProfit?: number;
+  restaurantPayout?: number;
+  riderPayout?: number;
+  taxFundVat?: number;
+  platformFee?: number;
+  couponCode?: string;
   discount?: number;
+  isFirstOrderDiscount?: boolean;
   totalAmount: number;
   paymentMethod: TPaymentMethod;
   paymentStatus: TPaymentStatus;
   orderStatus: TOrderStatus;
   stripeSessionId?: string;
+  stripePaymentIntentId?: string;
+  transactionId?: string;
+  walletNumber?: string;
+  refundInfo?: TRefundInfo;
   riderInfo?: {
     riderId?: string;
     name?: string;
     phone?: string;
     vehicleNumber?: string;
+    latitude?: number;
+    longitude?: number;
+    deliveredAt?: string;
   };
+  deliveryStatus?: string;
+  deliveredAt?: string;
+  deliveryOtp?: string;
+  deliveryOtpCreatedAt?: string;
   createdAt?: string;
   updatedAt?: string;
 }
@@ -58,6 +91,9 @@ export interface TCreateOrderPayload {
   deliveryFee: number;
   discount?: number;
   totalAmount: number;
+  couponCode?: string;
+  transactionId?: string;
+  walletNumber?: string;
 }
 
 export interface TOrderApiResponse {
@@ -67,3 +103,4 @@ export interface TOrderApiResponse {
   checkoutUrl?: string;
   data?: TOrder | TOrder[];
 }
+

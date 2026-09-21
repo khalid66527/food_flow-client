@@ -17,6 +17,9 @@ import {
   X,
   Sparkles,
   ShoppingBag,
+  History,
+  Key,
+  Heart,
 } from "lucide-react";
 import { useSession, signOut } from "@/lib/auth-client";
 import { useCart } from "@/contexts/CartContext";
@@ -73,9 +76,16 @@ export default function DashboardSideBar() {
           icon: Home,
         },
         {
-          label: "Restaurants",
+          label: "Dishes",
           href: "/restaurants",
           icon: Store,
+        },
+        {
+          label: "Favorites",
+          href: "/dashboard/customer/favorites",
+          icon: Heart,
+          badge: "Saved",
+          badgeType: "accent",
         },
       ],
     },
@@ -93,8 +103,13 @@ export default function DashboardSideBar() {
           label: "Orders",
           href: "/dashboard/customer/orders",
           icon: ShoppingBag,
-          badge: "History",
-          badgeType: "brand",
+        },
+        {
+          label: "Order History",
+          href: "/dashboard/customer/order-history",
+          icon: History,
+          badge: "Delivered",
+          badgeType: "success",
         },
         {
           label: "Order Tracking",
@@ -102,6 +117,13 @@ export default function DashboardSideBar() {
           icon: MapPin,
           badge: "Live",
           badgeType: "brand",
+        },
+        {
+          label: "Delivery OTP",
+          href: "/dashboard/customer/delivery-otp",
+          icon: Key,
+          badge: "OTP",
+          badgeType: "accent",
         },
       ],
     },

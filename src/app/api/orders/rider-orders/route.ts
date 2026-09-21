@@ -33,11 +33,14 @@ export async function GET(req: NextRequest) {
     };
 
     if (mode === "available") {
-      query.orderStatus = "Out for Delivery";
+      query.orderStatus = { $in: ["Ready", "Ready for Pickup", "Out for Delivery"] };
       query["riderInfo.riderId"] = { $exists: false };
+    } else if (mode === "history" || mode === "delivered") {
+      query["riderInfo.riderId"] = userId;
+      query.orderStatus = "Delivered";
     } else if (mode === "assigned" || mode === "active") {
       query["riderInfo.riderId"] = userId;
-      query.orderStatus = { $in: ["Out for Delivery", "Delivered"] };
+      query.orderStatus = { $in: ["Ready", "Ready for Pickup", "Out for Delivery", "Delivered"] };
     } else if (statusFilter) {
       const statuses = statusFilter.split(",").map((s) => s.trim());
       query.orderStatus = statuses.length === 1 ? statuses[0] : { $in: statuses };
@@ -48,7 +51,7 @@ export async function GET(req: NextRequest) {
     } else {
       query["$or"] = [
         { "riderInfo.riderId": userId },
-        { orderStatus: "Out for Delivery", "riderInfo.riderId": { $exists: false } },
+        { orderStatus: { $in: ["Ready", "Ready for Pickup", "Out for Delivery"] }, "riderInfo.riderId": { $exists: false } },
       ];
     }
 

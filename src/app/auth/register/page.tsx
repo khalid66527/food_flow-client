@@ -30,7 +30,12 @@ import type {
   FormFieldName,
   RoleRedirectMap,
 } from "@/types/auth";
-import { signUp, signIn } from "@/lib/auth-client";
+import { signUp, signIn, signOut } from "@/lib/auth-client";
+import {
+  saveRegisterDraft,
+  readRegisterDraft,
+  clearRegisterDraft,
+} from "@/lib/registerDraft";
 
 // ---------------------------------------------------------------------------
 // Role configuration displayed in the public registration UI.
@@ -280,6 +285,54 @@ export default function RegisterPage() {
   const [redirectCountdown, setRedirectCountdown] = useState(
     REDIRECT_COUNTDOWN_SECONDS
   );
+  const [draftRestored, setDraftRestored] = useState(false);
+  const [draftNotice, setDraftNotice] = useState<string | null>(null);
+
+  // Rehydrate the draft parked before the user clicked through to /terms or
+  // /privacy. This has to be a post-mount effect rather than a useState
+  // initialiser — reading sessionStorage during render would not match the
+  // server-rendered output. Same constraint (and same lint suppression) as
+  // AddFoodForm.
+  /* eslint-disable react-hooks/set-state-in-effect */
+  useEffect(() => {
+    const draft = readRegisterDraft();
+
+    if (draft) {
+      setForm((prev) => ({
+        ...prev,
+        fullName: draft.fullName,
+        email: draft.email,
+        phone: draft.phone,
+        role: draft.role,
+        agreeToTerms: draft.agreeToTerms,
+      }));
+      setDraftNotice(
+        "We restored your details — please re-enter your password."
+      );
+    }
+
+    // `touched` is intentionally not restored: it would immediately paint
+    // "Password is required" under the deliberately blank password fields.
+    // The draft is also not cleared here — autosave means it has to survive
+    // repeated round trips. It is cleared once registration succeeds.
+    setDraftRestored(true);
+  }, []);
+  /* eslint-enable react-hooks/set-state-in-effect */
+
+  // Autosave, debounced. Gated on `draftRestored` so the first render cannot
+  // write INITIAL_FORM over a stored draft before the effect above reads it.
+  useEffect(() => {
+    if (!draftRestored || isSuccess) return;
+    const timer = setTimeout(() => saveRegisterDraft(form), 300);
+    return () => clearTimeout(timer);
+  }, [form, draftRestored, isSuccess]);
+
+  // Restore notice auto-dismiss
+  useEffect(() => {
+    if (!draftNotice) return;
+    const timer = setTimeout(() => setDraftNotice(null), 4000);
+    return () => clearTimeout(timer);
+  }, [draftNotice]);
 
   // Shake animation reset
   useEffect(() => {
@@ -289,12 +342,12 @@ export default function RegisterPage() {
     }
   }, [shakeSubmit]);
 
-  // Auto-redirect countdown after successful registration
+  // Auto-redirect countdown after successful registration -> redirect to Login for OTP verification
   useEffect(() => {
     if (!isSuccess || !form.role) return;
 
     if (redirectCountdown <= 0) {
-      const destination = ROLE_REDIRECT_MAP[form.role as PublicRole] || "/dashboard/customer";
+      const destination = `/auth/login?registered=true&email=${encodeURIComponent(form.email)}`;
       router.push(destination);
       return;
     }
@@ -304,7 +357,7 @@ export default function RegisterPage() {
       1000
     );
     return () => clearTimeout(timer);
-  }, [isSuccess, redirectCountdown, form.role, router]);
+  }, [isSuccess, redirectCountdown, form.role, form.email, router]);
 
   const handleChange = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -416,8 +469,15 @@ export default function RegisterPage() {
         if (error) {
           setServerError(error.message || "Registration failed. Please try again.");
         } else if (data) {
-          setIsSuccess(true);
-          setRedirectCountdown(REDIRECT_COUNTDOWN_SECONDS);
+          try {
+            await signOut();
+          } catch {
+            // ignore
+          }
+          // The account exists now — the draft is stale and must not resurface
+          // on a later visit to /auth/register in this tab.
+          clearRegisterDraft();
+          router.push(`/auth/login?registered=true&email=${encodeURIComponent(form.email)}`);
         } else {
           setServerError("Could not complete registration.");
         }
@@ -461,10 +521,10 @@ export default function RegisterPage() {
           {/* Headline */}
           <div className="space-y-2">
             <h1 className="text-2xl sm:text-3xl font-extrabold text-gray-900 tracking-tight">
-              Welcome to Food Flow!
+              Account Created!
             </h1>
             <p className="text-sm text-gray-500 leading-relaxed">
-              Your account has been created successfully.
+              Please sign in with your email to verify with OTP and activate your account.
             </p>
           </div>
 
@@ -495,9 +555,9 @@ export default function RegisterPage() {
           {/* Redirect countdown */}
           <div className="space-y-3">
             <p className="text-xs text-gray-400">
-              Redirecting to your{" "}
+              Redirecting to{" "}
               <span className="font-semibold text-gray-700">
-                {role.toLowerCase()} dashboard
+                Sign In & OTP Verification
               </span>{" "}
               in{" "}
               <span className="font-bold text-orange-500 tabular-nums">
@@ -524,17 +584,11 @@ export default function RegisterPage() {
           {/* Actions */}
           <div className="flex flex-col sm:flex-row items-center justify-center gap-3 pt-2">
             <Link
-              href={dashboardRoute}
-              className="w-full sm:w-auto flex-1 inline-flex items-center justify-center gap-2 px-6 py-3 rounded-full bg-orange-500 text-white font-semibold text-sm shadow-lg shadow-orange-500/25 hover:bg-orange-600 hover:shadow-xl hover:shadow-orange-500/30 active:scale-95 transition-all duration-200"
+              href={`/auth/login?registered=true&email=${encodeURIComponent(form.email)}`}
+              className="w-full inline-flex items-center justify-center gap-2 px-6 py-3.5 rounded-full bg-orange-500 text-white font-semibold text-sm shadow-lg shadow-orange-500/25 hover:bg-orange-600 hover:shadow-xl hover:shadow-orange-500/30 active:scale-95 transition-all duration-200"
             >
-              Go to Dashboard
+              Proceed to Sign In & Verify
               <ArrowRight className="h-4 w-4" />
-            </Link>
-            <Link
-              href="/auth/login"
-              className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-6 py-3 rounded-full border border-gray-200 text-gray-700 font-semibold text-sm hover:bg-gray-50 active:scale-95 transition-all duration-200"
-            >
-              Sign In Instead
             </Link>
           </div>
         </div>
@@ -687,6 +741,13 @@ export default function RegisterPage() {
 
           {/* Form */}
           <form onSubmit={handleSubmit} className="space-y-4">
+            {draftNotice && (
+              <div className="flex items-center gap-2 p-3 rounded-xl bg-amber-50 border border-amber-200 text-xs sm:text-sm text-amber-700 animate-slide-down">
+                <CheckCircle2 className="h-4 w-4 shrink-0" />
+                <span>{draftNotice}</span>
+              </div>
+            )}
+
             {serverError && (
               <div className="flex items-center gap-2 p-3 rounded-xl bg-red-50 border border-red-200 text-xs sm:text-sm text-red-600 animate-slide-down">
                 <AlertCircle className="h-4 w-4 shrink-0" />

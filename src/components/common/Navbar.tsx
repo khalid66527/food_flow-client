@@ -14,7 +14,8 @@ import {
   ShieldCheck, 
   Menu, 
   X,
-  ChevronDown
+  ChevronDown,
+  Sparkles
 } from "lucide-react";
 import { useSession, signOut } from "@/lib/auth-client";
 import { useCart } from "@/contexts/CartContext";
@@ -22,11 +23,10 @@ import {
   getRealTimeLocation, 
   detectRealTimeLocation, 
   subscribeLocation, 
-  updateRealTimeLocation,
-  loadLocationFromStorage,
-  ILocationInfo 
+  ILocationInfo,
+  DEFAULT_INITIAL_LOCATION 
 } from "@/lib/location";
-import { getAddresses } from "@/lib/api/address";
+import LocationModal from "@/components/common/LocationModal";
 
 // Better Auth session ba user object-er type definition (Real implementation er jonno)
 type UserRole = "customer" | "restaurant" | "rider" | "admin" | string | null;
@@ -59,14 +59,14 @@ export default function Navbar({
   const [isMounted, setIsMounted] = useState<boolean>(false);
   const [isDropdownOpen, setIsDropdownOpen] = useState<boolean>(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState<boolean>(false);
-  const [locationInfo, setLocationInfo] = useState<ILocationInfo>(() => getRealTimeLocation());
+  const [isLocationModalOpen, setIsLocationModalOpen] = useState<boolean>(false);
+  const [locationInfo, setLocationInfo] = useState<ILocationInfo>(DEFAULT_INITIAL_LOCATION);
 
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   // Sync real-time location and trigger browser geolocation
   useEffect(() => {
     setIsMounted(true);
-    loadLocationFromStorage();
     setLocationInfo(getRealTimeLocation());
 
     const unsubscribe = subscribeLocation(() => {
@@ -88,38 +88,7 @@ export default function Navbar({
   const session = sessionProp || clientSession;
   const user = (userProp || session?.user || null) as UserSession | null;
 
-  // Auto detect user default delivery address city if logged in
-  useEffect(() => {
-    if (!user?.id || !user?.email) return;
-    let isCancelled = false;
 
-    const syncUserAddressCity = async () => {
-      try {
-        const res = await getAddresses(user.id, user.email);
-        if (isCancelled) return;
-        if (res.success && Array.isArray(res.data) && res.data.length > 0) {
-          const defaultAddr = res.data.find((a) => a.isDefault) || res.data[0];
-          if (defaultAddr) {
-            const addrObj = defaultAddr as any;
-            const detectedCity = addrObj.city || defaultAddr.area;
-            if (detectedCity) {
-              updateRealTimeLocation(
-                detectedCity,
-                defaultAddr.area || defaultAddr.streetAddress || `${detectedCity} Central`
-              );
-            }
-          }
-        }
-      } catch (e) {
-        console.warn("Failed to auto-detect user address city:", e);
-      }
-    };
-
-    syncUserAddressCity();
-    return () => {
-      isCancelled = true;
-    };
-  }, [user?.id, user?.email]);
 
   // Click outside listener for profile dropdown
   useEffect(() => {
@@ -208,10 +177,10 @@ export default function Navbar({
             Home
           </Link>
           <Link 
-            href="/restaurants" 
-            className={`px-4 py-1.5 rounded-full transition-all ${pathname === "/restaurants" ? "bg-white text-orange-600 shadow-xs font-semibold" : "hover:bg-white hover:text-orange-600"}`}
+            href="/dishes" 
+            className={`px-4 py-1.5 rounded-full transition-all ${pathname === "/restaurants" || pathname.startsWith("/dishes") ? "bg-white text-orange-600 shadow-xs font-semibold" : "hover:bg-white hover:text-orange-600"}`}
           >
-            Restaurants
+            Dishes
           </Link>
           <Link 
             href="/about" 
@@ -225,6 +194,17 @@ export default function Navbar({
           >
             Contact
           </Link>
+          <Link 
+            href="/ai" 
+            className={`px-3.5 py-1.5 rounded-full transition-all flex items-center gap-1.5 ${
+              pathname === "/ai" || pathname.startsWith("/ai")
+                ? "bg-gradient-to-r from-orange-500 to-amber-500 text-white shadow-xs font-semibold" 
+                : "hover:bg-white text-orange-600 font-medium"
+            }`}
+          >
+            <Sparkles className="h-3.5 w-3.5 text-amber-500 shrink-0 animate-pulse" />
+            <span>AI Assistant</span>
+          </Link>
         </nav>
 
         {/* 3. Right Section: Location, Cart & Better Auth User Session */}
@@ -232,12 +212,29 @@ export default function Navbar({
         <div className="flex items-center gap-2 sm:gap-3">
           
           {/* Real-Time Auto-Detected Location Badge (Beside Cart Button) */}
-          <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-orange-50/90 text-orange-700 border border-orange-200/80 text-xs font-bold shadow-2xs">
+          <button
+            type="button"
+            onClick={() => setIsLocationModalOpen(true)}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-orange-50/90 hover:bg-orange-100 text-orange-700 border border-orange-200/80 text-xs font-bold shadow-2xs transition-colors cursor-pointer"
+            title={
+              isMounted && locationInfo.zoneName
+                ? `Zone: ${locationInfo.zoneName} (Click to change location)`
+                : isMounted && !locationInfo.isInsideServiceArea && locationInfo.hasRealLocation
+                ? `Outside Service Area (${locationInfo.upazila || locationInfo.district || locationInfo.city}) - Click to change`
+                : "Click to select or change delivery location"
+            }
+          >
             <MapPin className="h-3.5 w-3.5 text-orange-500 shrink-0 animate-pulse" />
-            <span className="truncate max-w-[90px] sm:max-w-[125px]">
-              {isMounted ? (locationInfo.city || "Chattogram") : "Chattogram"}
+            <span className="truncate max-w-[95px] sm:max-w-[135px]">
+              {isMounted
+                ? (locationInfo.zoneName
+                    ? locationInfo.zoneName
+                    : locationInfo.hasRealLocation
+                    ? (locationInfo.upazila || locationInfo.district || locationInfo.city)
+                    : "Location Off")
+                : "Location"}
             </span>
-          </div>
+          </button>
 
           {/* Cart Button (opens sliding drawer) */}
           <button
@@ -353,11 +350,11 @@ export default function Navbar({
             Home
           </Link>
           <Link 
-            href="/restaurants" 
+            href="/dishes" 
             onClick={() => setIsMobileMenuOpen(false)}
-            className={`block px-3 py-2 rounded-lg text-base font-medium transition-colors ${pathname === "/restaurants" ? "bg-orange-50 text-orange-600" : "text-gray-700 hover:bg-orange-50 hover:text-orange-600"}`}
+            className={`block px-3 py-2 rounded-lg text-base font-medium transition-colors ${pathname === "/restaurants" || pathname.startsWith("/dishes") ? "bg-orange-50 text-orange-600" : "text-gray-700 hover:bg-orange-50 hover:text-orange-600"}`}
           >
-            Restaurants
+            Dishes
           </Link>
           <Link 
             href="/contact" 
@@ -365,6 +362,18 @@ export default function Navbar({
             className={`block px-3 py-2 rounded-lg text-base font-medium transition-colors ${pathname.startsWith("/contact") ? "bg-orange-50 text-orange-600" : "text-gray-700 hover:bg-orange-50 hover:text-orange-600"}`}
           >
             Contact
+          </Link>
+          <Link 
+            href="/ai" 
+            onClick={() => setIsMobileMenuOpen(false)}
+            className={`flex items-center gap-2 px-3 py-2 rounded-lg text-base font-semibold transition-colors ${
+              pathname === "/ai" || pathname.startsWith("/ai")
+                ? "bg-gradient-to-r from-orange-500 to-amber-500 text-white" 
+                : "text-orange-600 hover:bg-orange-50"
+            }`}
+          >
+            <Sparkles className="h-4 w-4" />
+            <span>AI Assistant</span>
           </Link>
 
           {user ? (
@@ -415,6 +424,12 @@ export default function Navbar({
           )}
         </div>
       )}
+
+      {/* Location Selection & Zone Modal */}
+      <LocationModal
+        isOpen={isLocationModalOpen}
+        onClose={() => setIsLocationModalOpen(false)}
+      />
     </header>
   );
 }

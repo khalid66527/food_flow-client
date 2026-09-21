@@ -8,16 +8,10 @@ const SERVER_BASE_URL = (
 
 const API_BASE_URL = `${SERVER_BASE_URL}/api`;
 
-interface IdentityHeaders {
-  "x-user-id": string;
-  "x-user-email": string;
-}
+import { getAuthHeaders } from "@/lib/jwt";
 
-function buildIdentityHeaders(userId: string, userEmail: string): IdentityHeaders {
-  return {
-    "x-user-id": userId,
-    "x-user-email": userEmail,
-  };
+function buildIdentityHeaders(userId?: string, userEmail?: string): Record<string, string> {
+  return getAuthHeaders(userId, userEmail);
 }
 
 /**
@@ -170,7 +164,7 @@ export async function getRiderOrdersApi(
   userId: string,
   userEmail: string,
   opts?: {
-    mode?: "available" | "assigned" | "active";
+    mode?: "available" | "assigned" | "active" | "history" | "delivered";
     status?: string;
   }
 ): Promise<TOrderApiResponse> {
@@ -199,8 +193,8 @@ export async function getRiderOrdersApi(
 }
 
 /**
- * Update order status (and optionally riderInfo) via PATCH /api/orders/:id
- * The backend handles: status transition logic, payment status, and rider info merge.
+ * Update order status (and optionally riderInfo, OTP, action) via PATCH /api/orders/:id
+ * The backend handles: status transition logic, payment status, rider info merge, and OTP validation.
  */
 export async function updateOrderStatusApi(
   orderId: string,
@@ -208,6 +202,11 @@ export async function updateOrderStatusApi(
     orderStatus?: string;
     riderInfo?: { riderId?: string; name?: string; phone?: string; vehicleNumber?: string };
     paymentStatus?: string;
+    otp?: string;
+    deliveryOtp?: string;
+    action?: string;
+    resendOtp?: boolean;
+    reason?: string;
   },
   userId?: string,
   userEmail?: string
@@ -233,3 +232,52 @@ export async function updateOrderStatusApi(
     };
   }
 }
+
+/**
+ * Trigger sending/resending Delivery OTP to customer (Email & Dashboard).
+ */
+export async function sendDeliveryOtpApi(
+  orderId: string,
+  userId?: string,
+  userEmail?: string
+): Promise<TOrderApiResponse> {
+  return updateOrderStatusApi(
+    orderId,
+    { action: "resend_otp" },
+    userId,
+    userEmail
+  );
+}
+
+/**
+ * Issue refund for an order via POST /api/orders/refund
+ */
+export async function refundOrderApi(
+  orderId: string,
+  payload: { amount?: number; reason?: string; markAsCancelled?: boolean },
+  userId?: string,
+  userEmail?: string
+): Promise<TOrderApiResponse> {
+  try {
+    const endpoint = `/api/orders/refund`;
+    const headers: Record<string, string> = { "Content-Type": "application/json" };
+    if (userId && userEmail) {
+      headers["x-user-id"] = userId;
+      headers["x-user-email"] = userEmail;
+    }
+    const res = await fetch(endpoint, {
+      method: "POST",
+      headers,
+      body: JSON.stringify({ orderId, ...payload }),
+    });
+    const data = await res.json();
+    return data as TOrderApiResponse;
+  } catch (err: unknown) {
+    return {
+      success: false,
+      message: err instanceof Error ? err.message : "Failed to process refund.",
+    };
+  }
+}
+
+

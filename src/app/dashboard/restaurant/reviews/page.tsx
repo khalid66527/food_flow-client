@@ -1,12 +1,5 @@
-import RestaurantReviews from '@/components/dashboardComponents/restaurantDashboard/RestaurantReviews';
-import React from 'react';
+import RestaurantReviews from "@/components/dashboardComponents/restaurantDashboard/RestaurantReviews";
 
-const page = () => {
-    return (
-        <div>
-            <RestaurantReviews />
-        </div>
-    );
-};
-
-export default page;
+export default function RestaurantReviewsPage() {
+  return <RestaurantReviews />;
+}

@@ -53,14 +53,17 @@ export default function OrderStatusStepper({
   cancelled = false,
 }: OrderStatusStepperProps) {
   const activeIndex = resolveStepIndex(currentStatus);
+  const isDelivered = ["delivered", "completed"].includes(
+    (currentStatus || "").toLowerCase().trim()
+  );
 
   return (
     <div className="w-full">
       <div className="flex items-center justify-between">
         {ORDER_STATUS_STEPS.map((step, i) => {
           const StepIcon = step.icon;
-          const done = activeIndex > i;
-          const active = i === activeIndex;
+          const done = isDelivered ? true : activeIndex > i;
+          const active = isDelivered ? false : i === activeIndex;
           const isLast = i === ORDER_STATUS_STEPS.length - 1;
 
           return (
@@ -70,7 +73,7 @@ export default function OrderStatusStepper({
                   className={[
                     "relative w-12 h-12 sm:w-14 sm:h-14 rounded-full flex items-center justify-center border-2 transition-all duration-300",
                     done
-                      ? "bg-emerald-500 border-emerald-500 text-white"
+                      ? "bg-emerald-500 border-emerald-500 text-white shadow-sm shadow-emerald-500/30"
                       : active
                         ? "bg-gradient-to-r from-[#FF6B35] to-amber-500 border-[#FF6B35] text-white shadow-lg shadow-orange-500/40 animate-pulse"
                         : "bg-white border-gray-200 text-gray-300",
@@ -80,12 +83,10 @@ export default function OrderStatusStepper({
                     <Check className="w-5 h-5 sm:w-6 sm:h-6" strokeWidth={3} />
                   ) : active && cancelled ? (
                     <X className="w-5 h-5 sm:w-6 sm:h-6 text-rose-500" strokeWidth={3} />
-                  ) : active ? (
-                    <StepIcon className="w-5 h-5 sm:w-6 sm:h-6" />
                   ) : (
                     <StepIcon className="w-5 h-5 sm:w-6 sm:h-6" />
                   )}
-                  {active && !cancelled && (
+                  {active && !cancelled && !isDelivered && (
                     <span className="absolute -top-1 -right-1 flex h-3.5 w-3.5">
                       <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#FF6B35] opacity-75" />
                       <span className="relative inline-flex rounded-full h-3.5 w-3.5 bg-[#FF6B35]" />
@@ -109,10 +110,18 @@ export default function OrderStatusStepper({
                   <p
                     className={[
                       "hidden sm:block text-[10px] font-medium",
-                      active ? "text-gray-600" : "text-gray-300",
+                      done
+                        ? "text-emerald-500"
+                        : active
+                          ? "text-gray-600"
+                          : "text-gray-300",
                     ].join(" ")}
                   >
-                    {active ? step.description : ""}
+                    {done && step.key === "Delivered"
+                      ? "Delivered successfully"
+                      : active
+                        ? step.description
+                        : ""}
                   </p>
                 </div>
               </div>
@@ -123,7 +132,7 @@ export default function OrderStatusStepper({
                     <div
                       className={[
                         "absolute inset-y-0 left-0 transition-all duration-700 ease-out",
-                        done
+                        done || isDelivered
                           ? "bg-emerald-500 w-full"
                           : active && !cancelled
                             ? "w-1/2 animate-pulse bg-gradient-to-r from-[#FF6B35] to-amber-500"

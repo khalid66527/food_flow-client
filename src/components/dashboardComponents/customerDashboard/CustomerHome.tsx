@@ -21,7 +21,7 @@ import {
 } from "lucide-react";
 import { useSession } from "@/lib/auth-client";
 import { getUserOrdersApi } from "@/lib/api/order";
-import { getRealTimeLocation, subscribeLocation, loadLocationFromStorage, ILocationInfo } from "@/lib/location";
+import { getRealTimeLocation, subscribeLocation, ILocationInfo, DEFAULT_INITIAL_LOCATION } from "@/lib/location";
 import { useCart } from "@/contexts/CartContext";
 import { TOrder } from "@/types/order";
 
@@ -34,12 +34,13 @@ export default function CustomerHome() {
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const [chartTimeframe, setChartTimeframe] = useState<"weekly" | "monthly">("weekly");
+  const [isMounted, setIsMounted] = useState(false);
 
   // Dynamic location subscription
-  const [locationInfo, setLocationInfo] = useState<ILocationInfo>(() => getRealTimeLocation());
+  const [locationInfo, setLocationInfo] = useState<ILocationInfo>(DEFAULT_INITIAL_LOCATION);
 
   useEffect(() => {
-    loadLocationFromStorage();
+    setIsMounted(true);
     setLocationInfo(getRealTimeLocation());
 
     const unsubscribe = subscribeLocation(() => {
@@ -183,14 +184,14 @@ export default function CustomerHome() {
             {/* Real-time Location Badge */}
             <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-white/20 backdrop-blur-md text-xs font-extrabold text-white border border-white/30 shadow-xs">
               <MapPin className="w-3.5 h-3.5 text-amber-200 animate-bounce" />
-              <span>{locationInfo.area || `${locationInfo.city} Central`}</span>
+              <span>{isMounted ? (locationInfo.area || `${locationInfo.city} Central`) : "Bangladesh"}</span>
             </div>
 
             <h1 className="text-2xl sm:text-4xl font-black tracking-tight leading-tight">
               Welcome back, {user?.name || "Foodie"}! 👋
             </h1>
             <p className="text-orange-100 text-sm sm:text-base font-medium leading-relaxed">
-              Delicious meals from top restaurants in {locationInfo.city} are ready for instant delivery to your doorstep.
+              Delicious meals from top restaurants {isMounted && locationInfo.city ? `in ${locationInfo.city}` : "across Bangladesh"} are ready for instant delivery to your doorstep.
             </p>
 
             <div className="pt-2 flex flex-wrap items-center gap-3">

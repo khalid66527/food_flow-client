@@ -21,6 +21,7 @@ import {
   Clock,
   Lock,
   Plus,
+  Star,
 } from "lucide-react";
 import { useSession, signOut } from "@/lib/auth-client";
 
@@ -111,8 +112,6 @@ export default function DashboardSideBar() {
           label: "Delivery Details",
           href: "/dashboard/rider/delivery-details",
           icon: Package,
-          badge: "4 Near",
-          badgeType: "brand",
         },
         {
           label: "Active Delivery",
@@ -132,9 +131,16 @@ export default function DashboardSideBar() {
           icon: DollarSign,
         },
         {
-          label: "History",
-          href: "/dashboard/rider/history",
+          label: "Delivery History",
+          href: "/dashboard/rider/delivery-history",
           icon: History,
+        },
+        {
+          label: "Ratings & Reviews",
+          href: "/dashboard/rider/reviews",
+          icon: Star,
+          badge: riderData?.rating ? `★ ${Number(riderData.rating).toFixed(1)}` : "4.8",
+          badgeType: "accent",
         },
       ],
     },

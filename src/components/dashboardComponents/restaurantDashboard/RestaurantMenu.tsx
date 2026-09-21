@@ -37,6 +37,7 @@ import {
   Sliders,
   ShoppingBag,
   Star,
+  Calculator,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useSession } from "@/lib/auth-client";
@@ -51,6 +52,7 @@ import {
   deleteFoodItemAction,
 } from "@/lib/actions/restaurant";
 import { getGlobalCategories, IGlobalCategory } from "@/lib/api/category";
+import { getPlatformSettings } from "@/lib/api/settings";
 import { IMenuItem } from "@/types/restaurant";
 import LoadingSpinner from "@/lib/api/LoadingSpinner";
 
@@ -122,21 +124,28 @@ export default function RestaurantMenu() {
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
 
-  // Global categories state for edit dropdown
+  // Global categories & platform commission state
   const [globalCategories, setGlobalCategories] = useState<IGlobalCategory[]>([]);
+  const [commissionPercentage, setCommissionPercentage] = useState<number>(15);
 
   useEffect(() => {
-    const loadCategories = async () => {
+    const loadInitialData = async () => {
       try {
-        const res = await getGlobalCategories();
-        if (res.success && Array.isArray(res.data) && res.data.length > 0) {
-          setGlobalCategories(res.data);
+        const [catRes, settingsRes] = await Promise.all([
+          getGlobalCategories(),
+          getPlatformSettings(),
+        ]);
+        if (catRes.success && Array.isArray(catRes.data) && catRes.data.length > 0) {
+          setGlobalCategories(catRes.data);
+        }
+        if (settingsRes.success && settingsRes.data) {
+          setCommissionPercentage(settingsRes.data.restaurantCommissionPercentage);
         }
       } catch {
         // fallback
       }
     };
-    loadCategories();
+    loadInitialData();
   }, []);
 
   // Filter & Search states
@@ -1406,7 +1415,7 @@ export default function RestaurantMenu() {
     <div className="w-full max-w-7xl mx-auto pb-16 space-y-8">
 
       {/* 🌟 HERO BANNER */}
-      <div className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-orange-600 via-[#FF6B35] to-amber-500 text-white p-7 sm:p-9 shadow-xl">
+      <div className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-[#FF6B35] via-[#FF7843] to-[#FF8C42] text-white p-7 sm:p-9 shadow-xl">
         <div className="relative z-10 flex flex-col sm:flex-row sm:items-center justify-between gap-6">
           <div className="space-y-2 max-w-2xl">
             <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/20 backdrop-blur-md text-xs font-bold uppercase tracking-wider">
@@ -1591,7 +1600,7 @@ export default function RestaurantMenu() {
 
         {itemsLoading ? (
           <div className="py-24 flex flex-col items-center justify-center">
-            <LoadingSpinner size={50} color="#f97316" message="Loading restaurant menu table..." />
+            <LoadingSpinner size={50} color="#f97316" />
           </div>
         ) : filteredItems.length === 0 ? (
           <div className="py-20 px-6 flex flex-col items-center justify-center text-center gap-4">
@@ -1729,29 +1738,42 @@ export default function RestaurantMenu() {
                         </span>
                       </td>
 
-                      {/* 3. PRICING & OFFER */}
+                      {/* 3. PRICING & OFFER WITH NET PAYOUT DISPLAY */}
                       <td className="py-4 px-4 whitespace-nowrap">
-                        <div className="space-y-0.5">
-                          {isDiscounted ? (
-                            <>
-                              <div className="flex items-center gap-1.5">
-                                <span className="text-base font-black text-[#FF6B35]">
-                                  Tk {Number(item.discountPrice).toFixed(2)}
+                        {(() => {
+                          const effectivePrice = isDiscounted ? Number(item.discountPrice) : Number(item.price || 0);
+                          const commissionVal = Math.round((effectivePrice * (commissionPercentage / 100)) * 100) / 100;
+                          const netPayoutVal = Math.max(0, Math.round((effectivePrice - commissionVal) * 100) / 100);
+
+                          return (
+                            <div className="space-y-1">
+                              {isDiscounted ? (
+                                <div className="flex items-center gap-1.5">
+                                  <span className="text-base font-black text-[#FF6B35]">
+                                    Tk {Number(item.discountPrice).toFixed(2)}
+                                  </span>
+                                  <span className="text-xs font-bold text-gray-400 line-through">
+                                    Tk {Number(item.price).toFixed(2)}
+                                  </span>
+                                  <span className="bg-rose-100 text-rose-700 text-[10px] font-black px-1.5 py-0.5 rounded">
+                                    {discountPercent}% OFF
+                                  </span>
+                                </div>
+                              ) : (
+                                <span className="text-base font-black text-gray-900">
+                                  Tk {Number(item.price || 0).toFixed(2)}
                                 </span>
-                                <span className="text-xs font-bold text-gray-400 line-through">
-                                  Tk {Number(item.price).toFixed(2)}
-                                </span>
+                              )}
+
+                              {/* 💰 REAL-TIME NET PAYOUT */}
+                              <div className="flex items-center gap-1.5 text-xs font-bold text-emerald-700 bg-emerald-50/90 border border-emerald-200/80 px-2 py-0.5 rounded-lg w-fit shadow-2xs">
+                                <span className="text-[10px] text-gray-500 font-semibold">Net Payout:</span>
+                                <span className="font-black text-emerald-700">Tk {netPayoutVal.toFixed(2)}</span>
+                                <span className="text-[9px] text-gray-400 font-normal">({commissionPercentage}% comm.)</span>
                               </div>
-                              <span className="inline-block bg-rose-100 text-rose-700 text-[10px] font-black px-1.5 py-0.2 rounded">
-                                {discountPercent}% OFF
-                              </span>
-                            </>
-                          ) : (
-                            <span className="text-base font-black text-gray-900">
-                              Tk {Number(item.price || 0).toFixed(2)}
-                            </span>
-                          )}
-                        </div>
+                            </div>
+                          );
+                        })()}
                       </td>
 
                       {/* 4. AVAILABILITY DROPDOWN SELECTOR */}
@@ -1930,6 +1952,16 @@ export default function RestaurantMenu() {
                       Tk {Number(viewItem.price || 0).toFixed(2)}
                     </span>
                   )}
+                  {(() => {
+                    const priceVal = Number(viewItem.discountPrice || viewItem.price || 0);
+                    const commVal = Math.round((priceVal * (commissionPercentage / 100)) * 100) / 100;
+                    const payoutVal = Math.max(0, Math.round((priceVal - commVal) * 100) / 100);
+                    return (
+                      <div className="mt-1 text-[11px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200/80 px-2 py-0.5 rounded-lg inline-block">
+                        Net Payout: ৳{payoutVal.toFixed(2)}
+                      </div>
+                    );
+                  })()}
                 </div>
               </div>
 
@@ -2124,6 +2156,45 @@ export default function RestaurantMenu() {
                         </div>
                       </div>
                     </div>
+
+                    {/* 💰 LIVE PROFIT & SETTLEMENT CALCULATOR */}
+                    {(() => {
+                      const rawPrice = Number(editFormData.discountPrice || editFormData.price || 0);
+                      const priceNum = Number.isNaN(rawPrice) ? 0 : rawPrice;
+                      const commissionVal = Math.round((priceNum * (commissionPercentage / 100)) * 100) / 100;
+                      const netPayout = Math.max(0, Math.round((priceNum - commissionVal) * 100) / 100);
+
+                      return (
+                        <div className="p-4 rounded-2xl bg-gradient-to-br from-emerald-50/90 via-teal-50/50 to-emerald-50/90 border border-emerald-200/80 space-y-2.5 shadow-xs">
+                          <div className="flex items-center justify-between border-b border-emerald-200/60 pb-2">
+                            <div className="flex items-center gap-2 text-xs font-black text-emerald-950">
+                              <Calculator className="w-4 h-4 text-emerald-600" />
+                              <span>Live Profit & Settlement Calculator</span>
+                            </div>
+                            <span className="text-[10px] font-black bg-emerald-600 text-white px-2 py-0.5 rounded-full">
+                              {commissionPercentage}% Platform Commission
+                            </span>
+                          </div>
+
+                          <div className="space-y-1.5 text-xs font-semibold text-gray-700">
+                            <div className="flex items-center justify-between">
+                              <span className="text-gray-600">Food Price (Selling Price):</span>
+                              <span className="font-extrabold text-gray-900">৳ {priceNum.toFixed(2)}</span>
+                            </div>
+                            <div className="flex items-center justify-between text-rose-600">
+                              <span>Platform Commission ({commissionPercentage}%):</span>
+                              <span className="font-extrabold">-৳ {commissionVal.toFixed(2)}</span>
+                            </div>
+                            <div className="pt-2 border-t border-emerald-200/80 flex items-center justify-between text-sm">
+                              <span className="font-black text-emerald-950">Your Net Payout (Net Payout):</span>
+                              <span className="font-black text-emerald-600 text-base">
+                                ৳ {netPayout.toFixed(2)}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })()}
 
                     {/* Stock Availability Status */}
                     <div className="space-y-1.5 pt-1">

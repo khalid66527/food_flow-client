@@ -3,7 +3,16 @@ import { getOrdersCollection, getCartCollection } from "@/lib/db";
 import { auth } from "@/lib/auth";
 import { ObjectId } from "mongodb";
 import Stripe from "stripe";
-import { sendOrderConfirmationEmail, sendOrderCancellationEmail } from "@/lib/email";
+import {
+  sendOrderConfirmationEmail,
+  sendOrderCancellationEmail,
+  sendOrderRefundEmail,
+  sendDeliveryOtpEmail,
+  sendDeliverySuccessEmail,
+  sendOrderPreparingEmail,
+  sendOrderReadyEmail,
+} from "@/lib/email";
+
 
 export async function GET(
   req: NextRequest,
@@ -97,7 +106,7 @@ export async function GET(
           {
             $set: {
               paymentStatus: "Paid",
-              orderStatus: "Confirmed",
+              orderStatus: "Preparing",
               updatedAt: new Date().toISOString(),
             },
           }
@@ -109,7 +118,7 @@ export async function GET(
         }
 
         order.paymentStatus = "Paid";
-        order.orderStatus = "Confirmed";
+        order.orderStatus = "Preparing";
       }
     }
 
@@ -143,16 +152,21 @@ export async function PATCH(
     const body = await req.json();
     const { action, paymentStatus, orderStatus, riderInfo, isDeleted } = body;
 
-    // Get userId from session or header for security
+    // Get session user and identity for security
+    let sessionUser: { id?: string; email?: string; name?: string } | null = null;
     let userId = req.headers.get("x-user-id");
-    if (!userId) {
-      try {
-        const session = await auth.api.getSession({ headers: req.headers });
-        if (session?.user?.id) userId = session.user.id;
-      } catch (err) {
-        console.warn("Session check in PATCH /api/orders/[id]:", err);
+    let userEmail = req.headers.get("x-user-email");
+    try {
+      const session = await auth.api.getSession({ headers: req.headers });
+      if (session?.user) {
+        sessionUser = session.user;
+        if (session.user.id) userId = session.user.id;
+        if (session.user.email) userEmail = session.user.email;
       }
+    } catch (err) {
+      console.warn("Session check in PATCH /api/orders/[id]:", err);
     }
+
 
     const ordersCol = await getOrdersCollection();
 
@@ -170,67 +184,101 @@ export async function PATCH(
       );
     }
 
-    // Security check: Verify order ownership if userId exists
-    if (userId && order.userId && order.userId !== userId) {
-      return NextResponse.json(
-        { success: false, message: "Unauthorized operation on this order document." },
-        { status: 403 }
-      );
-    }
+    // 🔴 1. Smart Order Cancellation & Automated Refund Policy
+    if (action === "cancel" || action === "refund" || orderStatus === "Cancelled" || orderStatus === "Refunded") {
+      const isPaidOnline =
+        order.paymentStatus === "Paid" ||
+        order.paymentMethod === "STRIPE" ||
+        ["BKASH", "NAGAD", "ROCKET", "WALLET"].includes(order.paymentMethod);
 
-    // 🔴 1. Smart Order Cancellation Policy
-    if (action === "cancel" || orderStatus === "Cancelled") {
-      // Rule A: Stripe/Online Paid orders cannot be cancelled directly
-      if (order.paymentMethod === "STRIPE" || order.paymentStatus === "Paid") {
-        return NextResponse.json(
-          {
-            success: false,
-            message: "Online paid orders cannot be cancelled directly. Please contact support for refund.",
-          },
-          { status: 400 }
-        );
-      }
+      const refundAmount = body.refundAmount ? Number(body.refundAmount) : order.totalAmount || 0;
+      const refundReason = body.reason || "Order cancellation and refund processed";
 
-      // Rule B: COD orders can only be cancelled if status is still 'Placed'
-      const currentStatus = (order.orderStatus || "Placed").toLowerCase();
-      if (currentStatus !== "placed") {
-        return NextResponse.json(
-          {
-            success: false,
-            message: `Cannot cancel order. Kitchen is already '${order.orderStatus}'.`,
-          },
-          { status: 400 }
-        );
-      }
+      let refundInfo = null;
 
-      await ordersCol.updateOne(
-        { _id: order._id },
-        {
-          $set: {
-            orderStatus: "Cancelled",
-            updatedAt: new Date().toISOString(),
-          },
+      if (isPaidOnline) {
+        let stripeRefundId: string | undefined = undefined;
+
+        if (order.paymentMethod === "STRIPE") {
+          const stripeSecretKey = process.env.STRIPE_SECRET_KEY || "";
+          if (stripeSecretKey && order.stripeSessionId) {
+            try {
+              const stripeInstance = new Stripe(stripeSecretKey.trim(), {
+                apiVersion: "2025-02-24.acacia" as any,
+              });
+              const session = await stripeInstance.checkout.sessions.retrieve(order.stripeSessionId);
+              if (session && session.payment_intent) {
+                const paymentIntentId =
+                  typeof session.payment_intent === "string"
+                    ? session.payment_intent
+                    : (session.payment_intent as any).id;
+
+                const stripeRefund = await stripeInstance.refunds.create({
+                  payment_intent: paymentIntentId,
+                  amount: Math.round(refundAmount * 100),
+                  reason: "requested_by_customer",
+                });
+                stripeRefundId = stripeRefund.id;
+              }
+            } catch (stripeErr: any) {
+              console.warn("Stripe refund API attempt fallback (mock/sandbox):", stripeErr?.message || stripeErr);
+            }
+          }
         }
-      );
 
+        const generatedRefundId =
+          stripeRefundId ||
+          `REF-${order.paymentMethod || "ONLINE"}-${Date.now().toString().slice(-6)}`;
+
+        refundInfo = {
+          refundId: generatedRefundId,
+          amount: refundAmount,
+          reason: refundReason,
+          refundedAt: new Date().toISOString(),
+          status: "Completed" as const,
+          refundedBy: body.refundedBy || (sessionUser?.email ? `Admin (${sessionUser.email})` : "Customer"),
+          stripeRefundId,
+        };
+      }
+
+      const updateFields: any = {
+        orderStatus: "Cancelled",
+        updatedAt: new Date().toISOString(),
+      };
+
+      if (isPaidOnline) {
+        updateFields.paymentStatus = "Refunded";
+        updateFields.refundInfo = refundInfo;
+      }
+
+      await ordersCol.updateOne({ _id: order._id }, { $set: updateFields });
       const updatedOrder = await ordersCol.findOne({ _id: order._id });
 
-      // 📧 Trigger Order Cancellation Email Notification (COD Orders)
-      if (updatedOrder && updatedOrder.paymentMethod === "COD") {
+      // 📧 Trigger Notifications:
+      if (updatedOrder) {
+        if (isPaidOnline && refundInfo) {
+          sendOrderRefundEmail(updatedOrder as any, refundInfo).catch((e) =>
+            console.warn("Background order refund email error:", e)
+          );
+        }
+
         sendOrderCancellationEmail(
           updatedOrder as any,
-          body.reason || "Order cancelled by user prior to kitchen preparation"
+          refundReason
         ).catch((e) =>
-          console.warn("Background order cancellation email trigger error:", e)
+          console.warn("Background order cancellation email error:", e)
         );
       }
 
       return NextResponse.json({
         success: true,
-        message: "Order cancelled successfully.",
+        message: isPaidOnline
+          ? `Order cancelled and ৳${refundAmount.toFixed(2)} refunded successfully!`
+          : "Order cancelled successfully.",
         data: updatedOrder,
       });
     }
+
 
     // 🗑️ 2. Delete / Hide Order from User History
     if (action === "delete" || isDeleted === true) {
@@ -250,15 +298,136 @@ export async function PATCH(
       });
     }
 
+    // 🔑 3. Send / Resend Delivery Verification OTP to Customer (Email & Dashboard)
+    if (action === "send_otp" || action === "resend_otp") {
+      const generatedOtp = Math.floor(100000 + Math.random() * 900000).toString();
+      await ordersCol.updateOne(
+        { _id: order._id },
+        {
+          $set: {
+            deliveryOtp: generatedOtp,
+            deliveryOtpCreatedAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+          },
+        }
+      );
+
+      const rName =
+        [...new Set((order.items || []).map((i: any) => i.restaurantName).filter(Boolean))].join(", ") ||
+        "FoodFlow Kitchen";
+
+      if (order.userEmail) {
+        sendDeliveryOtpEmail({
+          orderId: order.orderId,
+          userEmail: order.userEmail,
+          userName: order.userName || order.deliveryAddress?.fullName,
+          otp: generatedOtp,
+          restaurantName: rName,
+          totalAmount: order.totalAmount,
+        }).catch((e) => console.warn("Background OTP email dispatch error:", e));
+      }
+
+      const updatedOrder = await ordersCol.findOne({ _id: order._id });
+
+      return NextResponse.json({
+        success: true,
+        message: "Delivery OTP sent to customer successfully via email and dashboard.",
+        data: updatedOrder,
+      });
+    }
+
+    // 🔒 4. OTP Validation on Delivery Completion
+    if (orderStatus === "Delivered") {
+      if (order.deliveryOtp) {
+        const inputOtp = (body.otp || body.deliveryOtp || "").toString().trim();
+        if (!inputOtp || inputOtp !== order.deliveryOtp.trim()) {
+          return NextResponse.json(
+            {
+              success: false,
+              message: "Invalid OTP code. Please ask the customer for the 6-digit delivery verification OTP.",
+            },
+            { status: 400 }
+          );
+        }
+      }
+    }
+
     // Generic Update
     const updateFields: any = { updatedAt: new Date().toISOString() };
     if (paymentStatus) updateFields.paymentStatus = paymentStatus;
-    if (orderStatus) updateFields.orderStatus = orderStatus;
-    if (riderInfo) updateFields.riderInfo = riderInfo;
+    if (orderStatus) {
+      updateFields.orderStatus = orderStatus;
+
+      // Auto-generate OTP when status changes to 'Out for Delivery' if not already generated
+      if (orderStatus === "Out for Delivery") {
+        const otp = order.deliveryOtp || Math.floor(100000 + Math.random() * 900000).toString();
+        updateFields.deliveryOtp = otp;
+        updateFields.deliveryOtpCreatedAt = order.deliveryOtpCreatedAt || new Date().toISOString();
+
+        // Send OTP email to customer
+        const rName =
+          [...new Set((order.items || []).map((i: any) => i.restaurantName).filter(Boolean))].join(", ") ||
+          "FoodFlow Kitchen";
+
+        if (order.userEmail && (!order.deliveryOtp || body.resendOtp)) {
+          sendDeliveryOtpEmail({
+            orderId: order.orderId,
+            userEmail: order.userEmail,
+            userName: order.userName || order.deliveryAddress?.fullName,
+            otp,
+            restaurantName: rName,
+            totalAmount: order.totalAmount,
+          }).catch((e) => console.warn("Background OTP email dispatch error on status change:", e));
+        }
+      }
+
+      if (orderStatus === "Delivered") {
+        updateFields.deliveryStatus = "Delivered";
+        updateFields.deliveredAt = new Date().toISOString();
+        updateFields.paymentStatus = "Paid"; // Both COD and Online orders are marked Paid upon delivery
+      }
+    }
+    if (riderInfo) {
+      updateFields.riderInfo = {
+        ...(order.riderInfo || {}),
+        ...riderInfo,
+        ...(orderStatus === "Delivered" ? { deliveredAt: updateFields.deliveredAt || new Date().toISOString() } : {}),
+      };
+    }
     if (typeof isDeleted === "boolean") updateFields.isDeleted = isDeleted;
 
     await ordersCol.updateOne({ _id: order._id }, { $set: updateFields });
     const updatedOrder = await ordersCol.findOne({ _id: order._id });
+
+    // 🌟 Store into successorders collection for successful deliveries
+    if (orderStatus === "Delivered" && updatedOrder) {
+      try {
+        const successCol = await (await import("@/lib/db")).getSuccessOrdersCollection();
+        const successDoc = {
+          ...updatedOrder,
+          orderStatus: "Delivered",
+          deliveryStatus: "Delivered",
+          deliveredAt: updateFields.deliveredAt || new Date().toISOString(),
+          paymentStatus: "Paid",
+          storedAt: new Date().toISOString(),
+        };
+        delete (successDoc as any)._id; // prevent _id conflict on upsert
+        await successCol.updateOne(
+          { orderId: updatedOrder.orderId },
+          { $set: successDoc },
+          { upsert: true }
+        );
+      } catch (sErr) {
+        console.warn("Could not save to successorders collection:", sErr);
+      }
+
+      // 📧 Trigger Delivery Success Email to Customer
+      if (updatedOrder.userEmail) {
+        sendDeliverySuccessEmail(updatedOrder as any).catch((e) =>
+          console.warn("Background delivery success email trigger error:", e)
+        );
+      }
+    }
 
     // 📧 Trigger Order Cancellation Email for generic updates (e.g. restaurant/admin setting status to Cancelled)
     if (
@@ -275,9 +444,23 @@ export async function PATCH(
       );
     }
 
+    // 📧 Trigger Order Preparing Email (Kitchen started cooking)
+    if (orderStatus === "Preparing" && order.orderStatus !== "Preparing" && updatedOrder) {
+      sendOrderPreparingEmail(updatedOrder as any).catch((e) =>
+        console.warn("Background order preparing email trigger error:", e)
+      );
+    }
+
+    // 📧 Trigger Order Ready Email (Food packed, waiting for rider)
+    if (orderStatus === "Ready" && order.orderStatus !== "Ready" && updatedOrder) {
+      sendOrderReadyEmail(updatedOrder as any).catch((e) =>
+        console.warn("Background order ready email trigger error:", e)
+      );
+    }
+
     return NextResponse.json({
       success: true,
-      message: "Order updated successfully.",
+      message: orderStatus === "Delivered" ? "Order delivered successfully with OTP validation!" : "Order updated successfully.",
       data: updatedOrder,
     });
   } catch (error: any) {

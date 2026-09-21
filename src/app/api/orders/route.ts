@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
-import { getOrdersCollection, getCartCollection } from "@/lib/db";
+import { getOrdersCollection, getCartCollection, getSettingsCollection, getCouponsCollection } from "@/lib/db";
 import Stripe from "stripe";
 import { sendOrderConfirmationEmail } from "@/lib/email";
 
@@ -61,7 +61,7 @@ export async function POST(req: NextRequest) {
 
     // 2. Request Payload & Validation
     const body = await req.json();
-    const { items, deliveryAddress, paymentMethod, subtotal, deliveryFee, discount, totalAmount } = body;
+    const { items, deliveryAddress, paymentMethod, subtotal, deliveryFee, discount, couponCode, totalAmount } = body;
 
     if (!items || !Array.isArray(items) || items.length === 0) {
       return NextResponse.json(
@@ -83,27 +83,87 @@ export async function POST(req: NextRequest) {
         { status: 400 }
       );
     }
+    const normalizedPaymentMethod = paymentMethod as "COD" | "STRIPE";
 
-    // 3. Create Order Document
+    // 3. Create Order Document & Financial Settlement Calculations
     const ordersCol = await getOrdersCollection();
     const cartCol = await getCartCollection();
+    const settingsCol = await getSettingsCollection();
+    const couponsCol = await getCouponsCollection();
+
+    // Fetch active platform settings
+    const settings = await settingsCol.findOne({ key: "global_settings" });
+    const vatPercentage = Number(settings?.vatPercentage ?? 5);
+    const restaurantCommissionPercentage = Number(settings?.restaurantCommissionPercentage ?? 15);
+    const riderCommissionPercentage = Number(settings?.riderCommissionPercentage ?? 100);
+
+    const numSubtotal = Number(subtotal) || 0;
+    const numDeliveryFee = Number(deliveryFee) || 0;
+    const numDiscount = Number(discount) || 0;
+    const formattedCouponCode = couponCode ? String(couponCode).trim().toUpperCase() : null;
+
+    // Check first-order coupon restriction if coupon applied
+    let isFirstOrderDiscount = false;
+    if (formattedCouponCode) {
+      const couponDoc = await couponsCol.findOne({ code: formattedCouponCode });
+      if (couponDoc?.isFirstOrderOnly) {
+        isFirstOrderDiscount = true;
+        const priorOrder = await ordersCol.findOne({
+          userId,
+          orderStatus: { $ne: "Cancelled" },
+        });
+        if (priorOrder) {
+          return NextResponse.json(
+            {
+              success: false,
+              message: "This welcome coupon is valid exclusively for your first successful order!",
+            },
+            { status: 400 }
+          );
+        }
+      }
+    }
+
+    // Financial split & settlement calculations
+    const vatAmount = Math.round(numSubtotal * (vatPercentage / 100) * 100) / 100;
+    const adminGrossCommission = Math.round(numSubtotal * (restaurantCommissionPercentage / 100) * 100) / 100;
+    // Coupon discount is subtracted strictly from Admin Commission
+    const adminNetProfit = Math.round((adminGrossCommission - numDiscount) * 100) / 100;
+    // Restaurant payout is Subtotal - Gross Commission (100% earnings protected)
+    const restaurantPayout = Math.round((numSubtotal - adminGrossCommission) * 100) / 100;
+    // Rider payout
+    const riderPayout = Math.round((numDeliveryFee * (riderCommissionPercentage / 100)) * 100) / 100;
+    const taxFundVat = vatAmount;
+
+    const calculatedTotal = numSubtotal + vatAmount + numDeliveryFee - numDiscount;
+    const finalTotalAmount = totalAmount ? Number(totalAmount) : Math.max(0, calculatedTotal);
 
     const timestamp = Date.now();
     const randomSuffix = Math.floor(1000 + Math.random() * 9000);
     const orderId = `FF-${timestamp.toString().slice(-6)}-${randomSuffix}`;
 
-    const orderDoc = {
+    const orderDoc: any = {
       orderId,
       userId,
       userEmail,
       userName,
       items,
       deliveryAddress,
-      subtotal: Number(subtotal) || 0,
-      deliveryFee: Number(deliveryFee) || 0,
-      discount: Number(discount) || 0,
-      totalAmount: Number(totalAmount) || 0,
-      paymentMethod,
+      subtotal: numSubtotal,
+      vatPercentage,
+      vatAmount,
+      deliveryFee: numDeliveryFee,
+      couponCode: formattedCouponCode,
+      discount: numDiscount,
+      isFirstOrderDiscount,
+      totalAmount: finalTotalAmount,
+      restaurantCommissionPercentage,
+      adminGrossCommission,
+      adminNetProfit,
+      restaurantPayout,
+      riderPayout,
+      taxFundVat,
+      paymentMethod: normalizedPaymentMethod,
       paymentStatus: "Pending",
       orderStatus: "Placed",
       createdAt: new Date().toISOString(),
@@ -114,7 +174,7 @@ export async function POST(req: NextRequest) {
     const mongoId = insertResult.insertedId.toString();
 
     // 4. Handle Payment Method Flows
-    if (paymentMethod === "COD") {
+    if (normalizedPaymentMethod === "COD") {
       // Clear Cart on COD success
       await cartCol.deleteOne({ userId });
 
@@ -133,7 +193,8 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    if (paymentMethod === "STRIPE") {
+
+    if (normalizedPaymentMethod === "STRIPE") {
       const baseUrl =
         process.env.NEXT_PUBLIC_BETTER_AUTH_URL ||
         process.env.BETTER_AUTH_URL ||
@@ -161,7 +222,7 @@ export async function POST(req: NextRequest) {
           }));
 
           // Add delivery fee line item if applicable
-          if (deliveryFee && deliveryFee > 0) {
+          if (numDeliveryFee && numDeliveryFee > 0) {
             lineItems.push({
               price_data: {
                 currency: "usd",
@@ -170,7 +231,7 @@ export async function POST(req: NextRequest) {
                   images: [],
                   description: "Standard Delivery Charge",
                 },
-                unit_amount: Math.round(deliveryFee * 100),
+                unit_amount: Math.round(numDeliveryFee * 100),
               },
               quantity: 1,
             });
@@ -209,7 +270,6 @@ export async function POST(req: NextRequest) {
         } catch (stripeErr: any) {
           console.error("Stripe Checkout Session error:", stripeErr);
           
-          // Return clear error if key is invalid placeholder
           return NextResponse.json(
             {
               success: false,
@@ -224,7 +284,7 @@ export async function POST(req: NextRequest) {
         return NextResponse.json(
           {
             success: false,
-            message: "Stripe payment gateway is not configured. Please verify your STRIPE_SECRET_KEY in .env or choose Cash on Delivery (COD).",
+            message: "Stripe payment gateway is not configured. Please verify your STRIPE_SECRET_KEY in .env or choose Cash on Delivery (COD) or Mobile Wallet.",
           },
           { status: 400 }
         );

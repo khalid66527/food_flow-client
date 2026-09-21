@@ -1,4 +1,5 @@
 import { IMenuItem, IGlobalFoodItem } from "@/types/restaurant";
+import { getAuthHeaders } from "@/lib/jwt";
 
 export type TOpeningHoursDay = {
   open: string;
@@ -20,10 +21,18 @@ export type TAddress = {
   street: string;
   city: string;
   state?: string;
+  division?: string;
+  district?: string;
+  upazila?: string;
   postalCode?: string;
   country?: string;
   latitude?: number;
   longitude?: number;
+  coordinates?: {
+    latitude: number;
+    longitude: number;
+  };
+  zoneId?: string;
   fullAddress?: string;
   area?: string;
 };
@@ -33,6 +42,8 @@ export type TPricing = {
   deliveryFee: number;
   estimatedDeliveryTime: string;
   costForTwo?: number;
+  priceRange?: string;
+  [key: string]: any;
 };
 
 export type TFeatures = {
@@ -41,6 +52,9 @@ export type TFeatures = {
   hasDineIn: boolean;
   isPureVeg: boolean;
   isHalal: boolean;
+  freeDelivery?: boolean;
+  openNow?: boolean;
+  [key: string]: any;
 };
 
 export type TSocialLinks = {
@@ -88,6 +102,16 @@ export interface IRestaurant {
   status: "pending" | "active" | "suspended" | "closed";
   isFeatured?: boolean;
   discountOffer?: string;
+  zoneId?: string | number;
+  numericZoneId?: number;
+  zoneMongoId?: string;
+  zoneName?: string;
+  latitude?: number;
+  longitude?: number;
+  coordinates?: {
+    latitude: number;
+    longitude: number;
+  };
   createdAt?: string;
   updatedAt?: string;
 }
@@ -121,6 +145,11 @@ export type RestaurantFormData = {
   facebook: string;
   instagram: string;
   twitter: string;
+  latitude?: number;
+  longitude?: number;
+  zoneId?: string | number;
+  numericZoneId?: number;
+  zoneName?: string;
 };
 
 export interface ApiResponse<T> {
@@ -136,13 +165,7 @@ export interface ApiResponse<T> {
   error?: any;
 }
 
-const SERVER_BASE_URL = (
-  process.env.NEXT_PUBLIC_SERVER_API_URL ||
-  process.env.NEXT_PUBLIC_SERVER_URL ||
-  "http://localhost:5000"
-).replace(/\/api\/?$/, "").replace(/\/$/, "");
-
-const API_BASE_URL = `${SERVER_BASE_URL}/api`;
+import { getApiBaseUrl, getServerBaseUrl } from "@/lib/api/config";
 
 // -------------------------------------------------------------
 // GET Requests / Queries for Restaurant
@@ -156,17 +179,13 @@ export async function getMyRestaurantProfile(
   ownerId?: string
 ): Promise<ApiResponse<IRestaurant>> {
   try {
-    const url = new URL(`${API_BASE_URL}/restaurants/my-profile`);
+    const url = new URL(`${getApiBaseUrl()}/restaurants/my-profile`);
     if (ownerEmail) url.searchParams.append("ownerEmail", ownerEmail);
     if (ownerId) url.searchParams.append("ownerId", ownerId);
 
     const res = await fetch(url.toString(), {
       method: "GET",
-      headers: {
-        "Content-Type": "application/json",
-        "x-user-email": ownerEmail,
-        ...(ownerId ? { "x-user-id": ownerId } : {}),
-      },
+      headers: getAuthHeaders(ownerId, ownerEmail),
       cache: "no-store",
     });
 
@@ -188,7 +207,7 @@ export async function getAllRestaurants(
   query: Record<string, string> = {}
 ): Promise<ApiResponse<IRestaurant[]>> {
   try {
-    const url = new URL(`${API_BASE_URL}/restaurants`);
+    const url = new URL(`${getApiBaseUrl()}/restaurants`);
     url.searchParams.append("limit", "100");
     Object.entries(query).forEach(([key, val]) => {
       if (val) url.searchParams.append(key, val);
@@ -220,7 +239,7 @@ export async function getAllGlobalFoodItems(
   query: Record<string, string> = {}
 ): Promise<ApiResponse<IGlobalFoodItem[]>> {
   try {
-    const url = new URL(`${API_BASE_URL}/food`);
+    const url = new URL(`${getApiBaseUrl()}/food`);
     Object.entries(query).forEach(([key, val]) => {
       if (val) url.searchParams.append(key, val);
     });
@@ -248,7 +267,7 @@ export async function getAllGlobalFoodItems(
  */
 export async function getFoodCategories(): Promise<ApiResponse<string[]>> {
   try {
-    const res = await fetch(`${API_BASE_URL}/food/categories`, {
+    const res = await fetch(`${getApiBaseUrl()}/food/categories`, {
       method: "GET",
       headers: {
         "Content-Type": "application/json",
@@ -278,7 +297,7 @@ export async function getSingleFoodItem(
       return { success: false, message: "Food ID is required." };
     }
 
-    const res = await fetch(`${API_BASE_URL}/food/${foodId}`, {
+    const res = await fetch(`${getApiBaseUrl()}/food/${foodId}`, {
       method: "GET",
       headers: {
         "Content-Type": "application/json",
@@ -307,7 +326,7 @@ export async function getSingleRestaurantById(
       return { success: false, message: "Restaurant ID is required." };
     }
 
-    const res = await fetch(`${API_BASE_URL}/restaurants/${restaurantId}`, {
+    const res = await fetch(`${getApiBaseUrl()}/restaurants/${restaurantId}`, {
       method: "GET",
       headers: {
         "Content-Type": "application/json",
@@ -337,7 +356,7 @@ export async function getRestaurantMenuItems(
     }
 
     const res = await fetch(
-      `${API_BASE_URL}/restaurants/food/${restaurantId}`,
+      `${getApiBaseUrl()}/restaurants/food/${restaurantId}`,
       {
         method: "GET",
         headers: {
@@ -358,3 +377,112 @@ export async function getRestaurantMenuItems(
     };
   }
 }
+
+/**
+ * Get Grocery Food Items strictly for a specific Restaurant (Protected)
+ */
+export async function getRestaurantGroceryItems(
+  restaurantId: string,
+  ownerId?: string,
+  ownerEmail?: string
+): Promise<ApiResponse<any[]>> {
+  try {
+    if (!restaurantId) {
+      return { success: false, message: "Restaurant ID is required." };
+    }
+
+    const res = await fetch(
+      `${getApiBaseUrl()}/restaurants/grocery/${restaurantId}`,
+      {
+        method: "GET",
+        headers: getAuthHeaders(ownerId, ownerEmail),
+        cache: "no-store",
+      }
+    );
+
+    const data = await res.json();
+    return { ...data, data: Array.isArray(data?.data) ? data.data : [] };
+  } catch (err) {
+    return {
+      success: false,
+      message:
+        err instanceof Error ? err.message : "Failed to fetch restaurant grocery items.",
+      data: [],
+    };
+  }
+}
+
+/**
+ * Aggregate Grocery Ingredient List for a specific Restaurant (Protected)
+ */
+export async function aggregateRestaurantGroceryList(
+  restaurantId: string,
+  selectedItems: Array<{ foodId: string; portions: number }>,
+  ownerId?: string,
+  ownerEmail?: string
+): Promise<ApiResponse<any>> {
+  try {
+    if (!restaurantId) {
+      return { success: false, message: "Restaurant ID is required." };
+    }
+
+    const res = await fetch(
+      `${getApiBaseUrl()}/restaurants/grocery/aggregate`,
+      {
+        method: "POST",
+        headers: getAuthHeaders(ownerId, ownerEmail),
+        body: JSON.stringify({
+          restaurantId,
+          selectedItems,
+        }),
+      }
+    );
+
+    const data = await res.json();
+    return data;
+  } catch (err) {
+    return {
+      success: false,
+      message:
+        err instanceof Error ? err.message : "Failed to aggregate grocery list.",
+    };
+  }
+}
+
+/**
+ * Update Secret Grocery Ingredients / Raw Materials for a specific food item (Protected)
+ */
+export async function updateFoodSecretRecipe(
+  foodId: string,
+  ingredients: string[],
+  ownerId?: string,
+  ownerEmail?: string
+): Promise<ApiResponse<any>> {
+  try {
+    if (!foodId) {
+      return { success: false, message: "Food ID is required." };
+    }
+
+    const res = await fetch(
+      `${getApiBaseUrl()}/restaurants/grocery/food/${foodId}/recipe`,
+      {
+        method: "PATCH",
+        headers: getAuthHeaders(ownerId, ownerEmail),
+        body: JSON.stringify({
+          ingredients,
+        }),
+      }
+    );
+
+    const data = await res.json();
+    return data;
+  } catch (err) {
+    return {
+      success: false,
+      message:
+        err instanceof Error ? err.message : "Failed to save secret recipe ingredients.",
+    };
+  }
+}
+
+

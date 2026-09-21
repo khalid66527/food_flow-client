@@ -24,16 +24,23 @@ import {
   Sparkles,
   ChevronLeft,
   Zap,
+  Tag,
+  Percent,
+  Receipt,
+  X,
 } from "lucide-react";
 import { useSession } from "@/lib/auth-client";
 import { useCart } from "@/contexts/CartContext";
 import { TAddress } from "@/types/address";
 import { getAddresses } from "@/lib/api/address";
 import { createOrderApi } from "@/lib/api/order";
+import { getPlatformSettings } from "@/lib/api/settings";
+import { applyCouponApi, getCoupons, TCoupon } from "@/lib/api/coupon";
+import { getAllZones } from "@/lib/api/zone";
+import { IZone } from "@/types/zone";
+import { getSingleRestaurantById } from "@/lib/api/restaurant";
+import { resolveZoneDeliveryFee } from "@/lib/utils/deliveryFee";
 import AddressQuickSwitcherModal from "./AddressQuickSwitcherModal";
-
-const DELIVERY_FEE = 40;
-const FREE_DELIVERY_THRESHOLD = 500;
 
 export default function CustomerCheckout() {
   const router = useRouter();
@@ -88,10 +95,135 @@ export default function CustomerCheckout() {
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-  // Calculate Delivery Fee & Total based on active checkout items (Buy Now vs Cart)
-  const deliveryFee =
-    activeSubtotal === 0 || activeSubtotal >= FREE_DELIVERY_THRESHOLD ? 0 : DELIVERY_FEE;
-  const grandTotal = activeSubtotal + deliveryFee;
+
+
+  // Platform Settings & Zones State
+  const [vatPercentage, setVatPercentage] = useState<number>(5);
+  const [deliveryFeeBase, setDeliveryFeeBase] = useState<number>(40);
+  const [allZones, setAllZones] = useState<IZone[]>([]);
+  const [restaurant, setRestaurant] = useState<any | null>(null);
+
+  // Coupon Engine State
+  const [availableCoupons, setAvailableCoupons] = useState<TCoupon[]>([]);
+  const [couponLoadingList, setCouponLoadingList] = useState<boolean>(true);
+  const [appliedCoupon, setAppliedCoupon] = useState<{
+    code: string;
+    discountAmount: number;
+    isFirstOrderOnly?: boolean;
+  } | null>(null);
+  const [couponLoading, setCouponLoading] = useState<boolean>(false);
+  const [couponMessage, setCouponMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
+
+  // Fetch Platform Settings & All Delivery Zones
+  useEffect(() => {
+    const loadSettingsAndZones = async () => {
+      try {
+        const [settingsRes, zonesRes] = await Promise.all([
+          getPlatformSettings(),
+          getAllZones({ isActive: "true" }),
+        ]);
+
+        if (settingsRes.success && settingsRes.data) {
+          setVatPercentage(settingsRes.data.vatPercentage);
+          setDeliveryFeeBase(settingsRes.data.deliveryFeeBase);
+        }
+
+        if (zonesRes.success && Array.isArray(zonesRes.data)) {
+          setAllZones(zonesRes.data);
+        }
+      } catch (err) {
+        console.warn("Failed to load platform settings or zones:", err);
+      }
+    };
+    loadSettingsAndZones();
+  }, []);
+
+  // Fetch restaurant details for active items to resolve restaurant zone if needed
+  useEffect(() => {
+    const restId = activeItems[0]?.foodItem?.restaurantId;
+    if (restId) {
+      getSingleRestaurantById(restId)
+        .then((res) => {
+          if (res.success && res.data) {
+            setRestaurant(res.data);
+          }
+        })
+        .catch((e) => console.warn("Could not fetch restaurant details:", e));
+    }
+  }, [activeItems]);
+
+  // Fetch Available Active Coupons for Daraz-style Selection List (Personalized for User)
+  useEffect(() => {
+    const loadCoupons = async () => {
+      setCouponLoadingList(true);
+      try {
+        const res = await getCoupons("active", userId || undefined);
+        if (res.success && Array.isArray(res.data)) {
+          setAvailableCoupons(res.data);
+        }
+      } catch (err) {
+        console.warn("Failed to load active coupons:", err);
+      } finally {
+        setCouponLoadingList(false);
+      }
+    };
+    loadCoupons();
+  }, [userId]);
+
+  // Dynamic Zone-Wise Delivery Fee Calculation
+  const resolvedDelivery = React.useMemo(() => {
+    if (activeSubtotal === 0) {
+      return {
+        deliveryFee: 0,
+        baseFee: 0,
+        perKmFee: 0,
+        zoneName: null,
+        matchedZone: null,
+        distanceKm: undefined,
+        resolutionSource: "GLOBAL_FALLBACK" as const,
+      };
+    }
+    return resolveZoneDeliveryFee({
+      address: selectedAddress,
+      allZones,
+      restaurant,
+      fallbackBaseFee: deliveryFeeBase,
+    });
+  }, [activeSubtotal, selectedAddress, allZones, restaurant, deliveryFeeBase]);
+
+  const vatAmount = Math.round(activeSubtotal * (vatPercentage / 100) * 100) / 100;
+  const deliveryFee = resolvedDelivery.deliveryFee;
+  const detectedZoneName = resolvedDelivery.zoneName;
+  const distanceKm = resolvedDelivery.distanceKm;
+  const couponDiscount = appliedCoupon ? appliedCoupon.discountAmount : 0;
+  const grandTotal = Math.max(0, activeSubtotal + vatAmount + deliveryFee - couponDiscount);
+
+  // Handle Apply Coupon by Code directly from Coupon Card List
+  const handleApplyCouponCode = async (codeToApply: string) => {
+    if (!codeToApply) return;
+    setCouponLoading(true);
+    setCouponMessage(null);
+
+    const res = await applyCouponApi(codeToApply, userId, activeSubtotal);
+    setCouponLoading(false);
+
+    if (res.success && res.code && res.discountAmount !== undefined) {
+      setAppliedCoupon({
+        code: res.code,
+        discountAmount: res.discountAmount,
+        isFirstOrderOnly: res.isFirstOrderOnly,
+      });
+      setCouponMessage({ type: "success", text: res.message });
+    } else {
+      setCouponMessage({ type: "error", text: res.message || "Unable to apply this coupon." });
+    }
+  };
+
+  // Remove Coupon
+  const handleRemoveCoupon = () => {
+    setAppliedCoupon(null);
+    setCouponMessage(null);
+  };
 
   // 1. Address Validation Guard Execution
   const fetchAndValidateAddress = useCallback(async () => {
@@ -170,12 +302,15 @@ export default function CustomerCheckout() {
       deliveryAddress: selectedAddress,
       paymentMethod,
       subtotal: activeSubtotal,
+      vatPercentage,
+      vatAmount,
       deliveryFee,
-      discount: 0,
+      couponCode: appliedCoupon?.code || null,
+      discount: couponDiscount,
       totalAmount: grandTotal,
     };
 
-    const res = await createOrderApi(userId, userEmail, orderPayload);
+    const res = await createOrderApi(userId, userEmail, orderPayload as any);
 
     setIsSubmitting(false);
 
@@ -207,6 +342,7 @@ export default function CustomerCheckout() {
       return;
     }
   };
+
 
   // Helper to extract clean address details
   const getCleanAddressDetails = (addr: TAddress) => {
@@ -280,123 +416,81 @@ export default function CustomerCheckout() {
         </div>
       )}
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        {/* Left Column: Address & Payment Methods */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
+        {/* Left 2 Columns: Address Guard & Payment Method Selection */}
         <div className="lg:col-span-2 space-y-6">
-          {/* REQUIREMENT 1: Dedicated Delivery Address Summary Card */}
-          <div className="bg-white rounded-3xl border border-gray-200 shadow-sm p-6 relative overflow-hidden transition-all hover:border-orange-200">
-            <div className="flex items-center justify-between border-b border-gray-100 pb-4 mb-4">
-              <div className="flex items-center gap-2.5">
-                <div className="w-9 h-9 rounded-2xl bg-orange-50 text-[#FF6B35] flex items-center justify-center font-bold">
+          {/* Address Guard Card */}
+          <div className="bg-white rounded-3xl border border-gray-200 shadow-sm p-6 sm:p-8 space-y-5">
+            <div className="flex items-center justify-between border-b border-gray-100 pb-4">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-orange-50 text-[#FF6B35] flex items-center justify-center font-bold">
                   <MapPin className="w-5 h-5" />
                 </div>
                 <div>
-                  <h2 className="text-base font-extrabold text-gray-900">
-                    Delivery Address Summary
-                  </h2>
-                  <p className="text-xs text-gray-400">
-                    Your order will be delivered to this verified address
-                  </p>
+                  <h2 className="text-base font-extrabold text-gray-900">Delivery Address</h2>
+                  <p className="text-xs text-gray-400">Order will be delivered to this location</p>
                 </div>
               </div>
 
-              {/* Requirement 1: "Change / Edit" (বাটন) */}
               <button
                 type="button"
                 onClick={() => setIsSwitcherOpen(true)}
-                className="inline-flex items-center gap-1.5 px-4 py-2 rounded-full border border-orange-200 bg-orange-50/70 text-[#FF6B35] hover:bg-[#FF6B35] hover:text-white text-xs font-extrabold transition-all cursor-pointer shadow-xs"
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-orange-50 hover:bg-orange-100 text-[#FF6B35] text-xs font-bold transition border border-orange-200/80 cursor-pointer"
               >
                 <Pencil className="w-3.5 h-3.5" />
-                Change / Edit
+                <span>Change Address</span>
               </button>
             </div>
 
             {selectedAddress ? (
-              (() => {
-                const { category, buildingClean } = getCleanAddressDetails(selectedAddress);
-                return (
-                  <div className="bg-gray-50/70 rounded-2xl p-5 border border-gray-100 space-y-3">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <span
-                          className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-extrabold border ${category === "Home"
-                              ? "bg-blue-50 text-blue-700 border-blue-200"
-                              : category === "Work"
-                                ? "bg-purple-50 text-purple-700 border-purple-200"
-                                : "bg-amber-50 text-amber-700 border-amber-200"
-                            }`}
-                        >
-                          {category === "Home" ? (
-                            <Home className="w-3.5 h-3.5" />
-                          ) : category === "Work" ? (
-                            <Briefcase className="w-3.5 h-3.5" />
-                          ) : (
-                            <MapPin className="w-3.5 h-3.5" />
-                          )}
-                          {category}
-                        </span>
-
-                        {selectedAddress.isDefault && (
-                          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-gradient-to-r from-orange-500 to-amber-500 text-white text-[11px] font-extrabold">
-                            <CheckCircle2 className="w-3 h-3" /> Default Address
-                          </span>
-                        )}
-                      </div>
-                    </div>
-
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
-                      <div>
-                        <p className="text-gray-400 font-semibold uppercase text-[10px]">
-                          Recipient Name
-                        </p>
-                        <p className="font-extrabold text-gray-900 flex items-center gap-1.5 mt-0.5 text-sm">
-                          <User className="w-3.5 h-3.5 text-[#FF6B35]" />
-                          {selectedAddress.fullName}
-                        </p>
-                      </div>
-
-                      <div>
-                        <p className="text-gray-400 font-semibold uppercase text-[10px]">
-                          Contact Phone
-                        </p>
-                        <p className="font-bold text-gray-800 flex items-center gap-1.5 mt-0.5 text-sm">
-                          <Phone className="w-3.5 h-3.5 text-gray-400" />
-                          {selectedAddress.phoneNumber}
-                        </p>
-                      </div>
-                    </div>
-
-                    <div className="pt-2 border-t border-gray-200/60 text-xs text-gray-700 space-y-1">
-                      <p className="font-bold text-gray-900">
-                        {selectedAddress.streetAddress}, {selectedAddress.area}
-                        {selectedAddress.postalCode ? ` - ${selectedAddress.postalCode}` : ""}
-                      </p>
-                      {buildingClean && (
-                        <p className="text-gray-500 flex items-center gap-1 font-medium">
-                          <Building2 className="w-3.5 h-3.5 text-gray-400" />
-                          {buildingClean}
-                        </p>
-                      )}
-                      {selectedAddress.deliveryInstructions && (
-                        <p className="text-gray-500 italic bg-white p-2.5 rounded-xl border border-gray-200/80 mt-1">
-                          Rider Note: &quot;{selectedAddress.deliveryInstructions}&quot;
-                        </p>
-                      )}
-                    </div>
+              <div className="p-4 rounded-2xl bg-gradient-to-r from-orange-50/40 to-amber-50/30 border border-orange-100 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div className="space-y-1.5">
+                  <div className="flex items-center gap-2">
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-white border border-gray-200 text-gray-700 text-[10px] font-bold uppercase tracking-wider">
+                      {getCleanAddressDetails(selectedAddress).category === "Home" && <Home className="w-3 h-3 text-[#FF6B35]" />}
+                      {getCleanAddressDetails(selectedAddress).category === "Work" && <Briefcase className="w-3 h-3 text-blue-500" />}
+                      {getCleanAddressDetails(selectedAddress).category === "Other" && <MapPin className="w-3 h-3 text-purple-500" />}
+                      {getCleanAddressDetails(selectedAddress).category}
+                    </span>
+                    <span className="text-xs font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-md">
+                      ✓ Default Address
+                    </span>
                   </div>
-                );
-              })()
-            ) : (
-              <div className="text-center py-6">
-                <p className="text-xs text-red-500 font-bold">No delivery address selected.</p>
+
+                  <p className="text-sm font-bold text-gray-900">
+                    {selectedAddress.streetAddress}
+                    {selectedAddress.building && `, ${getCleanAddressDetails(selectedAddress).buildingClean}`}
+                  </p>
+                  <p className="text-xs text-gray-500">
+                    {selectedAddress.area}
+                    {selectedAddress.postalCode && ` - ${selectedAddress.postalCode}`}
+                  </p>
+
+                  <div className="flex items-center gap-4 text-xs text-gray-600 pt-1">
+                    <span className="flex items-center gap-1">
+                      <User className="w-3.5 h-3.5 text-gray-400" />
+                      {selectedAddress.fullName}
+                    </span>
+                    <span className="flex items-center gap-1">
+                      <Phone className="w-3.5 h-3.5 text-gray-400" />
+                      {selectedAddress.phoneNumber}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="shrink-0 flex items-center">
+                  <span className="w-8 h-8 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center">
+                    <CheckCircle2 className="w-5 h-5" />
+                  </span>
+                </div>
               </div>
-            )}
+            ) : null}
           </div>
 
-          {/* REQUIREMENT 2: Payment Method Selection */}
-          <div className="bg-white rounded-3xl border border-gray-200 shadow-sm p-6 space-y-4">
-            <div className="flex items-center gap-2.5 border-b border-gray-100 pb-4">
-              <div className="w-9 h-9 rounded-2xl bg-orange-50 text-[#FF6B35] flex items-center justify-center font-bold">
+          {/* Payment Method Selection Card */}
+          <div className="bg-white rounded-3xl border border-gray-200 shadow-sm p-6 sm:p-8 space-y-5">
+            <div className="flex items-center gap-3 border-b border-gray-100 pb-4">
+              <div className="w-10 h-10 rounded-2xl bg-orange-50 text-[#FF6B35] flex items-center justify-center font-bold">
                 <CreditCard className="w-5 h-5" />
               </div>
               <div>
@@ -406,14 +500,17 @@ export default function CustomerCheckout() {
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-1">
+
               {/* COD Method Option Card */}
               <div
                 onClick={() => setPaymentMethod("COD")}
+
                 className={`p-5 rounded-2xl border-2 transition-all cursor-pointer relative ${paymentMethod === "COD"
                     ? "border-[#FF6B35] bg-orange-50/40 ring-2 ring-[#FF6B35]/20 shadow-md"
                     : "border-gray-200 hover:border-gray-300 bg-white"
                   }`}
               >
+
                 <div className="flex items-start justify-between">
                   <div className="w-10 h-10 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center mb-3 font-bold">
                     <Banknote className="w-6 h-6" />
@@ -461,7 +558,7 @@ export default function CustomerCheckout() {
 
                 <h3 className="text-sm font-extrabold text-gray-900">Stripe Online Payment</h3>
                 <p className="text-xs text-gray-500 mt-1 leading-relaxed">
-                  Instant secure online checkout via Credit/Debit Card or digital wallet.
+                  Instant secure online checkout via Credit/Debit Card (Visa, Mastercard).
                 </p>
                 <span className="inline-block mt-3 px-2.5 py-1 rounded-md bg-blue-50 text-blue-700 text-[10px] font-extrabold border border-blue-200">
                   Instant Confirmation & Invoice
@@ -470,6 +567,7 @@ export default function CustomerCheckout() {
             </div>
           </div>
         </div>
+
 
         {/* Right Column: Order Summary & Place Order Action */}
         <div className="space-y-6">
@@ -516,28 +614,184 @@ export default function CustomerCheckout() {
               })}
             </div>
 
-            {/* Financial Summary */}
+            {/* 🎟️ DARAZ-STYLE DYNAMIC COUPON LIST */}
+            <div className="pt-3 border-t border-gray-100 space-y-3">
+              <div className="flex items-center justify-between">
+                <label className="text-[11px] font-extrabold text-gray-800 uppercase tracking-wider flex items-center gap-1.5">
+                  <Tag className="w-4 h-4 text-[#FF6B35]" />
+                  Available Coupons ({availableCoupons.length})
+                </label>
+                {appliedCoupon && (
+                  <button
+                    type="button"
+                    onClick={handleRemoveCoupon}
+                    className="text-[11px] font-bold text-rose-600 hover:underline flex items-center gap-1 cursor-pointer"
+                  >
+                    <X className="w-3.5 h-3.5" /> Remove ({appliedCoupon.code})
+                  </button>
+                )}
+              </div>
+
+              {couponLoadingList ? (
+                <div className="py-4 flex items-center justify-center gap-2 text-xs font-bold text-gray-400">
+                  <Loader2 className="w-4 h-4 animate-spin text-[#FF6B35]" /> Loading vouchers...
+                </div>
+              ) : availableCoupons.length === 0 ? (
+                <div className="p-3 rounded-2xl bg-gray-50 text-center text-xs text-gray-500 font-medium border border-gray-100">
+                  No active coupons available at this time.
+                </div>
+              ) : (
+                <div className="space-y-2.5 max-h-64 overflow-y-auto pr-1 scrollbar-thin">
+                  {availableCoupons.map((c) => {
+                    const isApplied = appliedCoupon?.code === c.code;
+                    const discountLabel =
+                      c.discountType === "percentage"
+                        ? `${c.discountValue}% OFF`
+                        : `৳ ${c.discountValue} OFF`;
+                    const meetsMinOrder = activeSubtotal >= (c.minOrderValue || 0);
+                    const formattedExpiry = c.expiryDate
+                      ? new Date(c.expiryDate).toLocaleDateString("en-US", {
+                          month: "short",
+                          day: "numeric",
+                          year: "numeric",
+                        })
+                      : "No Expiry";
+
+                    return (
+                      <div
+                        key={c._id || c.code}
+                        className={`relative rounded-2xl border p-3 transition-all duration-200 flex items-center justify-between gap-3 ${
+                          isApplied
+                            ? "bg-emerald-50/90 border-emerald-300 shadow-xs"
+                            : meetsMinOrder
+                            ? "bg-gradient-to-r from-orange-50/50 via-amber-50/30 to-white border-orange-200/80 hover:border-orange-300 hover:shadow-xs"
+                            : "bg-gray-50/60 border-gray-200 opacity-70"
+                        }`}
+                      >
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="font-black text-xs text-gray-900 tracking-wider bg-white px-2 py-0.5 rounded-md border border-gray-200 shadow-2xs">
+                              {c.code}
+                            </span>
+                            <span className="text-[10px] font-black text-[#FF6B35] bg-orange-100/80 px-2 py-0.5 rounded-full">
+                              {discountLabel}
+                            </span>
+                            {c.isFirstOrderOnly && (
+                              <span className="text-[9px] font-bold text-amber-800 bg-amber-100 px-1.5 py-0.5 rounded-md">
+                                1st Order Only
+                              </span>
+                            )}
+                          </div>
+
+                          <div className="mt-1.5 flex items-center gap-2 text-[11px] text-gray-500 font-medium">
+                            <span>Min. Spend ৳{c.minOrderValue || 0}</span>
+                            <span>•</span>
+                            <span>Valid till {formattedExpiry}</span>
+                          </div>
+
+                          {!meetsMinOrder && (
+                            <p className="text-[10px] text-rose-500 font-semibold mt-1">
+                              Add ৳{((c.minOrderValue || 0) - activeSubtotal).toFixed(0)} more to unlock
+                            </p>
+                          )}
+                        </div>
+
+                        <button
+                          type="button"
+                          disabled={couponLoading || isApplied || !meetsMinOrder}
+                          onClick={() => handleApplyCouponCode(c.code)}
+                          className={`px-3.5 py-1.5 rounded-xl text-xs font-black transition shrink-0 cursor-pointer ${
+                            isApplied
+                              ? "bg-emerald-600 text-white shadow-xs"
+                              : meetsMinOrder
+                              ? "bg-[#FF6B35] text-white hover:bg-[#e85b27] shadow-xs active:scale-95"
+                              : "bg-gray-200 text-gray-400 cursor-not-allowed"
+                          }`}
+                        >
+                          {couponLoading && appliedCoupon?.code === c.code ? (
+                            <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                          ) : isApplied ? (
+                            <span className="flex items-center gap-1">
+                              <CheckCircle2 className="w-3.5 h-3.5" /> Applied
+                            </span>
+                          ) : (
+                            "Apply"
+                          )}
+                        </button>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+
+              {couponMessage && (
+                <p
+                  className={`text-[11px] font-semibold flex items-center gap-1 mt-1 ${
+                    couponMessage.type === "success" ? "text-emerald-700" : "text-rose-600"
+                  }`}
+                >
+                  {couponMessage.type === "success" ? (
+                    <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
+                  ) : (
+                    <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                  )}
+                  <span>{couponMessage.text}</span>
+                </p>
+              )}
+            </div>
+
+            {/* Financial Summary Breakdown */}
             <div className="pt-3 border-t border-gray-100 space-y-2.5 text-xs">
               <div className="flex items-center justify-between text-gray-600">
-                <span>Subtotal</span>
+                <span>Subtotal (Food Price)</span>
                 <span className="font-bold text-gray-900">Tk {activeSubtotal.toFixed(2)}</span>
               </div>
 
               <div className="flex items-center justify-between text-gray-600">
-                <span>Delivery Fee</span>
-                <span className="font-bold text-gray-900">
-                  {deliveryFee === 0 ? (
-                    <span className="text-emerald-600 font-extrabold">FREE</span>
-                  ) : (
-                    `Tk ${deliveryFee.toFixed(2)}`
+                <span>VAT ({vatPercentage}%)</span>
+                <span className="font-bold text-gray-900">+Tk {vatAmount.toFixed(2)}</span>
+              </div>
+
+              <div className="flex items-center justify-between text-gray-600">
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  <span>Delivery Fee</span>
+                  {detectedZoneName && (
+                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-orange-100 text-[#FF6B35]">
+                      {detectedZoneName}
+                    </span>
                   )}
+                </div>
+                <span className="font-bold text-gray-900">
+                  +Tk {deliveryFee.toFixed(2)}
                 </span>
               </div>
 
-              {deliveryFee > 0 && (
-                <div className="p-2.5 rounded-xl bg-orange-50 text-[11px] text-orange-700 flex items-center gap-1.5 font-medium border border-orange-100">
-                  <Sparkles className="w-3.5 h-3.5 shrink-0 text-[#FF6B35]" />
-                  Add Tk {(FREE_DELIVERY_THRESHOLD - activeSubtotal).toFixed(2)} more for free delivery!
+              {/* Distance Breakdown in Small Text */}
+              <div className="flex items-center justify-between text-[11px] text-gray-400 font-medium -mt-1 pl-0.5">
+                <span className="flex items-center gap-1">
+                  <span>
+                    📍 Distance:{" "}
+                    <strong className="text-gray-600 font-semibold">
+                      {distanceKm !== undefined
+                        ? `${distanceKm} km`
+                        : "Within 2.0 km"}
+                    </strong>
+                  </span>
+                  {resolvedDelivery.perKmFee > 0 && (
+                    <span className="text-[10px] text-gray-400">
+                      (Base ৳{resolvedDelivery.baseFee}{resolvedDelivery.perKmFee ? ` • +৳${resolvedDelivery.perKmFee}/km` : ""})
+                    </span>
+                  )}
+                </span>
+                <span className="text-[10px] text-gray-400">
+                  Zone Rate
+                </span>
+              </div>
+
+              {couponDiscount > 0 && (
+                <div className="flex items-center justify-between text-emerald-600 font-extrabold">
+                  <span>Coupon Discount ({appliedCoupon?.code})</span>
+                  <span>-Tk {couponDiscount.toFixed(2)}</span>
                 </div>
               )}
 

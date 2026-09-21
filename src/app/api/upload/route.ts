@@ -22,8 +22,7 @@ export async function POST(req: NextRequest) {
 
     const apiKey =
       process.env.NEXT_PUBLIC_IMGBB_API_KEY ||
-      process.env.IMGBB_API_KEY ||
-      "203d60bb9fab7d8774cd2e6e230ff932";
+      process.env.IMGBB_API_KEY;
 
     const uploadedUrls: string[] = [];
 

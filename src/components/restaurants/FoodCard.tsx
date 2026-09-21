@@ -10,6 +10,14 @@ function formatPrice(price: number): string {
   return `Tk ${price.toFixed(2)}`;
 }
 
+// The API falls back to a placeholder when the restaurant join comes back empty —
+// show nothing rather than a bare "From " or "From Unknown Restaurant".
+function resolveRestaurantName(name?: string): string | null {
+  const trimmed = (name || '').trim();
+  if (!trimmed || trimmed.toLowerCase() === 'unknown restaurant') return null;
+  return trimmed;
+}
+
 interface FoodCardProps {
   item: IGlobalFoodItem;
   index?: number;
@@ -29,6 +37,10 @@ export default function FoodCard({
 }: FoodCardProps) {
   const isAdded = addedFeedbackId === item._id;
   const hasDiscount = !!item.discountPrice && item.discountPrice < item.price;
+  const restaurantLabel = resolveRestaurantName(item.restaurantName);
+
+  const displayRating = (item.rating && item.rating > 0) ? item.rating : (item.restaurantRating || 0);
+  const displayReviewCount = item.reviewCount || 0;
 
   const handleAddToCart = (e: React.MouseEvent) => {
     e.preventDefault();
@@ -71,10 +83,13 @@ export default function FoodCard({
             {item.isAvailable ? 'Available' : 'Unavailable'}
           </span>
           {/* Rating badge */}
-          {item.restaurantRating > 0 && (
+          {displayRating > 0 && (
             <span className="absolute top-3 right-3 flex items-center gap-1 px-2 py-1 rounded-lg bg-white/90 backdrop-blur-md text-[11px] font-bold text-gray-800 shadow-sm">
               <Star className="w-3 h-3 text-amber-400 fill-amber-400" />
-              {item.restaurantRating.toFixed(1)}
+              <span>{displayRating.toFixed(1)}</span>
+              {displayReviewCount > 0 && (
+                <span className="text-[10px] text-gray-500 font-semibold">({displayReviewCount})</span>
+              )}
             </span>
           )}
         </div>
@@ -85,7 +100,9 @@ export default function FoodCard({
             <h3 className="font-bold text-gray-900 text-[15px] group-hover:text-[#FF6B35] transition-colors line-clamp-1">
               {item.name}
             </h3>
-            <p className="text-xs text-gray-400 mt-1 font-medium">From {item.restaurantName}</p>
+            {restaurantLabel && (
+              <p className="text-xs text-gray-400 mt-1 font-medium">From {restaurantLabel}</p>
+            )}
             <div className="mt-2.5">
               {hasDiscount ? (
                 <div className="flex items-baseline gap-2">
@@ -180,10 +197,13 @@ export default function FoodCard({
         </span>
 
         {/* Rating badge */}
-        {item.restaurantRating > 0 && (
+        {displayRating > 0 && (
           <span className="absolute top-3 right-3 flex items-center gap-1 px-2 py-1 rounded-lg bg-white/90 backdrop-blur-md text-[11px] font-bold text-gray-800 shadow-sm">
             <Star className="w-3 h-3 text-amber-400 fill-amber-400" />
-            {item.restaurantRating.toFixed(1)}
+            <span>{displayRating.toFixed(1)}</span>
+            {displayReviewCount > 0 && (
+              <span className="text-[10px] text-gray-500 font-semibold">({displayReviewCount})</span>
+            )}
           </span>
         )}
 
@@ -201,7 +221,9 @@ export default function FoodCard({
           <h3 className="font-bold text-gray-900 text-[15px] group-hover:text-[#FF6B35] transition-colors line-clamp-1">
             {item.name}
           </h3>
-          <p className="text-xs text-gray-400 mt-1 font-medium">From {item.restaurantName}</p>
+          {restaurantLabel && (
+            <p className="text-xs text-gray-400 mt-1 font-medium">From {restaurantLabel}</p>
+          )}
           <div className="mt-2.5">
             {hasDiscount ? (
               <div className="flex items-baseline gap-2">

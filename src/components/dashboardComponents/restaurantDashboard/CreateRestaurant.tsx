@@ -22,16 +22,36 @@ import {
   X,
   Eye,
   ChevronDown,
+  Search,
+  Crosshair,
+  Navigation,
 } from "lucide-react";
 import { FaFacebookF, FaInstagram, FaTwitter } from "react-icons/fa6";
 import { useRouter } from "next/navigation";
 import AOS from "aos";
+import LocationPickerMap from "@/components/common/LocationPickerMap";
+import { detectZone } from "@/lib/api/zone";
+import { IZone } from "@/types/zone";
 import { IRestaurant, RestaurantFormData } from "@/lib/api/restaurant";
 import { BANGLADESH_LOCATIONS } from "@/data/bangladeshLocations";
 import {
   createRestaurantProfile,
   updateRestaurantProfile,
 } from "@/lib/actions/restaurant";
+
+const DIVISION_CENTERS: Record<string, { lat: number; lng: number }> = {
+  mymensingh: { lat: 24.7471, lng: 90.4203 },
+  dhaka: { lat: 23.8103, lng: 90.4125 },
+  chattogram: { lat: 22.3569, lng: 91.7832 },
+  chittagong: { lat: 22.3569, lng: 91.7832 },
+  sylhet: { lat: 24.8949, lng: 91.8687 },
+  feni: { lat: 23.0159, lng: 91.3976 },
+  moulvibazar: { lat: 24.4829, lng: 91.7649 },
+  rajshahi: { lat: 24.3745, lng: 88.6042 },
+  khulna: { lat: 22.8456, lng: 89.5403 },
+  barishal: { lat: 22.7010, lng: 90.3535 },
+  rangpur: { lat: 25.7439, lng: 89.2752 },
+};
 
 interface CreateRestaurantProps {
   initialData?: Partial<IRestaurant> | null;
@@ -94,6 +114,18 @@ export default function CreateRestaurant({
     AOS.refresh();
   }, [activeTab]);
 
+  const initialLat =
+    initialData?.coordinates?.latitude ??
+    initialData?.address?.coordinates?.latitude ??
+    initialData?.address?.latitude ??
+    (initialData?.latitude !== undefined ? Number(initialData.latitude) : 24.7471);
+
+  const initialLng =
+    initialData?.coordinates?.longitude ??
+    initialData?.address?.coordinates?.longitude ??
+    initialData?.address?.longitude ??
+    (initialData?.longitude !== undefined ? Number(initialData.longitude) : 90.4203);
+
   const [formData, setFormData] = useState<RestaurantFormData>({
     restaurantName: initialData?.restaurantName || "",
     tagline: initialData?.tagline || "",
@@ -125,7 +157,180 @@ export default function CreateRestaurant({
     facebook: initialData?.socialLinks?.facebook || "",
     instagram: initialData?.socialLinks?.instagram || "",
     twitter: initialData?.socialLinks?.twitter || "",
+    latitude: initialLat,
+    longitude: initialLng,
+    zoneId: initialData?.zoneId || "",
+    numericZoneId: initialData?.numericZoneId,
+    zoneName: initialData?.zoneName || "",
   });
+
+  const [detectedZone, setDetectedZone] = useState<IZone | null>(null);
+  const [adjacentZones, setAdjacentZones] = useState<IZone[]>([]);
+  const [nearestZone, setNearestZone] = useState<IZone | null>(null);
+  const [distanceToNearestKm, setDistanceToNearestKm] = useState<number | null>(null);
+  const [isDetectingZone, setIsDetectingZone] = useState(false);
+  const [zoneEvalMessage, setZoneEvalMessage] = useState<string>("");
+  const [isLocating, setIsLocating] = useState(false);
+
+  // Map search query
+  const [mapSearchQuery, setMapSearchQuery] = useState("");
+  const [mapSearchResults, setMapSearchResults] = useState<Array<{ display_name: string; lat: string; lon: string }>>([]);
+  const [isSearchingMap, setIsSearchingMap] = useState(false);
+  const [showMapSuggestions, setShowMapSuggestions] = useState(false);
+
+  // Live Zone Detection when coordinates change
+  useEffect(() => {
+    const lat = Number(formData.latitude);
+    const lng = Number(formData.longitude);
+    if (!Number.isFinite(lat) || !Number.isFinite(lng)) return;
+
+    let isCancelled = false;
+    setIsDetectingZone(true);
+
+    const timer = setTimeout(async () => {
+      try {
+        const res = await detectZone(lat, lng);
+        if (isCancelled) return;
+
+        if (res.success && res.data) {
+          if (res.data.isInsideServiceArea && res.data.primaryZone) {
+            setDetectedZone(res.data.primaryZone);
+            setAdjacentZones(res.data.adjacentZones || []);
+            setNearestZone(null);
+            setDistanceToNearestKm(null);
+            setZoneEvalMessage("");
+          } else {
+            setDetectedZone(null);
+            setAdjacentZones([]);
+            setNearestZone(res.data.nearestZone || null);
+            setDistanceToNearestKm(res.data.distanceToNearestKm ?? null);
+            setZoneEvalMessage(
+              res.data.message ||
+                `Outside active delivery coverage (${res.data.distanceToNearestKm || "?"} km from nearest zone)`
+            );
+          }
+        } else {
+          setDetectedZone(null);
+          setAdjacentZones([]);
+          setZoneEvalMessage("Unable to verify delivery zone coverage.");
+        }
+      } catch (err) {
+        if (!isCancelled) {
+          setDetectedZone(null);
+          setZoneEvalMessage("Failed to evaluate zone.");
+        }
+      } finally {
+        if (!isCancelled) {
+          setIsDetectingZone(false);
+        }
+      }
+    }, 350);
+
+    return () => {
+      isCancelled = true;
+      clearTimeout(timer);
+    };
+  }, [formData.latitude, formData.longitude]);
+
+  // GPS Locate me button
+  const handleLocateMe = () => {
+    if (typeof window === "undefined" || !navigator.geolocation) {
+      alert("Geolocation is not supported by your browser.");
+      return;
+    }
+
+    setIsLocating(true);
+    navigator.geolocation.getCurrentPosition(
+      async (pos) => {
+        const lat = pos.coords.latitude;
+        const lng = pos.coords.longitude;
+        setFormData((prev) => ({
+          ...prev,
+          latitude: lat,
+          longitude: lng,
+        }));
+        setIsLocating(false);
+
+        // Reverse geocode to assist address fill if street is empty
+        try {
+          const revRes = await fetch(
+            `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&zoom=18&addressdetails=1`,
+            { headers: { "Accept-Language": "en" } }
+          );
+          if (revRes.ok) {
+            const data = await revRes.json();
+            if (data?.display_name && !formData.street) {
+              setFormData((prev) => ({
+                ...prev,
+                street: data.display_name.split(",").slice(0, 3).join(",").trim(),
+              }));
+            }
+          }
+        } catch {}
+      },
+      (err) => {
+        console.warn("GPS error:", err);
+        setIsLocating(false);
+        alert("Could not retrieve GPS location. Please check browser permissions or move the pin manually.");
+      },
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+    );
+  };
+
+  const handleMapPositionChange = (lat: number, lng: number) => {
+    setFormData((prev) => ({
+      ...prev,
+      latitude: lat,
+      longitude: lng,
+    }));
+  };
+
+  // Map search query autocompletion
+  useEffect(() => {
+    if (!mapSearchQuery.trim() || mapSearchQuery.length < 3) {
+      setMapSearchResults([]);
+      setShowMapSuggestions(false);
+      return;
+    }
+
+    const timer = setTimeout(async () => {
+      setIsSearchingMap(true);
+      try {
+        const q = encodeURIComponent(`${mapSearchQuery.trim()}, Bangladesh`);
+        const res = await fetch(
+          `https://nominatim.openstreetmap.org/search?format=json&q=${q}&limit=5&countrycodes=bd`,
+          { headers: { "Accept-Language": "en" } }
+        );
+        if (res.ok) {
+          const data = await res.json();
+          if (Array.isArray(data)) {
+            setMapSearchResults(data);
+            setShowMapSuggestions(true);
+          }
+        }
+      } catch {
+        setMapSearchResults([]);
+      } finally {
+        setIsSearchingMap(false);
+      }
+    }, 450);
+
+    return () => clearTimeout(timer);
+  }, [mapSearchQuery]);
+
+  const handleSelectMapSearchResult = (item: { display_name: string; lat: string; lon: string }) => {
+    const lat = parseFloat(item.lat);
+    const lng = parseFloat(item.lon);
+    if (!isNaN(lat) && !isNaN(lng)) {
+      setFormData((prev) => ({
+        ...prev,
+        latitude: lat,
+        longitude: lng,
+      }));
+    }
+    setMapSearchQuery(item.display_name.split(",").slice(0, 2).join(","));
+    setShowMapSuggestions(false);
+  };
 
   const handleInputChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>
@@ -147,11 +352,13 @@ export default function CreateRestaurant({
 
   const handleCitySelect = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const val = e.target.value;
+    const center = DIVISION_CENTERS[val.toLowerCase()];
     setFormData((prev) => ({
       ...prev,
       city: val,
       state: "",
       postalCode: "",
+      ...(center ? { latitude: center.lat, longitude: center.lng } : {}),
     }));
   };
 
@@ -237,6 +444,14 @@ export default function CreateRestaurant({
       return;
     }
 
+    const matchedPostal = availablePostalCodes.find(
+      (p) => p.code === formData.postalCode.trim()
+    );
+    const upazilaName = matchedPostal?.name || formData.postalCode.trim() || formData.state.trim();
+
+    const lat = Number(formData.latitude) || 24.7471;
+    const lng = Number(formData.longitude) || 90.4203;
+
     const payload: Partial<IRestaurant> = {
       ownerId: userId || initialData?.ownerId,
       ownerEmail: userEmail || formData.contactEmail,
@@ -254,10 +469,29 @@ export default function CreateRestaurant({
         street: formData.street.trim(),
         city: formData.city.trim(),
         state: formData.state.trim(),
+        division: formData.city.trim(),
+        district: formData.state.trim(),
+        upazila: upazilaName,
+        area: upazilaName,
         postalCode: formData.postalCode.trim(),
         country: formData.country.trim() || "Bangladesh",
-        fullAddress: `${formData.street.trim()}, ${formData.city.trim()}`,
+        fullAddress: `${formData.street.trim()}, ${upazilaName ? upazilaName + ', ' : ''}${formData.state.trim()}, ${formData.city.trim()}`,
+        latitude: lat,
+        longitude: lng,
+        coordinates: {
+          latitude: lat,
+          longitude: lng,
+        },
+        zoneId: detectedZone?.zoneId ? String(detectedZone.zoneId) : (initialData?.zoneId ? String(initialData.zoneId) : undefined),
       },
+      coordinates: {
+        latitude: lat,
+        longitude: lng,
+      },
+      zoneId: detectedZone?.zoneId ? String(detectedZone.zoneId) : (initialData?.zoneId ? String(initialData.zoneId) : undefined),
+      numericZoneId: detectedZone?.zoneId ? Number(detectedZone.zoneId) : (initialData?.numericZoneId ? Number(initialData.numericZoneId) : undefined),
+      zoneMongoId: (detectedZone as any)?._id || initialData?.zoneMongoId,
+      zoneName: detectedZone?.name || initialData?.zoneName,
       generalOpenTime: formData.generalOpenTime,
       generalCloseTime: formData.generalCloseTime,
       pricing: {
@@ -794,6 +1028,190 @@ export default function CreateRestaurant({
                       readOnly
                       className="w-full px-4 py-3 rounded-xl bg-gray-100/90 border border-gray-200 text-gray-600 outline-none text-sm font-medium transition cursor-not-allowed"
                     />
+                  </div>
+
+                  {/* INTERACTIVE MAP & LIVE DELIVERY ZONE ASSIGNMENT */}
+                  <div className="md:col-span-2 pt-3">
+                    <div className="bg-gradient-to-br from-gray-50 via-orange-50/20 to-amber-50/20 rounded-2xl p-4 sm:p-5 border border-orange-200/70 shadow-sm space-y-4">
+                      {/* Section Header */}
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-gray-200/70 pb-3.5">
+                        <div>
+                          <h3 className="text-sm sm:text-base font-extrabold text-gray-900 flex items-center gap-2">
+                            <span className="w-7 h-7 rounded-lg bg-[#FF6B35]/15 text-[#FF6B35] flex items-center justify-center">
+                              <MapPin className="w-4 h-4 text-[#FF6B35]" />
+                            </span>
+                            <span>Pinpoint Restaurant Exact GPS Location</span>
+                          </h3>
+                          <p className="text-xs text-gray-500 mt-0.5">
+                            Drag the map pin, click anywhere, or search to set your restaurant's exact pickup coordinates.
+                          </p>
+                        </div>
+
+                        {/* GPS Locate Me Button */}
+                        <button
+                          type="button"
+                          onClick={handleLocateMe}
+                          disabled={isLocating}
+                          className="self-start sm:self-auto px-4 py-2.5 rounded-xl bg-white border border-gray-200 hover:border-[#FF6B35] hover:text-[#FF6B35] text-gray-700 text-xs font-bold transition flex items-center gap-2 shadow-xs cursor-pointer active:scale-95 disabled:opacity-60"
+                        >
+                          <Crosshair className={`w-4 h-4 text-[#FF6B35] ${isLocating ? "animate-spin" : ""}`} />
+                          <span>{isLocating ? "Detecting GPS..." : "Locate via Device GPS"}</span>
+                        </button>
+                      </div>
+
+                      {/* Map Area / Street Search Box */}
+                      <div className="relative">
+                        <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+                        <input
+                          type="text"
+                          value={mapSearchQuery}
+                          onChange={(e) => setMapSearchQuery(e.target.value)}
+                          placeholder="Search landmark, road or area to jump map (e.g. Mymensingh Sadar, Banani Road 11)..."
+                          className="w-full pl-10 pr-10 py-2.5 rounded-xl bg-white border border-gray-200 focus:border-[#FF6B35] text-xs outline-none shadow-xs transition"
+                        />
+                        {isSearchingMap && (
+                          <Loader2 className="w-4 h-4 absolute right-3.5 top-1/2 -translate-y-1/2 text-[#FF6B35] animate-spin" />
+                        )}
+
+                        {/* Autocomplete suggestions dropdown */}
+                        {mapSearchResults.length > 0 && showMapSuggestions && (
+                          <div className="absolute top-full left-0 right-0 mt-1.5 bg-white border border-gray-200 rounded-xl shadow-xl z-[1000] overflow-hidden max-h-48 overflow-y-auto">
+                            {mapSearchResults.map((item, idx) => (
+                              <button
+                                key={idx}
+                                type="button"
+                                onClick={() => handleSelectMapSearchResult(item)}
+                                className="w-full text-left px-3.5 py-2 hover:bg-orange-50 text-xs text-gray-700 hover:text-[#FF6B35] flex items-center gap-2 transition cursor-pointer border-b border-gray-50 last:border-none"
+                              >
+                                <MapPin className="w-3.5 h-3.5 text-[#FF6B35] shrink-0" />
+                                <span className="truncate">{item.display_name}</span>
+                              </button>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Leaflet Interactive Map */}
+                      <div className="w-full h-[340px] sm:h-[400px] rounded-xl overflow-hidden border border-gray-200 shadow-inner relative">
+                        <LocationPickerMap
+                          latitude={Number(formData.latitude) || 24.7471}
+                          longitude={Number(formData.longitude) || 90.4203}
+                          onPositionChange={handleMapPositionChange}
+                          onLocateMe={handleLocateMe}
+                          isLocating={isLocating}
+                          currentRestaurantId={initialData?._id || initialData?.id}
+                        />
+                      </div>
+
+                      {/* Explicit Latitude & Longitude Coordinate Inputs */}
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+                        <div>
+                          <label className="block text-[11px] font-bold text-gray-600 uppercase tracking-wider mb-1">
+                            Latitude (GPS) <span className="text-rose-500">*</span>
+                          </label>
+                          <input
+                            type="number"
+                            step="any"
+                            name="latitude"
+                            value={formData.latitude ?? ""}
+                            onChange={(e) => {
+                              const val = parseFloat(e.target.value);
+                              setFormData((p) => ({ ...p, latitude: isNaN(val) ? undefined : val }));
+                            }}
+                            placeholder="e.g. 24.7471"
+                            className="w-full px-3.5 py-2.5 rounded-xl bg-white border border-gray-200 focus:border-[#FF6B35] outline-none text-xs font-mono font-medium transition"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block text-[11px] font-bold text-gray-600 uppercase tracking-wider mb-1">
+                            Longitude (GPS) <span className="text-rose-500">*</span>
+                          </label>
+                          <input
+                            type="number"
+                            step="any"
+                            name="longitude"
+                            value={formData.longitude ?? ""}
+                            onChange={(e) => {
+                              const val = parseFloat(e.target.value);
+                              setFormData((p) => ({ ...p, longitude: isNaN(val) ? undefined : val }));
+                            }}
+                            placeholder="e.g. 90.4203"
+                            className="w-full px-3.5 py-2.5 rounded-xl bg-white border border-gray-200 focus:border-[#FF6B35] outline-none text-xs font-mono font-medium transition"
+                          />
+                        </div>
+                      </div>
+
+                      {/* Live Delivery Zone Geofence Status Badge */}
+                      {isDetectingZone ? (
+                        <div className="flex items-center gap-2.5 p-3.5 rounded-xl bg-blue-50 border border-blue-200 text-blue-700 text-xs">
+                          <Loader2 className="w-4 h-4 animate-spin shrink-0 text-blue-600" />
+                          <span>Checking delivery zone geofence coverage for coordinates...</span>
+                        </div>
+                      ) : detectedZone ? (
+                        <div className="flex items-start gap-3 p-3.5 rounded-xl bg-emerald-50/90 border border-emerald-200/90 shadow-xs">
+                          <div className="w-8 h-8 rounded-lg bg-emerald-500 text-white flex items-center justify-center shrink-0 mt-0.5 shadow-xs">
+                            <CheckCircle2 className="w-5 h-5" />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span className="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold uppercase bg-emerald-200 text-emerald-900 tracking-wide">
+                                Primary Zone {detectedZone.zoneId || 1}
+                              </span>
+                              <h4 className="text-xs sm:text-sm font-bold text-emerald-950 truncate">
+                                {detectedZone.name}
+                              </h4>
+                            </div>
+                            <p className="text-[11px] sm:text-xs text-emerald-800 leading-relaxed mt-1">
+                              ✅ <strong>Inside Delivery Coverage:</strong> Your restaurant is registered in this delivery zone. Nearby customers within your delivery radius will easily discover your outlet.
+                            </p>
+
+                            {adjacentZones.length > 0 && (
+                              <div className="mt-2.5 pt-2 border-t border-emerald-200/70 flex items-center gap-1.5 flex-wrap">
+                                <span className="text-[11px] font-bold text-emerald-900">
+                                  Multi-Zone Reach (Border Coverage):
+                                </span>
+                                {adjacentZones.map((az) => (
+                                  <span
+                                    key={az.zoneId || az._id}
+                                    className="px-2 py-0.5 rounded-md text-[10px] font-semibold bg-white border border-emerald-300 text-emerald-800 shadow-xs"
+                                  >
+                                    Zone {az.zoneId}: {az.name}
+                                  </span>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="flex items-start gap-3 p-3.5 rounded-xl bg-amber-50 border border-amber-200 shadow-xs">
+                          <div className="w-8 h-8 rounded-lg bg-amber-500 text-white flex items-center justify-center shrink-0 mt-0.5 shadow-xs">
+                            <AlertCircle className="w-5 h-5" />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span className="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold uppercase bg-amber-200 text-amber-900 tracking-wide">
+                                Outside Active Zone
+                              </span>
+                              <h4 className="text-xs sm:text-sm font-bold text-amber-950">
+                                No Active Delivery Zone At This Coordinate
+                              </h4>
+                            </div>
+                            <p className="text-[11px] sm:text-xs text-amber-800 leading-relaxed mt-1">
+                              {zoneEvalMessage || "These GPS coordinates fall outside all currently active delivery hubs."}
+                              {nearestZone && (
+                                <span className="block mt-0.5 font-semibold text-amber-900">
+                                  Nearest Hub: {nearestZone.name} (~{distanceToNearestKm || "?"} km away).
+                                </span>
+                              )}
+                              <span className="block mt-1 font-medium text-amber-900/80 text-[10px]">
+                                💡 Tip: Move the pin inside an active zone (e.g. Mymensingh Sadar, Dhaka, Chattogram, Sylhet, Feni, Moulvibazar) so nearby customers can order.
+                              </span>
+                            </p>
+                          </div>
+                        </div>
+                      )}
+                    </div>
                   </div>
                 </div>
 

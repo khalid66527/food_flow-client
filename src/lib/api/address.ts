@@ -8,21 +8,10 @@ const SERVER_BASE_URL = (
 
 const API_BASE_URL = `${SERVER_BASE_URL}/api`;
 
-interface IdentityHeaders {
-  "x-user-id": string;
-  "x-user-email": string;
-}
+import { getAuthHeaders } from "@/lib/jwt";
 
-/**
- * Build the identity headers used by every address API call. The server uses
- * these (per the codebase convention) to authenticate the caller and enforce
- * customer-only access.
- */
-function buildIdentityHeaders(userId: string, userEmail: string): IdentityHeaders {
-  return {
-    "x-user-id": userId,
-    "x-user-email": userEmail,
-  };
+function buildIdentityHeaders(userId?: string, userEmail?: string): Record<string, string> {
+  return getAuthHeaders(userId, userEmail);
 }
 
 /**

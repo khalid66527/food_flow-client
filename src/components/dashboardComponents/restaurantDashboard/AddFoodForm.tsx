@@ -34,12 +34,25 @@ import {
   Eye,
   ShoppingBag,
   Star,
+  Calculator,
 } from "lucide-react";
 import { useSession } from "@/lib/auth-client";
 import { getMyRestaurantProfile, IRestaurant } from "@/lib/api/restaurant";
 import { createFoodItem } from "@/lib/actions/restaurant";
 import { getGlobalCategories, IGlobalCategory } from "@/lib/api/category";
+import { getPlatformSettings } from "@/lib/api/settings";
 import LoadingSpinner from "@/lib/api/LoadingSpinner";
+import {
+  saveAiImageEditHandoff,
+  getAiImageEditHandoff,
+  clearAiImageEditHandoff,
+} from "@/lib/aiImageEdit";
+import {
+  saveAddFoodDraft,
+  readAddFoodDraft,
+  clearAddFoodDraft,
+} from "@/lib/addFoodDraft";
+import RestaurantAiButton from "./RestaurantAiButton";
 
 type CategoryType = string;
 
@@ -47,7 +60,7 @@ type FoodStatus = "available" | "unavailable";
 
 const MAX_IMAGE_SIZE_MB = 10;
 const IMGBB_API_KEY =
-  process.env.NEXT_PUBLIC_IMGBB_API_KEY || "203d60bb9fab7d8774cd2e6e230ff932";
+  process.env.NEXT_PUBLIC_IMGBB_API_KEY ;
 
 // Preset sample photos mapping per category
 const CATEGORY_SAMPLE_PHOTOS: Record<string, string[]> = {
@@ -104,24 +117,41 @@ export default function AddFoodForm() {
   // Category State
   const [category, setCategory] = useState<CategoryType>("Pizza");
   const [customCategory, setCustomCategory] = useState("");
-  const [globalCategories, setGlobalCategories] = useState<IGlobalCategory[]>([]);
+  const [globalCategories, setGlobalCategories] = useState<IGlobalCategory[]>(
+    [],
+  );
   const [loading, setLoading] = useState(false);
   const [successMsg, setSuccessMsg] = useState("");
   const [errorMsg, setErrorMsg] = useState("");
 
-  // Fetch admin approved global categories
+  // Commission Percentage State
+  const [commissionPercentage, setCommissionPercentage] = useState<number>(15);
+
+  // Fetch admin approved global categories & platform settings
   useEffect(() => {
-    const loadCategories = async () => {
+    const loadData = async () => {
       try {
-        const res = await getGlobalCategories();
-        if (res.success && Array.isArray(res.data) && res.data.length > 0) {
-          setGlobalCategories(res.data);
+        const [catRes, settingsRes] = await Promise.all([
+          getGlobalCategories(),
+          getPlatformSettings(),
+        ]);
+        if (
+          catRes.success &&
+          Array.isArray(catRes.data) &&
+          catRes.data.length > 0
+        ) {
+          setGlobalCategories(catRes.data);
+        }
+        if (settingsRes.success && settingsRes.data) {
+          setCommissionPercentage(
+            settingsRes.data.restaurantCommissionPercentage,
+          );
         }
       } catch {
         // fallback
       }
     };
-    loadCategories();
+    loadData();
   }, []);
 
   // Common General Food Fields
@@ -150,10 +180,65 @@ export default function AddFoodForm() {
   const [images, setImages] = useState<string[]>([]);
   const [activePreviewIndex, setActivePreviewIndex] = useState<number>(0);
   const [imageUrlInput, setImageUrlInput] = useState<string>("");
-  const [imageInputMode, setImageInputMode] = useState<"upload" | "url">("upload");
+  const [imageInputMode, setImageInputMode] = useState<"upload" | "url">(
+    "upload",
+  );
   const [uploading, setUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState<string>("");
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Restore the draft parked by the trip to the AI image editor.
+  //
+  // Restore-once: the draft is dropped as soon as it is read, so this only ever
+  // rehydrates the round trip — a later plain visit to Add Food is a blank form.
+  //
+  // sessionStorage does not exist while rendering on the server, so seeding this
+  // through useState initialisers would mismatch on hydration — it has to be a
+  // post-mount effect, which is what set-state-in-effect is disabled for here.
+  /* eslint-disable react-hooks/set-state-in-effect */
+  useEffect(() => {
+    const draft = readAddFoodDraft();
+    if (!draft) return;
+
+    setCategory(draft.category);
+    setCustomCategory(draft.customCategory);
+    if (Object.keys(draft.commonData).length > 0) {
+      setCommonData((prev) => ({
+        ...prev,
+        ...(draft.commonData as Partial<typeof prev>),
+      }));
+    }
+    if (Object.keys(draft.dynamicData).length > 0) {
+      setDynamicData(draft.dynamicData);
+    }
+    setImageInputMode(draft.imageInputMode);
+
+    // The editor writes the edited cover into the draft on Apply. If the gallery
+    // was dropped to fit the storage quota, the hand-off still holds the photo.
+    const handoff = getAiImageEditHandoff();
+    const restoredImages =
+      draft.images.length > 0
+        ? draft.images
+        : handoff?.image
+          ? [handoff.image]
+          : [];
+
+    setImages(restoredImages);
+    setActivePreviewIndex(
+      Math.min(draft.activePreviewIndex, Math.max(0, restoredImages.length - 1)),
+    );
+
+    clearAddFoodDraft();
+    clearAiImageEditHandoff();
+
+    setSuccessMsg(
+      draft.coverEdited
+        ? "✓ Your draft was restored with the AI-edited cover photo."
+        : "✓ Your draft was restored.",
+    );
+    setTimeout(() => setSuccessMsg(""), 4000);
+  }, []);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   // Resolve Logged-in Restaurant
   useEffect(() => {
@@ -179,11 +264,17 @@ export default function AddFoodForm() {
       }
 
       try {
-        const res = await getMyRestaurantProfile(user?.email || "", user?.id || "");
+        const res = await getMyRestaurantProfile(
+          user?.email || "",
+          user?.id || "",
+        );
         if (!isMounted) return;
         if (res.success && res.data) {
           setRestaurant(res.data);
-          localStorage.setItem("foodflow_restaurant_data", JSON.stringify(res.data));
+          localStorage.setItem(
+            "foodflow_restaurant_data",
+            JSON.stringify(res.data),
+          );
         } else if (!cached) {
           setRestaurant(null);
         }
@@ -202,7 +293,9 @@ export default function AddFoodForm() {
 
   // Handle General Input Change
   const handleCommonChange = (
-    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>
+    e: React.ChangeEvent<
+      HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement
+    >,
   ) => {
     const { name, value } = e.target;
     setCommonData((prev) => ({ ...prev, [name]: value }));
@@ -279,7 +372,7 @@ export default function AddFoodForm() {
 
   // Handle Dynamic Field Change
   const handleDynamicChange = (
-    e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
+    e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>,
   ) => {
     const { name, value } = e.target;
     setDynamicData((prev) => ({ ...prev, [name]: value }));
@@ -287,11 +380,40 @@ export default function AddFoodForm() {
 
   // Auto-Load 3-4 High Quality Preset Photos for active category
   const handleAutoFillCategoryPhotos = () => {
-    const samples = CATEGORY_SAMPLE_PHOTOS[category] || CATEGORY_SAMPLE_PHOTOS.Pizza;
+    const samples =
+      CATEGORY_SAMPLE_PHOTOS[category] || CATEGORY_SAMPLE_PHOTOS.Pizza;
     setImages(samples);
     setActivePreviewIndex(0);
-    setSuccessMsg(`✓ Auto-loaded ${samples.length} high-resolution ${category} photos!`);
+    setSuccessMsg(
+      `✓ Auto-loaded ${samples.length} high-resolution ${category} photos!`,
+    );
     setTimeout(() => setSuccessMsg(""), 3000);
+  };
+
+  // AI photo editing — hand the cover photo to the editor page and navigate there.
+  //
+  // Navigating unmounts this form, so the whole draft is parked in sessionStorage
+  // first and rehydrated by the mount effect above on the way back.
+  const handleAiImageEdit = () => {
+    const coverImage = images[0];
+    if (!coverImage) return;
+
+    saveAddFoodDraft({
+      category,
+      customCategory,
+      commonData,
+      dynamicData,
+      images,
+      imageInputMode,
+      activePreviewIndex,
+    });
+
+    saveAiImageEditHandoff({
+      image: coverImage,
+      foodName: commonData.name.trim() || undefined,
+      category,
+    });
+    router.push("/dashboard/restaurant/ai-image-edit");
   };
 
   // Helper: Read and compress image locally so it NEVER fails
@@ -374,7 +496,9 @@ export default function AddFoodForm() {
       if (json.success && Array.isArray(json.urls) && json.urls.length > 0) {
         setImages((prev) => [...prev, ...json.urls]);
         setActivePreviewIndex(0);
-        setSuccessMsg(`✓ Successfully added ${json.urls.length} photo(s) from your device!`);
+        setSuccessMsg(
+          `✓ Successfully added ${json.urls.length} photo(s) from your device!`,
+        );
         setTimeout(() => setSuccessMsg(""), 3000);
       } else {
         // Fallback: Read & compress locally in client so it NEVER fails
@@ -386,7 +510,9 @@ export default function AddFoodForm() {
         if (fallbackUrls.length > 0) {
           setImages((prev) => [...prev, ...fallbackUrls]);
           setActivePreviewIndex(0);
-          setSuccessMsg(`✓ Successfully added ${fallbackUrls.length} photo(s)!`);
+          setSuccessMsg(
+            `✓ Successfully added ${fallbackUrls.length} photo(s)!`,
+          );
           setTimeout(() => setSuccessMsg(""), 3000);
         } else {
           setErrorMsg("Could not process the selected image files.");
@@ -403,7 +529,9 @@ export default function AddFoodForm() {
         if (fallbackUrls.length > 0) {
           setImages((prev) => [...prev, ...fallbackUrls]);
           setActivePreviewIndex(0);
-          setSuccessMsg(`✓ Successfully added ${fallbackUrls.length} photo(s)!`);
+          setSuccessMsg(
+            `✓ Successfully added ${fallbackUrls.length} photo(s)!`,
+          );
           setTimeout(() => setSuccessMsg(""), 3000);
         } else {
           setErrorMsg("Failed to process images.");
@@ -422,7 +550,7 @@ export default function AddFoodForm() {
     e.preventDefault();
     if (uploading) return;
     const droppedFiles = Array.from(e.dataTransfer.files || []).filter((f) =>
-      f.type.startsWith("image/")
+      f.type.startsWith("image/"),
     );
     if (droppedFiles.length === 0) return;
 
@@ -442,7 +570,10 @@ export default function AddFoodForm() {
   const handleAddUrlImage = () => {
     const url = imageUrlInput.trim();
     if (url) {
-      const urlsToAdd = url.split(",").map((u) => u.trim()).filter(Boolean);
+      const urlsToAdd = url
+        .split(",")
+        .map((u) => u.trim())
+        .filter(Boolean);
       setImages((prev) => [...prev, ...urlsToAdd]);
       setActivePreviewIndex(0);
       setImageUrlInput("");
@@ -501,7 +632,9 @@ export default function AddFoodForm() {
         return (
           <>
             <div className="space-y-1">
-              <label className="text-xs font-bold text-gray-700">Crust Type</label>
+              <label className="text-xs font-bold text-gray-700">
+                Crust Type
+              </label>
               <select
                 name="crustType"
                 required
@@ -511,13 +644,17 @@ export default function AddFoodForm() {
               >
                 <option value="Thin Italian Crust">Thin Italian Crust</option>
                 <option value="Pan Crust">Fluffy Pan Crust</option>
-                <option value="Cheese Stuffed Crust">Cheese Stuffed Crust (+Cheese)</option>
+                <option value="Cheese Stuffed Crust">
+                  Cheese Stuffed Crust (+Cheese)
+                </option>
                 <option value="Chicago Deep Dish">Chicago Deep Dish</option>
               </select>
             </div>
 
             <div className="space-y-1">
-              <label className="text-xs font-bold text-gray-700">Pizza Size (Inches / Slices)</label>
+              <label className="text-xs font-bold text-gray-700">
+                Pizza Size (Inches / Slices)
+              </label>
               <select
                 name="pizzaSize"
                 required
@@ -525,15 +662,25 @@ export default function AddFoodForm() {
                 onChange={handleDynamicChange}
                 className="w-full px-3.5 py-2.5 rounded-xl bg-gray-50 border border-gray-200 text-xs font-semibold focus:bg-white focus:border-[#FF6B35] outline-none"
               >
-                <option value="8 Inch (Personal - 4 Slices)">8 Inch (Personal - 4 Slices)</option>
-                <option value="12 Inch (Medium - 6 Slices)">12 Inch (Medium - 6 Slices)</option>
-                <option value="16 Inch (Large - 8 Slices)">16 Inch (Large - 8 Slices)</option>
-                <option value="20 Inch (Party Feast - 12 Slices)">20 Inch (Party Feast - 12 Slices)</option>
+                <option value="8 Inch (Personal - 4 Slices)">
+                  8 Inch (Personal - 4 Slices)
+                </option>
+                <option value="12 Inch (Medium - 6 Slices)">
+                  12 Inch (Medium - 6 Slices)
+                </option>
+                <option value="16 Inch (Large - 8 Slices)">
+                  16 Inch (Large - 8 Slices)
+                </option>
+                <option value="20 Inch (Party Feast - 12 Slices)">
+                  20 Inch (Party Feast - 12 Slices)
+                </option>
               </select>
             </div>
 
             <div className="space-y-1">
-              <label className="text-xs font-bold text-gray-700">Sauce Base</label>
+              <label className="text-xs font-bold text-gray-700">
+                Sauce Base
+              </label>
               <select
                 name="sauceBase"
                 required
@@ -541,15 +688,23 @@ export default function AddFoodForm() {
                 onChange={handleDynamicChange}
                 className="w-full px-3.5 py-2.5 rounded-xl bg-gray-50 border border-gray-200 text-xs font-semibold focus:bg-white focus:border-[#FF6B35] outline-none"
               >
-                <option value="San Marzano Tomato Marinara">San Marzano Tomato Marinara</option>
+                <option value="San Marzano Tomato Marinara">
+                  San Marzano Tomato Marinara
+                </option>
                 <option value="Spicy BBQ Sauce">Spicy BBQ Sauce</option>
-                <option value="White Garlic Parmesan Cream">White Garlic Parmesan Cream</option>
-                <option value="Basil Pesto Herb Sauce">Basil Pesto Herb Sauce</option>
+                <option value="White Garlic Parmesan Cream">
+                  White Garlic Parmesan Cream
+                </option>
+                <option value="Basil Pesto Herb Sauce">
+                  Basil Pesto Herb Sauce
+                </option>
               </select>
             </div>
 
             <div className="space-y-1">
-              <label className="text-xs font-bold text-gray-700">Cheese & Topping Blend</label>
+              <label className="text-xs font-bold text-gray-700">
+                Cheese & Topping Blend
+              </label>
               <input
                 type="text"
                 name="cheeseType"
@@ -567,7 +722,9 @@ export default function AddFoodForm() {
         return (
           <>
             <div className="space-y-1">
-              <label className="text-xs font-bold text-gray-700">Patty Style & Meat</label>
+              <label className="text-xs font-bold text-gray-700">
+                Patty Style & Meat
+              </label>
               <select
                 name="pattyType"
                 required
@@ -577,15 +734,23 @@ export default function AddFoodForm() {
               >
                 <option value="Double Angus Beef">Double Angus Beef</option>
                 <option value="Single Angus Beef">Single Angus Beef</option>
-                <option value="Crispy Golden Fried Chicken">Crispy Golden Fried Chicken</option>
-                <option value="Grilled Chicken Breast">Grilled Chicken Breast</option>
+                <option value="Crispy Golden Fried Chicken">
+                  Crispy Golden Fried Chicken
+                </option>
+                <option value="Grilled Chicken Breast">
+                  Grilled Chicken Breast
+                </option>
                 <option value="Smash Beef Patty">Smash Beef Patty</option>
-                <option value="Plant-based Veggie Patty">Plant-based Veggie Patty</option>
+                <option value="Plant-based Veggie Patty">
+                  Plant-based Veggie Patty
+                </option>
               </select>
             </div>
 
             <div className="space-y-1">
-              <label className="text-xs font-bold text-gray-700">Patty Count / Serving</label>
+              <label className="text-xs font-bold text-gray-700">
+                Patty Count / Serving
+              </label>
               <select
                 name="pattyCount"
                 required
@@ -593,14 +758,22 @@ export default function AddFoodForm() {
                 onChange={handleDynamicChange}
                 className="w-full px-3.5 py-2.5 rounded-xl bg-gray-50 border border-gray-200 text-xs font-semibold focus:bg-white focus:border-[#FF6B35] outline-none"
               >
-                <option value="1x Single Patty (150g)">1x Single Patty (150g)</option>
-                <option value="2x Double Stack (300g)">2x Double Stack (300g)</option>
-                <option value="3x Triple Monster (450g)">3x Triple Monster (450g)</option>
+                <option value="1x Single Patty (150g)">
+                  1x Single Patty (150g)
+                </option>
+                <option value="2x Double Stack (300g)">
+                  2x Double Stack (300g)
+                </option>
+                <option value="3x Triple Monster (450g)">
+                  3x Triple Monster (450g)
+                </option>
               </select>
             </div>
 
             <div className="space-y-1">
-              <label className="text-xs font-bold text-gray-700">Bun Type</label>
+              <label className="text-xs font-bold text-gray-700">
+                Bun Type
+              </label>
               <select
                 name="bunType"
                 required
@@ -608,7 +781,9 @@ export default function AddFoodForm() {
                 onChange={handleDynamicChange}
                 className="w-full px-3.5 py-2.5 rounded-xl bg-gray-50 border border-gray-200 text-xs font-semibold focus:bg-white focus:border-[#FF6B35] outline-none"
               >
-                <option value="Toasted Golden Brioche Bun">Toasted Golden Brioche Bun</option>
+                <option value="Toasted Golden Brioche Bun">
+                  Toasted Golden Brioche Bun
+                </option>
                 <option value="Sesame Seed Bun">Sesame Seed Bun</option>
                 <option value="Soft Potato Bun">Soft Potato Bun</option>
                 <option value="Gluten Free Bun">Gluten Free Bun</option>
@@ -616,7 +791,9 @@ export default function AddFoodForm() {
             </div>
 
             <div className="space-y-1">
-              <label className="text-xs font-bold text-gray-700">Combo & Add-ons</label>
+              <label className="text-xs font-bold text-gray-700">
+                Combo & Add-ons
+              </label>
               <input
                 type="text"
                 name="comboOptions"
@@ -634,7 +811,9 @@ export default function AddFoodForm() {
         return (
           <>
             <div className="space-y-1">
-              <label className="text-xs font-bold text-gray-700">Meat & Biryani Recipe</label>
+              <label className="text-xs font-bold text-gray-700">
+                Meat & Biryani Recipe
+              </label>
               <select
                 name="meatType"
                 required
@@ -642,15 +821,25 @@ export default function AddFoodForm() {
                 onChange={handleDynamicChange}
                 className="w-full px-3.5 py-2.5 rounded-xl bg-gray-50 border border-gray-200 text-xs font-semibold focus:bg-white focus:border-[#FF6B35] outline-none"
               >
-                <option value="Mutton Kacchi (Dum Cooked)">Traditional Mutton Kacchi (Dum Cooked)</option>
-                <option value="Chicken Roast Morog Polao">Shahi Chicken Roast & Morog Polao</option>
-                <option value="Old Dhaka Beef Tehari">Old Dhaka Mustard Beef Tehari</option>
-                <option value="Hydrabadi Dum Biryani">Hydrabadi Dum Biryani</option>
+                <option value="Mutton Kacchi (Dum Cooked)">
+                  Traditional Mutton Kacchi (Dum Cooked)
+                </option>
+                <option value="Chicken Roast Morog Polao">
+                  Shahi Chicken Roast & Morog Polao
+                </option>
+                <option value="Old Dhaka Beef Tehari">
+                  Old Dhaka Mustard Beef Tehari
+                </option>
+                <option value="Hydrabadi Dum Biryani">
+                  Hydrabadi Dum Biryani
+                </option>
               </select>
             </div>
 
             <div className="space-y-1">
-              <label className="text-xs font-bold text-gray-700">Portion / Platter Size</label>
+              <label className="text-xs font-bold text-gray-700">
+                Portion / Platter Size
+              </label>
               <select
                 name="portionSize"
                 required
@@ -658,14 +847,22 @@ export default function AddFoodForm() {
                 onChange={handleDynamicChange}
                 className="w-full px-3.5 py-2.5 rounded-xl bg-gray-50 border border-gray-200 text-xs font-semibold focus:bg-white focus:border-[#FF6B35] outline-none"
               >
-                <option value="Single Serving (1:1) - 1 Person">Single Serving (1:1) - 1 Person</option>
-                <option value="Duo Feast (1:2) - 2 Persons">Duo Feast (1:2) - 2 Persons</option>
-                <option value="Family Feast Tray (1:4) - 4-5 Persons">Family Feast Tray (1:4) - 4-5 Persons</option>
+                <option value="Single Serving (1:1) - 1 Person">
+                  Single Serving (1:1) - 1 Person
+                </option>
+                <option value="Duo Feast (1:2) - 2 Persons">
+                  Duo Feast (1:2) - 2 Persons
+                </option>
+                <option value="Family Feast Tray (1:4) - 4-5 Persons">
+                  Family Feast Tray (1:4) - 4-5 Persons
+                </option>
               </select>
             </div>
 
             <div className="space-y-1">
-              <label className="text-xs font-bold text-gray-700">Rice Type</label>
+              <label className="text-xs font-bold text-gray-700">
+                Rice Type
+              </label>
               <select
                 name="riceType"
                 required
@@ -673,14 +870,22 @@ export default function AddFoodForm() {
                 onChange={handleDynamicChange}
                 className="w-full px-3.5 py-2.5 rounded-xl bg-gray-50 border border-gray-200 text-xs font-semibold focus:bg-white focus:border-[#FF6B35] outline-none"
               >
-                <option value="Shahi Basmati Long Grain">Shahi Basmati Long Grain</option>
-                <option value="Aromatic Chinigura Rice">Aromatic Chinigura Rice</option>
-                <option value="Kalijira Fragrant Rice">Kalijira Fragrant Rice</option>
+                <option value="Shahi Basmati Long Grain">
+                  Shahi Basmati Long Grain
+                </option>
+                <option value="Aromatic Chinigura Rice">
+                  Aromatic Chinigura Rice
+                </option>
+                <option value="Kalijira Fragrant Rice">
+                  Kalijira Fragrant Rice
+                </option>
               </select>
             </div>
 
             <div className="space-y-1">
-              <label className="text-xs font-bold text-gray-700">Complimentary Sides</label>
+              <label className="text-xs font-bold text-gray-700">
+                Complimentary Sides
+              </label>
               <input
                 type="text"
                 name="complimentarySides"
@@ -698,7 +903,9 @@ export default function AddFoodForm() {
         return (
           <>
             <div className="space-y-1">
-              <label className="text-xs font-bold text-gray-700">Pasta Shape</label>
+              <label className="text-xs font-bold text-gray-700">
+                Pasta Shape
+              </label>
               <select
                 name="pastaShape"
                 required
@@ -714,7 +921,9 @@ export default function AddFoodForm() {
             </div>
 
             <div className="space-y-1">
-              <label className="text-xs font-bold text-gray-700">Sauce Choice</label>
+              <label className="text-xs font-bold text-gray-700">
+                Sauce Choice
+              </label>
               <select
                 name="sauceType"
                 required
@@ -722,15 +931,25 @@ export default function AddFoodForm() {
                 onChange={handleDynamicChange}
                 className="w-full px-3.5 py-2.5 rounded-xl bg-gray-50 border border-gray-200 text-xs font-semibold focus:bg-white focus:border-[#FF6B35] outline-none"
               >
-                <option value="Creamy Garlic Parmesan Alfredo">Creamy Garlic Parmesan Alfredo</option>
-                <option value="Spicy Tomato Arrabbiata">Spicy Tomato Arrabbiata</option>
-                <option value="Pink Rosa Sauce (Cream + Tomato)">Pink Rosa Sauce (Cream + Tomato)</option>
-                <option value="Basil Pine Nut Pesto">Basil Pine Nut Pesto</option>
+                <option value="Creamy Garlic Parmesan Alfredo">
+                  Creamy Garlic Parmesan Alfredo
+                </option>
+                <option value="Spicy Tomato Arrabbiata">
+                  Spicy Tomato Arrabbiata
+                </option>
+                <option value="Pink Rosa Sauce (Cream + Tomato)">
+                  Pink Rosa Sauce (Cream + Tomato)
+                </option>
+                <option value="Basil Pine Nut Pesto">
+                  Basil Pine Nut Pesto
+                </option>
               </select>
             </div>
 
             <div className="space-y-1">
-              <label className="text-xs font-bold text-gray-700">Protein Choice</label>
+              <label className="text-xs font-bold text-gray-700">
+                Protein Choice
+              </label>
               <input
                 type="text"
                 name="protein"
@@ -743,7 +962,9 @@ export default function AddFoodForm() {
             </div>
 
             <div className="space-y-1">
-              <label className="text-xs font-bold text-gray-700">Garlic Bread Included</label>
+              <label className="text-xs font-bold text-gray-700">
+                Garlic Bread Included
+              </label>
               <select
                 name="garlicBreadIncluded"
                 required
@@ -751,8 +972,12 @@ export default function AddFoodForm() {
                 onChange={handleDynamicChange}
                 className="w-full px-3.5 py-2.5 rounded-xl bg-gray-50 border border-gray-200 text-xs font-semibold focus:bg-white focus:border-[#FF6B35] outline-none"
               >
-                <option value="Yes (2 Slices Cheesy Garlic Bread)">Yes (2 Slices Cheesy Garlic Bread)</option>
-                <option value="No (Pasta Bowl Only)">No (Pasta Bowl Only)</option>
+                <option value="Yes (2 Slices Cheesy Garlic Bread)">
+                  Yes (2 Slices Cheesy Garlic Bread)
+                </option>
+                <option value="No (Pasta Bowl Only)">
+                  No (Pasta Bowl Only)
+                </option>
               </select>
             </div>
           </>
@@ -762,7 +987,9 @@ export default function AddFoodForm() {
         return (
           <>
             <div className="space-y-1">
-              <label className="text-xs font-bold text-gray-700">Cut & Meat Type</label>
+              <label className="text-xs font-bold text-gray-700">
+                Cut & Meat Type
+              </label>
               <select
                 name="cutType"
                 required
@@ -770,15 +997,25 @@ export default function AddFoodForm() {
                 onChange={handleDynamicChange}
                 className="w-full px-3.5 py-2.5 rounded-xl bg-gray-50 border border-gray-200 text-xs font-semibold focus:bg-white focus:border-[#FF6B35] outline-none"
               >
-                <option value="Charcoal Chicken Quarter (Leg/Breast)">Charcoal Chicken Quarter (Leg/Breast)</option>
-                <option value="Boneless Chicken Tikka Boti">Boneless Chicken Tikka Boti</option>
-                <option value="Smoked Beef Short Ribs">Smoked Beef Short Ribs</option>
-                <option value="Mutton Seekh Kebab Skewers">Mutton Seekh Kebab Skewers</option>
+                <option value="Charcoal Chicken Quarter (Leg/Breast)">
+                  Charcoal Chicken Quarter (Leg/Breast)
+                </option>
+                <option value="Boneless Chicken Tikka Boti">
+                  Boneless Chicken Tikka Boti
+                </option>
+                <option value="Smoked Beef Short Ribs">
+                  Smoked Beef Short Ribs
+                </option>
+                <option value="Mutton Seekh Kebab Skewers">
+                  Mutton Seekh Kebab Skewers
+                </option>
               </select>
             </div>
 
             <div className="space-y-1">
-              <label className="text-xs font-bold text-gray-700">Marinade & Spice Level</label>
+              <label className="text-xs font-bold text-gray-700">
+                Marinade & Spice Level
+              </label>
               <select
                 name="spiceLevel"
                 required
@@ -786,15 +1023,25 @@ export default function AddFoodForm() {
                 onChange={handleDynamicChange}
                 className="w-full px-3.5 py-2.5 rounded-xl bg-gray-50 border border-gray-200 text-xs font-semibold focus:bg-white focus:border-[#FF6B35] outline-none"
               >
-                <option value="Peri-Peri Spicy Hot 🔥">Peri-Peri Spicy Hot 🔥</option>
-                <option value="Smoky Medium BBQ Glaze">Smoky Medium BBQ Glaze</option>
-                <option value="Creamy Reshmi Malai (Mild)">Creamy Reshmi Malai (Mild)</option>
-                <option value="Naga Charcoal Fire 🔥🔥">Naga Charcoal Fire 🔥🔥</option>
+                <option value="Peri-Peri Spicy Hot 🔥">
+                  Peri-Peri Spicy Hot 🔥
+                </option>
+                <option value="Smoky Medium BBQ Glaze">
+                  Smoky Medium BBQ Glaze
+                </option>
+                <option value="Creamy Reshmi Malai (Mild)">
+                  Creamy Reshmi Malai (Mild)
+                </option>
+                <option value="Naga Charcoal Fire 🔥🔥">
+                  Naga Charcoal Fire 🔥🔥
+                </option>
               </select>
             </div>
 
             <div className="space-y-1">
-              <label className="text-xs font-bold text-gray-700">Serving Side</label>
+              <label className="text-xs font-bold text-gray-700">
+                Serving Side
+              </label>
               <input
                 type="text"
                 name="servingSide"
@@ -812,7 +1059,9 @@ export default function AddFoodForm() {
         return (
           <>
             <div className="space-y-1">
-              <label className="text-xs font-bold text-gray-700">Serving Temperature & Style</label>
+              <label className="text-xs font-bold text-gray-700">
+                Serving Temperature & Style
+              </label>
               <select
                 name="servingTemp"
                 required
@@ -820,14 +1069,22 @@ export default function AddFoodForm() {
                 onChange={handleDynamicChange}
                 className="w-full px-3.5 py-2.5 rounded-xl bg-gray-50 border border-gray-200 text-xs font-semibold focus:bg-white focus:border-[#FF6B35] outline-none"
               >
-                <option value="Warm & Gooey with Cold Gelato">Warm & Gooey with Cold Gelato</option>
-                <option value="Chilled & Creamy">Chilled & Creamy (Refrigerator)</option>
-                <option value="Freshly Baked Room Temp">Freshly Baked Room Temp</option>
+                <option value="Warm & Gooey with Cold Gelato">
+                  Warm & Gooey with Cold Gelato
+                </option>
+                <option value="Chilled & Creamy">
+                  Chilled & Creamy (Refrigerator)
+                </option>
+                <option value="Freshly Baked Room Temp">
+                  Freshly Baked Room Temp
+                </option>
               </select>
             </div>
 
             <div className="space-y-1">
-              <label className="text-xs font-bold text-gray-700">Gelato / Ice Cream Scoop</label>
+              <label className="text-xs font-bold text-gray-700">
+                Gelato / Ice Cream Scoop
+              </label>
               <select
                 name="iceCreamScoop"
                 required
@@ -835,9 +1092,15 @@ export default function AddFoodForm() {
                 onChange={handleDynamicChange}
                 className="w-full px-3.5 py-2.5 rounded-xl bg-gray-50 border border-gray-200 text-xs font-semibold focus:bg-white focus:border-[#FF6B35] outline-none"
               >
-                <option value="Vanilla Bean Gelato Scoop Included">Vanilla Bean Gelato Scoop Included</option>
-                <option value="Chocolate Fudge Scoop Included">Chocolate Fudge Scoop Included</option>
-                <option value="No Ice Cream (Pastry/Cake Only)">No Ice Cream (Pastry/Cake Only)</option>
+                <option value="Vanilla Bean Gelato Scoop Included">
+                  Vanilla Bean Gelato Scoop Included
+                </option>
+                <option value="Chocolate Fudge Scoop Included">
+                  Chocolate Fudge Scoop Included
+                </option>
+                <option value="No Ice Cream (Pastry/Cake Only)">
+                  No Ice Cream (Pastry/Cake Only)
+                </option>
               </select>
             </div>
           </>
@@ -847,7 +1110,9 @@ export default function AddFoodForm() {
         return (
           <>
             <div className="space-y-1">
-              <label className="text-xs font-bold text-gray-700">Cup Size / Volume</label>
+              <label className="text-xs font-bold text-gray-700">
+                Cup Size / Volume
+              </label>
               <select
                 name="cupSize"
                 required
@@ -857,12 +1122,16 @@ export default function AddFoodForm() {
               >
                 <option value="Regular Cup (350ml)">Regular Cup (350ml)</option>
                 <option value="Large Cup (500ml)">Large Cup (500ml)</option>
-                <option value="Sharing Pitcher (1.5L)">Sharing Pitcher (1.5L)</option>
+                <option value="Sharing Pitcher (1.5L)">
+                  Sharing Pitcher (1.5L)
+                </option>
               </select>
             </div>
 
             <div className="space-y-1">
-              <label className="text-xs font-bold text-gray-700">Ice & Sweetness Level</label>
+              <label className="text-xs font-bold text-gray-700">
+                Ice & Sweetness Level
+              </label>
               <input
                 type="text"
                 name="iceLevel"
@@ -880,7 +1149,9 @@ export default function AddFoodForm() {
         return (
           <>
             <div className="space-y-1">
-              <label className="text-xs font-bold text-gray-700">Portion / Serving Size</label>
+              <label className="text-xs font-bold text-gray-700">
+                Portion / Serving Size
+              </label>
               <input
                 type="text"
                 name="portionSize"
@@ -892,7 +1163,9 @@ export default function AddFoodForm() {
             </div>
 
             <div className="space-y-1">
-              <label className="text-xs font-bold text-gray-700">Preparation / Flavor Notes</label>
+              <label className="text-xs font-bold text-gray-700">
+                Preparation / Flavor Notes
+              </label>
               <input
                 type="text"
                 name="prepStyle"
@@ -904,7 +1177,9 @@ export default function AddFoodForm() {
             </div>
 
             <div className="space-y-1 sm:col-span-2">
-              <label className="text-xs font-bold text-gray-700">Special Serving Options</label>
+              <label className="text-xs font-bold text-gray-700">
+                Special Serving Options
+              </label>
               <input
                 type="text"
                 name="specialNotes"
@@ -946,6 +1221,7 @@ export default function AddFoodForm() {
     setImageUrlInput("");
     setErrorMsg("");
     setSuccessMsg("");
+    clearAddFoodDraft();
   };
 
   // Submit Handler
@@ -954,9 +1230,8 @@ export default function AddFoodForm() {
     setErrorMsg("");
     setSuccessMsg("");
 
-    const effectiveCategory = (
-      category === "Custom" ? customCategory.trim() : category.trim()
-    );
+    const effectiveCategory =
+      category === "Custom" ? customCategory.trim() : category.trim();
 
     if (!effectiveCategory) {
       setErrorMsg("Please select or enter a Food Category!");
@@ -980,7 +1255,9 @@ export default function AddFoodForm() {
 
     if (
       discountPriceNum !== undefined &&
-      (!Number.isFinite(discountPriceNum) || discountPriceNum >= priceNum || discountPriceNum < 0)
+      (!Number.isFinite(discountPriceNum) ||
+        discountPriceNum >= priceNum ||
+        discountPriceNum < 0)
     ) {
       setErrorMsg("Discount price must be less than the regular price.");
       return;
@@ -988,7 +1265,9 @@ export default function AddFoodForm() {
 
     // Require at least 1 image
     if (images.length === 0) {
-      setErrorMsg("Please upload or add at least 1 food photo to the gallery before submitting.");
+      setErrorMsg(
+        "Please upload or add at least 1 food photo to the gallery before submitting.",
+      );
       return;
     }
 
@@ -997,15 +1276,23 @@ export default function AddFoodForm() {
     try {
       const restaurantId = restaurant?._id || restaurant?.id || "";
       if (!restaurantId) {
-        throw new Error("No active restaurant profile found. Please create your restaurant first.");
+        throw new Error(
+          "No active restaurant profile found. Please create your restaurant first.",
+        );
       }
 
       const tagsArray = commonData.tags
-        ? commonData.tags.split(",").map((t) => t.trim()).filter(Boolean)
+        ? commonData.tags
+            .split(",")
+            .map((t) => t.trim())
+            .filter(Boolean)
         : [effectiveCategory];
 
       const ingredientsArray = commonData.ingredients
-        ? commonData.ingredients.split(",").map((i) => i.trim()).filter(Boolean)
+        ? commonData.ingredients
+            .split(",")
+            .map((i) => i.trim())
+            .filter(Boolean)
         : [];
 
       const payload = {
@@ -1034,14 +1321,18 @@ export default function AddFoodForm() {
       const res = await createFoodItem(payload);
 
       if (res.success && res.data) {
-        setSuccessMsg(`🎉 "${res.data.name}" has been published to your menu successfully with ${images.length} photos!`);
+        setSuccessMsg(
+          `🎉 "${res.data.name}" has been published to your menu successfully with ${images.length} photos!`,
+        );
         handleReset();
         setTimeout(() => {
           router.push("/dashboard/restaurant/menu");
           router.refresh();
         }, 1200);
       } else {
-        setErrorMsg(res.message || "Failed to publish food item. Please try again.");
+        setErrorMsg(
+          res.message || "Failed to publish food item. Please try again.",
+        );
       }
     } catch (err: any) {
       setErrorMsg(err?.message || "An unexpected error occurred.");
@@ -1064,13 +1355,18 @@ export default function AddFoodForm() {
           <div className="w-18 h-18 rounded-3xl bg-orange-50 border border-orange-100 flex items-center justify-center text-[#FF6B35]">
             <Store className="w-9 h-9" />
           </div>
-          <h2 className="text-2xl font-black text-gray-900">No Restaurant Profile Found</h2>
+          <h2 className="text-2xl font-black text-gray-900">
+            No Restaurant Profile Found
+          </h2>
           <p className="text-sm text-gray-500 max-w-md">
-            You need to create your restaurant profile before adding food items to your menu.
+            You need to create your restaurant profile before adding food items
+            to your menu.
           </p>
           <button
             type="button"
-            onClick={() => router.push("/dashboard/restaurant/create-restaurant")}
+            onClick={() =>
+              router.push("/dashboard/restaurant/create-restaurant")
+            }
             className="px-7 py-3.5 rounded-2xl bg-[#FF6B35] text-white text-sm font-bold shadow-lg shadow-orange-500/25 hover:bg-[#e85b27] transition cursor-pointer"
           >
             Create Restaurant Profile
@@ -1082,7 +1378,6 @@ export default function AddFoodForm() {
 
   return (
     <div className="w-full max-w-7xl mx-auto pb-16 space-y-8">
-
       {/* 🌟 HERO BANNER */}
       <div className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-orange-600 via-[#FF6B35] to-amber-500 text-white p-7 sm:p-9 shadow-xl">
         <div className="relative z-10 space-y-2">
@@ -1094,7 +1389,8 @@ export default function AddFoodForm() {
             Add New Dish to {restaurant.restaurantName}
           </h1>
           <p className="text-orange-100 text-xs sm:text-sm max-w-2xl">
-            Choose a food category to dynamically switch recipe specifications, upload multiple gallery photos, and preview your live customer card.
+            Choose a food category to dynamically switch recipe specifications,
+            upload multiple gallery photos, and preview your live customer card.
           </p>
         </div>
       </div>
@@ -1116,14 +1412,11 @@ export default function AddFoodForm() {
 
       {/* MAIN FORM */}
       <form onSubmit={handleSubmit} className="space-y-8">
-
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-start">
-
           {/* ======================================================= */}
           {/* 👈 LEFT COLUMN: GENERAL FOOD INFORMATION                */}
           {/* ======================================================= */}
           <div className="bg-white rounded-3xl border border-gray-200/90 shadow-sm p-6 sm:p-8 space-y-5">
-
             <div className="flex items-center justify-between border-b border-gray-100 pb-3">
               <div className="flex items-center gap-2.5 text-sm font-black text-gray-900">
                 <UtensilsCrossed className="w-4 h-4 text-[#FF6B35]" />
@@ -1151,8 +1444,12 @@ export default function AddFoodForm() {
             {/* Category Selector */}
             <div className="space-y-2">
               <label className="text-xs font-bold text-gray-700 uppercase tracking-wider flex items-center justify-between">
-                <span>Food Category <span className="text-rose-500">*</span></span>
-                <span className="text-[10px] text-[#FF6B35] font-bold">Adapts specifications dynamically</span>
+                <span>
+                  Food Category <span className="text-rose-500">*</span>
+                </span>
+                <span className="text-[10px] text-[#FF6B35] font-bold">
+                  Adapts specifications dynamically
+                </span>
               </label>
               <select
                 name="category"
@@ -1163,27 +1460,27 @@ export default function AddFoodForm() {
               >
                 {globalCategories.length > 0
                   ? globalCategories.map((cat) => (
-                    <option key={cat._id} value={cat.name}>
-                      {cat.emoji || "🏷️"} {cat.name}
-                    </option>
-                  ))
+                      <option key={cat._id} value={cat.name}>
+                        {cat.emoji || "🏷️"} {cat.name}
+                      </option>
+                    ))
                   : [
-                    { name: "Pizza", emoji: "🍕" },
-                    { name: "Burgers", emoji: "🍔" },
-                    { name: "Biryani", emoji: "🍛" },
-                    { name: "Pasta", emoji: "🍝" },
-                    { name: "BBQ & Grill", emoji: "🍖" },
-                    { name: "Desserts", emoji: "🍰" },
-                    { name: "Drinks", emoji: "🥤" },
-                    { name: "Sushi", emoji: "🍣" },
-                    { name: "Chinese", emoji: "🍲" },
-                    { name: "Thai", emoji: "🌿" },
-                    { name: "Healthy", emoji: "🥗" },
-                  ].map((cat) => (
-                    <option key={cat.name} value={cat.name}>
-                      {cat.emoji} {cat.name}
-                    </option>
-                  ))}
+                      { name: "Pizza", emoji: "🍕" },
+                      { name: "Burgers", emoji: "🍔" },
+                      { name: "Biryani", emoji: "🍛" },
+                      { name: "Pasta", emoji: "🍝" },
+                      { name: "BBQ & Grill", emoji: "🍖" },
+                      { name: "Desserts", emoji: "🍰" },
+                      { name: "Drinks", emoji: "🥤" },
+                      { name: "Sushi", emoji: "🍣" },
+                      { name: "Chinese", emoji: "🍲" },
+                      { name: "Thai", emoji: "🌿" },
+                      { name: "Healthy", emoji: "🥗" },
+                    ].map((cat) => (
+                      <option key={cat.name} value={cat.name}>
+                        {cat.emoji} {cat.name}
+                      </option>
+                    ))}
                 <option value="Custom">✨ Add Custom / New Category...</option>
               </select>
 
@@ -1191,7 +1488,8 @@ export default function AddFoodForm() {
               {category === "Custom" && (
                 <div className="mt-2.5 space-y-1">
                   <label className="text-xs font-bold text-[#FF6B35] uppercase tracking-wider">
-                    Enter New Category Name <span className="text-rose-500">*</span>
+                    Enter New Category Name{" "}
+                    <span className="text-rose-500">*</span>
                   </label>
                   <input
                     type="text"
@@ -1232,7 +1530,9 @@ export default function AddFoodForm() {
               <div className="space-y-1">
                 <label className="text-xs font-bold text-gray-700 uppercase tracking-wider flex items-center justify-between">
                   <span>Discount Price</span>
-                  <span className="text-[10px] text-orange-500 font-bold">Offer</span>
+                  <span className="text-[10px] text-orange-500 font-bold">
+                    Offer
+                  </span>
                 </label>
                 <div className="relative">
                   <Percent className="w-4 h-4 text-gray-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
@@ -1250,24 +1550,92 @@ export default function AddFoodForm() {
               </div>
             </div>
 
+            {/* 💰 REQUIREMENT 2: "ADD FOOD" LIVE PROFIT CALCULATOR */}
+            {(() => {
+              const rawPrice = Number(
+                commonData.discountPrice || commonData.price || 0,
+              );
+              const priceNum = Number.isNaN(rawPrice) ? 0 : rawPrice;
+              const commissionVal =
+                Math.round(priceNum * (commissionPercentage / 100) * 100) / 100;
+              const netPayout = Math.max(
+                0,
+                Math.round((priceNum - commissionVal) * 100) / 100,
+              );
+
+              return (
+                <div className="p-4 rounded-2xl bg-gradient-to-br from-emerald-50/90 via-teal-50/50 to-emerald-50/90 border border-emerald-200/80 space-y-2.5 shadow-xs">
+                  <div className="flex items-center justify-between border-b border-emerald-200/60 pb-2">
+                    <div className="flex items-center gap-2 text-xs font-black text-emerald-950">
+                      <Calculator className="w-4 h-4 text-emerald-600" />
+                      <span>Live Profit & Settlement Calculator</span>
+                    </div>
+                    <span className="text-[10px] font-black bg-emerald-600 text-white px-2 py-0.5 rounded-full">
+                      {commissionPercentage}% Platform Commission
+                    </span>
+                  </div>
+
+                  <div className="space-y-1.5 text-xs font-semibold text-gray-700">
+                    <div className="flex items-center justify-between">
+                      <span className="text-gray-600">
+                        Food Price (Selling Price):
+                      </span>
+                      <span className="font-extrabold text-gray-900">
+                        ৳ {priceNum.toFixed(2)}
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between text-rose-600">
+                      <span>
+                        Platform Commission ({commissionPercentage}%):
+                      </span>
+                      <span className="font-extrabold">
+                        -৳ {commissionVal.toFixed(2)}
+                      </span>
+                    </div>
+                    <div className="pt-2 border-t border-emerald-200/80 flex items-center justify-between text-sm">
+                      <span className="font-black text-emerald-950">
+                        Your Net Payout (Net Payout):
+                      </span>
+                      <span className="font-black text-emerald-600 text-base">
+                        ৳ {netPayout.toFixed(2)}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              );
+            })()}
+
             {/* ⭐ AVAILABILITY / STOCK STATUS FIELD */}
             <div className="space-y-1.5 pt-1">
               <label className="text-xs font-bold text-gray-700 uppercase tracking-wider flex items-center justify-between">
-                <span>Food Availability / Stock Status <span className="text-rose-500">*</span></span>
-                <span className={`text-[10px] font-black px-2 py-0.5 rounded-md ${commonData.status === "available" ? "bg-emerald-100 text-emerald-800" : "bg-rose-100 text-rose-800"
-                  }`}>
-                  {commonData.status === "available" ? "● In Stock" : "● Out of Stock"}
+                <span>
+                  Food Availability / Stock Status{" "}
+                  <span className="text-rose-500">*</span>
+                </span>
+                <span
+                  className={`text-[10px] font-black px-2 py-0.5 rounded-md ${
+                    commonData.status === "available"
+                      ? "bg-emerald-100 text-emerald-800"
+                      : "bg-rose-100 text-rose-800"
+                  }`}
+                >
+                  {commonData.status === "available"
+                    ? "● In Stock"
+                    : "● Out of Stock"}
                 </span>
               </label>
 
               <div className="grid grid-cols-2 gap-3 p-1.5 bg-gray-100 rounded-2xl border border-gray-200">
                 <button
                   type="button"
-                  onClick={() => setCommonData((p) => ({ ...p, status: "available" }))}
-                  className={`py-3 px-4 rounded-xl text-xs font-bold transition flex items-center justify-center gap-2 cursor-pointer ${commonData.status === "available"
+                  onClick={() =>
+                    setCommonData((p) => ({ ...p, status: "available" }))
+                  }
+                  className={`py-3 px-4 rounded-xl text-xs font-bold transition flex items-center justify-center gap-2 cursor-pointer ${
+                    commonData.status === "available"
                       ? "bg-emerald-500 text-white shadow-md shadow-emerald-500/20 scale-[1.02]"
                       : "text-gray-600 hover:text-gray-900 bg-transparent"
-                    }`}
+                  }`}
                 >
                   <CheckCircle className="w-4 h-4" />
                   <span>Available (In Stock)</span>
@@ -1275,11 +1643,14 @@ export default function AddFoodForm() {
 
                 <button
                   type="button"
-                  onClick={() => setCommonData((p) => ({ ...p, status: "unavailable" }))}
-                  className={`py-3 px-4 rounded-xl text-xs font-bold transition flex items-center justify-center gap-2 cursor-pointer ${commonData.status === "unavailable"
+                  onClick={() =>
+                    setCommonData((p) => ({ ...p, status: "unavailable" }))
+                  }
+                  className={`py-3 px-4 rounded-xl text-xs font-bold transition flex items-center justify-center gap-2 cursor-pointer ${
+                    commonData.status === "unavailable"
                       ? "bg-rose-500 text-white shadow-md shadow-rose-500/20 scale-[1.02]"
                       : "text-gray-600 hover:text-gray-900 bg-transparent"
-                    }`}
+                  }`}
                 >
                   <XCircle className="w-4 h-4" />
                   <span>Unavailable (Out of Stock)</span>
@@ -1337,11 +1708,17 @@ export default function AddFoodForm() {
             <div className="grid grid-cols-2 gap-3 pt-1">
               <button
                 type="button"
-                onClick={() => setCommonData((p) => ({ ...p, isVegetarian: !p.isVegetarian }))}
-                className={`flex items-center justify-center gap-2 p-3 rounded-2xl border text-xs font-bold transition cursor-pointer ${commonData.isVegetarian
+                onClick={() =>
+                  setCommonData((p) => ({
+                    ...p,
+                    isVegetarian: !p.isVegetarian,
+                  }))
+                }
+                className={`flex items-center justify-center gap-2 p-3 rounded-2xl border text-xs font-bold transition cursor-pointer ${
+                  commonData.isVegetarian
                     ? "bg-emerald-50 border-emerald-300 text-emerald-700 shadow-xs"
                     : "bg-gray-50 border-gray-200 text-gray-600 hover:bg-gray-100"
-                  }`}
+                }`}
               >
                 <Leaf className="w-4 h-4" />
                 <span>Vegetarian</span>
@@ -1349,27 +1726,27 @@ export default function AddFoodForm() {
 
               <button
                 type="button"
-                onClick={() => setCommonData((p) => ({ ...p, isSpicy: !p.isSpicy }))}
-                className={`flex items-center justify-center gap-2 p-3 rounded-2xl border text-xs font-bold transition cursor-pointer ${commonData.isSpicy
+                onClick={() =>
+                  setCommonData((p) => ({ ...p, isSpicy: !p.isSpicy }))
+                }
+                className={`flex items-center justify-center gap-2 p-3 rounded-2xl border text-xs font-bold transition cursor-pointer ${
+                  commonData.isSpicy
                     ? "bg-rose-50 border-rose-300 text-rose-700 shadow-xs"
                     : "bg-gray-50 border-gray-200 text-gray-600 hover:bg-gray-100"
-                  }`}
+                }`}
               >
                 <Flame className="w-4 h-4" />
                 <span>Spicy Hot 🔥</span>
               </button>
             </div>
-
           </div>
 
           {/* ======================================================= */}
           {/* 👉 RIGHT COLUMN: DYNAMIC SPECS & MULTI-IMAGE GALLERY    */}
           {/* ======================================================= */}
           <div className="space-y-6">
-
             {/* 1. DYNAMIC CATEGORY SPECIFICATIONS CARD */}
             <div className="bg-white rounded-3xl border border-gray-200/90 shadow-sm p-6 sm:p-8 space-y-5">
-
               <div className="flex items-center justify-between border-b border-gray-100 pb-3">
                 <div className="flex items-center gap-2 text-sm font-black text-gray-900">
                   {getCategoryIcon()}
@@ -1384,12 +1761,10 @@ export default function AddFoodForm() {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 {renderDynamicFields()}
               </div>
-
             </div>
 
             {/* 2. MULTIPLE PHOTO GALLERY UPLOADER CARD (3-4 PHOTOS) */}
             <div className="bg-white rounded-3xl border border-gray-200/90 shadow-sm p-6 sm:p-8 space-y-4">
-
               <div className="flex items-center justify-between border-b border-gray-100 pb-3">
                 <div className="flex items-center gap-2 text-sm font-black text-gray-900">
                   <ImageIcon className="w-4 h-4 text-[#FF6B35]" />
@@ -1400,16 +1775,22 @@ export default function AddFoodForm() {
                   <button
                     type="button"
                     onClick={() => setImageInputMode("upload")}
-                    className={`px-2.5 py-1 rounded-lg transition cursor-pointer ${imageInputMode === "upload" ? "bg-white text-[#FF6B35] shadow-xs" : "text-gray-500"
-                      }`}
+                    className={`px-2.5 py-1 rounded-lg transition cursor-pointer ${
+                      imageInputMode === "upload"
+                        ? "bg-white text-[#FF6B35] shadow-xs"
+                        : "text-gray-500"
+                    }`}
                   >
                     Upload Files
                   </button>
                   <button
                     type="button"
                     onClick={() => setImageInputMode("url")}
-                    className={`px-2.5 py-1 rounded-lg transition cursor-pointer ${imageInputMode === "url" ? "bg-white text-[#FF6B35] shadow-xs" : "text-gray-500"
-                      }`}
+                    className={`px-2.5 py-1 rounded-lg transition cursor-pointer ${
+                      imageInputMode === "url"
+                        ? "bg-white text-[#FF6B35] shadow-xs"
+                        : "text-gray-500"
+                    }`}
                   >
                     Paste URL
                   </button>
@@ -1432,7 +1813,10 @@ export default function AddFoodForm() {
                     role="button"
                     tabIndex={0}
                     onClick={() => fileInputRef.current?.click()}
-                    onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && fileInputRef.current?.click()}
+                    onKeyDown={(e) =>
+                      (e.key === "Enter" || e.key === " ") &&
+                      fileInputRef.current?.click()
+                    }
                     onDragOver={(e) => e.preventDefault()}
                     onDrop={handleDropFiles}
                     className="w-full py-6 px-4 rounded-2xl border-2 border-dashed border-gray-300 hover:border-[#FF6B35] hover:bg-orange-50/30 bg-gray-50/70 transition flex flex-col items-center justify-center gap-2 cursor-pointer group select-none"
@@ -1443,7 +1827,9 @@ export default function AddFoodForm() {
                         <span className="text-xs font-bold text-gray-800">
                           {uploadProgress || "Uploading photos..."}
                         </span>
-                        <span className="text-[10px] text-gray-400">Please wait a moment</span>
+                        <span className="text-[10px] text-gray-400">
+                          Please wait a moment
+                        </span>
                       </div>
                     ) : (
                       <>
@@ -1455,7 +1841,8 @@ export default function AddFoodForm() {
                             Click to select 3, 4, or more Photos (Multi-select)
                           </span>
                           <span className="text-[11px] text-gray-400">
-                            Or drag & drop photos here from your computer / phone gallery
+                            Or drag & drop photos here from your computer /
+                            phone gallery
                           </span>
                         </div>
                       </>
@@ -1471,6 +1858,13 @@ export default function AddFoodForm() {
                     <Zap className="w-3.5 h-3.5 fill-[#FF6B35]" />
                     <span>Auto-load 4 High-Res {category} Photos (Demo)</span>
                   </button>
+
+                  {/* AI Image Editing Entry Point */}
+                  <RestaurantAiButton
+                    onClick={handleAiImageEdit}
+                    size="md"
+                    disabled={images.length === 0}
+                  />
                 </div>
               ) : (
                 <div className="space-y-2">
@@ -1479,7 +1873,10 @@ export default function AddFoodForm() {
                       type="url"
                       value={imageUrlInput}
                       onChange={(e) => setImageUrlInput(e.target.value)}
-                      onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), handleAddUrlImage())}
+                      onKeyDown={(e) =>
+                        e.key === "Enter" &&
+                        (e.preventDefault(), handleAddUrlImage())
+                      }
                       placeholder="https://images.unsplash.com/photo-..."
                       className="flex-1 px-3.5 py-2.5 rounded-xl bg-gray-50 border border-gray-200 text-xs font-medium focus:bg-white focus:border-[#FF6B35] outline-none"
                     />
@@ -1501,6 +1898,13 @@ export default function AddFoodForm() {
                     <Zap className="w-3.5 h-3.5 fill-[#FF6B35]" />
                     <span>Auto-load 4 High-Res {category} Photos (Demo)</span>
                   </button>
+
+                  {/* AI Image Editing Entry Point */}
+                  <RestaurantAiButton
+                    onClick={handleAiImageEdit}
+                    size="sm"
+                    disabled={images.length === 0}
+                  />
                 </div>
               )}
 
@@ -1512,19 +1916,22 @@ export default function AddFoodForm() {
                       <CheckCircle className="w-3.5 h-3.5" />
                       <span>{images.length} Photos in Gallery</span>
                     </span>
-                    <span className="text-[10px] text-orange-500 font-semibold">1st Photo is Primary Cover</span>
+                    <span className="text-[10px] text-orange-500 font-semibold">
+                      1st Photo is Primary Cover
+                    </span>
                   </div>
 
                   <div className="grid grid-cols-4 gap-2.5">
                     {images.map((imgUrl, idx) => (
                       <div
                         key={idx}
-                        className={`relative rounded-2xl overflow-hidden border-2 aspect-square group bg-gray-100 shadow-xs cursor-pointer ${idx === 0
+                        className={`relative rounded-2xl overflow-hidden border-2 aspect-square group bg-gray-100 shadow-xs cursor-pointer ${
+                          idx === 0
                             ? "border-[#FF6B35] ring-2 ring-orange-500/20"
                             : idx === activePreviewIndex
                               ? "border-blue-500 ring-2 ring-blue-500/20"
                               : "border-gray-200"
-                          }`}
+                        }`}
                         onClick={() => setActivePreviewIndex(idx)}
                       >
                         <img
@@ -1572,11 +1979,13 @@ export default function AddFoodForm() {
                 <div className="p-4 rounded-2xl bg-amber-50/60 border border-amber-200/70 text-amber-800 text-xs flex items-center justify-between gap-2.5">
                   <div className="flex items-center gap-2">
                     <ImageIcon className="w-4 h-4 text-amber-600 shrink-0" />
-                    <span>No photos added yet. Select photos or use Auto-load button.</span>
+                    <span>
+                      No photos added yet. Select photos or use Auto-load
+                      button.
+                    </span>
                   </div>
                 </div>
               )}
-
             </div>
 
             {/* 🌟 3. LIVE INTERACTIVE CUSTOMER PREVIEW CARD */}
@@ -1615,26 +2024,32 @@ export default function AddFoodForm() {
                     <span className="bg-black/70 backdrop-blur-md text-white text-[10px] font-black px-2.5 py-1 rounded-lg">
                       {category}
                     </span>
-                    {commonData.discountPrice && Number(commonData.discountPrice) < Number(commonData.price) && (
-                      <span className="bg-rose-500 text-white text-[10px] font-black px-2.5 py-1 rounded-lg shadow-sm">
-                        {Math.round(
-                          ((Number(commonData.price) - Number(commonData.discountPrice)) /
-                            Number(commonData.price)) *
-                          100
-                        )}
-                        % OFF
-                      </span>
-                    )}
+                    {commonData.discountPrice &&
+                      Number(commonData.discountPrice) <
+                        Number(commonData.price) && (
+                        <span className="bg-rose-500 text-white text-[10px] font-black px-2.5 py-1 rounded-lg shadow-sm">
+                          {Math.round(
+                            ((Number(commonData.price) -
+                              Number(commonData.discountPrice)) /
+                              Number(commonData.price)) *
+                              100,
+                          )}
+                          % OFF
+                        </span>
+                      )}
                   </div>
 
                   <div className="absolute top-3 right-3 z-10">
                     <span
-                      className={`text-[10px] font-black px-2.5 py-1 rounded-lg backdrop-blur-md shadow-sm ${commonData.status === "available"
+                      className={`text-[10px] font-black px-2.5 py-1 rounded-lg backdrop-blur-md shadow-sm ${
+                        commonData.status === "available"
                           ? "bg-emerald-500/90 text-white"
                           : "bg-rose-500/90 text-white"
-                        }`}
+                      }`}
                     >
-                      {commonData.status === "available" ? "● In Stock" : "● Out of Stock"}
+                      {commonData.status === "available"
+                        ? "● In Stock"
+                        : "● Out of Stock"}
                     </span>
                   </div>
 
@@ -1653,12 +2068,17 @@ export default function AddFoodForm() {
                         key={idx}
                         type="button"
                         onClick={() => setActivePreviewIndex(idx)}
-                        className={`relative w-16 h-12 rounded-xl overflow-hidden shrink-0 border-2 transition cursor-pointer ${activePreviewIndex === idx
+                        className={`relative w-16 h-12 rounded-xl overflow-hidden shrink-0 border-2 transition cursor-pointer ${
+                          activePreviewIndex === idx
                             ? "border-[#FF6B35] ring-2 ring-orange-500/30 scale-105"
                             : "border-gray-200 opacity-70 hover:opacity-100"
-                          }`}
+                        }`}
                       >
-                        <img src={thumbUrl} alt={`Thumbnail ${idx + 1}`} className="w-full h-full object-cover" />
+                        <img
+                          src={thumbUrl}
+                          alt={`Thumbnail ${idx + 1}`}
+                          className="w-full h-full object-cover"
+                        />
                       </button>
                     ))}
                   </div>
@@ -1672,7 +2092,8 @@ export default function AddFoodForm() {
                         {commonData.name || "Delicious Dish Name"}
                       </h4>
                       <p className="text-xs text-gray-500 line-clamp-2 mt-0.5">
-                        {commonData.description || "Freshly cooked with premium ingredients..."}
+                        {commonData.description ||
+                          "Freshly cooked with premium ingredients..."}
                       </p>
                     </div>
 
@@ -1704,7 +2125,7 @@ export default function AddFoodForm() {
                         >
                           {v}
                         </span>
-                      ) : null
+                      ) : null,
                     )}
                     {commonData.isVegetarian && (
                       <span className="px-2 py-0.5 rounded-lg bg-emerald-100 text-emerald-700 text-[10px] font-bold flex items-center gap-1">
@@ -1720,9 +2141,7 @@ export default function AddFoodForm() {
                 </div>
               </div>
             </div>
-
           </div>
-
         </div>
 
         {/* 🚀 SUBMIT & RESET FOOTER */}
@@ -1750,12 +2169,14 @@ export default function AddFoodForm() {
             ) : (
               <>
                 <Sparkles className="w-4 h-4" />
-                <span>Publish &quot;{commonData.name || category}&quot; ({images.length} Photos)</span>
+                <span>
+                  Publish &quot;{commonData.name || category}&quot; (
+                  {images.length} Photos)
+                </span>
               </>
             )}
           </button>
         </div>
-
       </form>
     </div>
   );

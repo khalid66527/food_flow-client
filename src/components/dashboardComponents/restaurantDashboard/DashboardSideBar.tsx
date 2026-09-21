@@ -8,12 +8,7 @@ import {
   ClipboardList,
   UtensilsCrossed,
   PlusCircle,
-  FolderTree,
-  Boxes,
-  BadgePercent,
-  Users,
-  Star,
-  TrendingUp,
+  ShoppingBag,
   User,
   Settings,
   LogOut,
@@ -28,6 +23,8 @@ import {
   Plus,
   Clock,
   Lock,
+  Receipt,
+  Star,
 } from "lucide-react";
 import { useSession, signOut } from "@/lib/auth-client";
 
@@ -130,14 +127,24 @@ export default function DashboardSideBar() {
           label: "Orders",
           href: "/dashboard/restaurant/orders",
           icon: ClipboardList,
-          badge: "8 Active",
-          badgeType: "brand",
         },
         {
           label: "Delivery",
           href: "/dashboard/restaurant/delivery",
           icon: Truck,
           badge: "Live",
+          badgeType: "accent",
+        },
+        {
+          label: "Sell History",
+          href: "/dashboard/restaurant/sell-history",
+          icon: Receipt,
+        },
+        {
+          label: "Customer Reviews",
+          href: "/dashboard/restaurant/reviews",
+          icon: Star,
+          badge: restaurantData?.rating ? `★ ${Number(restaurantData.rating).toFixed(1)}` : "Reviews",
           badgeType: "accent",
         },
       ],
@@ -158,46 +165,15 @@ export default function DashboardSideBar() {
           badgeType: "success",
         },
         {
-          label: "Categories",
-          href: "/dashboard/restaurant/categories",
-          icon: FolderTree,
-        },
-        {
-          label: "Inventory",
-          href: "/dashboard/restaurant/inventory",
-          icon: Boxes,
+          label: "Smart Grocery",
+          href: "/dashboard/restaurant/grocery",
+          icon: ShoppingBag,
+          badge: "Smart",
+          badgeType: "brand",
         },
       ],
     },
-    {
-      title: "Marketing & Insights",
-      items: [
-        {
-          label: "Offers",
-          href: "/dashboard/restaurant/offers",
-          icon: BadgePercent,
-          badge: "Promo",
-          badgeType: "accent",
-        },
-        {
-          label: "Customers",
-          href: "/dashboard/restaurant/customers",
-          icon: Users,
-        },
-        {
-          label: "Reviews",
-          href: "/dashboard/restaurant/reviews",
-          icon: Star,
-          badge: "4.9 ★",
-          badgeType: "accent",
-        },
-        {
-          label: "Analytics",
-          href: "/dashboard/restaurant/analytics",
-          icon: TrendingUp,
-        },
-      ],
-    },
+
     {
       title: "Account & System",
       items: [
@@ -507,8 +483,11 @@ export default function DashboardSideBar() {
                 <span>Partner Rating</span>
               </div>
               <div className="mt-1 flex items-center justify-between text-xs">
-                <span className="font-bold text-gray-800">4.9 / 5.0 (500+ Reviews)</span>
-                <span className="text-[10px] font-bold text-emerald-600">Top Rated</span>
+                <span className="font-bold text-gray-800">
+                  ★ {restaurantData?.rating ? Number(restaurantData.rating).toFixed(1) : "5.0"} / 5.0 (
+                  {restaurantData?.reviewCount || restaurantData?.totalReviews || 0} Reviews)
+                </span>
+                <span className="text-[10px] font-bold text-emerald-600">Verified</span>
               </div>
             </div>
           )}
