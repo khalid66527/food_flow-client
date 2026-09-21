@@ -862,8 +862,12 @@ export default function AIChatbot() {
   /* ---- Auto-expand textarea ---- */
   useEffect(() => {
     if (textareaRef.current) {
-      textareaRef.current.style.height = "auto";
-      textareaRef.current.style.height = `${Math.min(textareaRef.current.scrollHeight, 120)}px`;
+      if (!input.trim()) {
+        textareaRef.current.style.height = "38px";
+      } else {
+        textareaRef.current.style.height = "auto";
+        textareaRef.current.style.height = `${Math.min(textareaRef.current.scrollHeight, 120)}px`;
+      }
     }
   }, [input]);
 
@@ -1317,13 +1321,13 @@ export default function AIChatbot() {
             )}
 
             {/* ---- Input Composer (assistant-ui style) ---- */}
-            <div className="border-t border-gray-200 bg-white p-3">
+            <div className="border-t border-gray-100 bg-white p-3">
               <form
                 onSubmit={(e) => {
                   e.preventDefault();
                   handleSend();
                 }}
-                className="relative flex items-end gap-2 bg-gray-50 rounded-2xl border border-gray-200 p-1.5 focus-within:border-orange-500 focus-within:bg-white focus-within:ring-2 focus-within:ring-orange-500/20 transition-all"
+                className="relative flex items-center gap-2 bg-gray-50 rounded-2xl border border-gray-200/90 px-2 py-1.5 focus-within:border-orange-500 focus-within:bg-white focus-within:ring-2 focus-within:ring-orange-500/20 transition-all"
               >
                 {/* Voice Input Button */}
                 <button
@@ -1334,7 +1338,7 @@ export default function AIChatbot() {
                       ? "bg-red-500 text-white animate-pulse"
                       : "text-gray-400 hover:text-orange-500 hover:bg-orange-50"
                   }`}
-                  title={isListening ? "Listening... Click to stop" : "Voice Input (বাংলায় কথা বলুন)"}
+                  title={isListening ? "রেকর্ডিং হচ্ছে... থামাতে ক্লিক করুন" : "ভয়েস দিয়ে লিখুন (বাংলা)"}
                 >
                   {isListening ? <MicOff className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
                 </button>
@@ -1345,16 +1349,17 @@ export default function AIChatbot() {
                   value={input}
                   onChange={(e) => setInput(e.target.value)}
                   onKeyDown={handleKeyDown}
-                  placeholder="আপনার বাজেট বা খাবারের নাম লিখুন... (যেমন: বাজেট ৫০০ ঝাল খাবার)"
+                  placeholder="মেসেজ লিখুন..."
                   disabled={isTyping}
-                  className="flex-1 max-h-28 min-h-[36px] resize-none border-none bg-transparent py-2 text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none disabled:opacity-60"
+                  className="flex-1 max-h-28 min-h-[38px] resize-none border-none bg-transparent py-2 px-2 text-sm leading-normal text-gray-900 placeholder:text-gray-400 focus:outline-none disabled:opacity-60 overflow-y-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
                 />
 
                 <button
                   type="submit"
                   disabled={!input.trim() || isTyping}
-                  className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-orange-500 text-white shadow-md shadow-orange-500/20 hover:bg-orange-600 active:scale-95 transition-all disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+                  className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-orange-500 text-white shadow-sm hover:bg-orange-600 active:scale-95 transition-all disabled:opacity-35 disabled:cursor-not-allowed cursor-pointer"
                   aria-label="Send message"
+                  title="মেসেজ পাঠান"
                 >
                   {isTyping ? (
                     <Loader2 className="h-4 w-4 animate-spin" />
@@ -1368,7 +1373,7 @@ export default function AIChatbot() {
                 <span className="flex items-center gap-1">
                   <ShieldCheck className="h-3 w-3 text-emerald-500" /> লাইভ ফুড রিকমেন্ডেশন ও অর্ডার ট্র্যাকার
                 </span>
-                <span>Enter = Send, Shift+Enter = New line</span>
+                <span className="hidden sm:inline">Enter = Send, Shift+Enter = New line</span>
               </div>
             </div>
           </motion.div>

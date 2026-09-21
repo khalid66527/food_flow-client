@@ -4,7 +4,7 @@ import crypto from "crypto";
 const JWT_SECRET =
   process.env.JWT_SECRET ||
   process.env.BETTER_AUTH_SECRET ||
-  "Ermde6JRPK1BwSjUnCI4H7gBKmTdq6WU";
+  "";
 
 function base64UrlEncode(str: string): string {
   return Buffer.from(str)
@@ -31,6 +31,13 @@ function signJwt(payload: any, secret: string): string {
 
 export async function POST(req: NextRequest) {
   try {
+    if (!JWT_SECRET) {
+      return NextResponse.json(
+        { success: false, message: "JWT secret is not configured in environment variables." },
+        { status: 500 }
+      );
+    }
+
     const body = await req.json();
     const { id, userId, email, name, role, phone } = body || {};
 

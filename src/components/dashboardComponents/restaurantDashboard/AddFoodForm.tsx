@@ -60,7 +60,7 @@ type FoodStatus = "available" | "unavailable";
 
 const MAX_IMAGE_SIZE_MB = 10;
 const IMGBB_API_KEY =
-  process.env.NEXT_PUBLIC_IMGBB_API_KEY || "203d60bb9fab7d8774cd2e6e230ff932";
+  process.env.NEXT_PUBLIC_IMGBB_API_KEY ;
 
 // Preset sample photos mapping per category
 const CATEGORY_SAMPLE_PHOTOS: Record<string, string[]> = {

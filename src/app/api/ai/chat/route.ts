@@ -3,32 +3,40 @@ import {
   getFoodCollection, 
   getOrdersCollection, 
   getSuccessOrdersCollection, 
-  getRestaurantCollection, 
+  getRestaurantsCollection, 
   getCouponsCollection,
   getCartCollection,
 } from "@/lib/db";
 import { ObjectId } from "mongodb";
 
-let workingKeyIndex = 0;
-let cachedWorkingModel = "gemini-3.1-flash-lite";
+const FALLBACK_KEYS: string[] = [];
 
-async function callGeminiRestWithFailover(payload: any) {
+let workingKeyIndex = 0;
+let cachedWorkingModel = "gemini-2.5-flash";
+
+async function callGeminiRestWithFailover(payload: any): Promise<string> {
   const envKeys = process.env.GEMINI_API_KEYS
     ? process.env.GEMINI_API_KEYS.split(",").map((k) => k.trim()).filter(Boolean)
     : [];
   const singleKey = process.env.GEMINI_API_KEY?.trim();
 
-  const keyPool = Array.from(new Set([...envKeys, ...(singleKey ? [singleKey] : [])]));
+  const keyPool = Array.from(new Set([
+    ...envKeys, 
+    ...(singleKey ? [singleKey] : [])
+  ]));
+
   const models = [
     cachedWorkingModel,
-    "gemini-3.1-flash-lite",
-    "gemini-3.1-flash-lite-preview",
-    "gemini-3.5-flash-lite",
-    "gemini-flash-lite-latest",
     "gemini-2.5-flash",
+    "gemini-2.5-flash-lite",
+    "gemini-2.0-flash",
+    "gemini-1.5-flash",
   ].filter((v, i, a) => a.indexOf(v) === i);
 
   const totalKeys = keyPool.length;
+  if (totalKeys === 0) {
+    throw new Error("No Gemini API keys found in process.env.GEMINI_API_KEY or process.env.GEMINI_API_KEYS");
+  }
   let attempts = 0;
   let lastError: any = null;
 
@@ -86,6 +94,113 @@ function sanitizeImageUrl(rawImg?: string): string {
   return rawImg;
 }
 
+/**
+ * Intelligent local fallback generator for FoodFlow queries
+ */
+function generateLocalFallbackResponse(
+  message: string, 
+  liveFoods: any[], 
+  userOrders: any[], 
+  userCart: any, 
+  activeCoupons: any[]
+): string {
+  const q = message.toLowerCase();
+  
+  // 1. Check if user is asking about Cart
+  if (q.includes("cart") || q.includes("কার্ট") || q.includes("ঝুড়ি")) {
+    if (userCart.totalItems > 0) {
+      const itemsList = userCart.items.map((i: any) => `${i.name} (${i.quantity}টি)`).join(", ");
+      return `আপনার কার্টে মোট ${userCart.totalItems}টি আইটেম রয়েছে: ${itemsList}। খাবার মূল্য ৳${userCart.subtotal} + ডেলিভারি চার্জ ৳৪০ = সর্বমোট ৳${userCart.grandTotal}।\n\n\`\`\`action_buttons\n[{"type":"CHECKOUT","label":"সরাসরি চেকআউট করুন"}]\n\`\`\``;
+    }
+    return `আপনার কার্ট বর্তমানে খালি আছে। আমাদের সুস্বাদু মেনু থেকে আপনার পছন্দের খাবার কার্টে যোগ করুন!`;
+  }
+
+  // 2. Check if user is asking about Order Status
+  if (q.includes("order") || q.includes("অর্ডার") || q.includes("track") || q.includes("ট্র্যাক") || q.includes("status") || q.includes("স্ট্যাটাস") || q.includes("রাইডার")) {
+    if (userOrders.length > 0) {
+      const ord = userOrders[0];
+      return `আপনার সাম্প্রতিক অর্ডার #${ord.orderId}-এর বর্তমান স্ট্যাটাস: **${ord.status}**। ডেলিভারি রাইডার: ${ord.riderName || "নির্ধারণ করা হচ্ছে"} (আনুমানিক সময়: ${ord.eta || "২৫ মিনিট"})।\n\n\`\`\`order_status\n${JSON.stringify(ord)}\n\`\`\`\n\`\`\`action_buttons\n[{"type":"TRACK_ORDER","label":"লাইভ অর্ডার ট্র্যাকিং"}]\n\`\`\``;
+    }
+    return `আপনার কোনো সক্রিয় অর্ডার পাওয়া যায়নি। আপনি নতুন খাবার অর্ডার করলে এখান থেকেই লাইভ স্ট্যাটাস দেখতে পারবেন!`;
+  }
+
+  // 3. Check for Coupons / Offers
+  if (q.includes("coupon") || q.includes("কুপন") || q.includes("offer") || q.includes("অফার") || q.includes("discount") || q.includes("ছাড়")) {
+    const couponList = activeCoupons.length > 0 
+      ? activeCoupons.map((c: any) => `• **${c.code}**: ${c.discount} ডিসকাউন্ট`).join("\n")
+      : "• **WELCOME20**: প্রথম অর্ডারে দারুণ ছাড়\n• **CRAVE30**: ৳৩০ ছাড়";
+    return `FoodFlow-তে বর্তমানে আকর্ষণীয় ডিসকাউন্ট ভাউচার চলছে:\n\n${couponList}\n\nচেকআউট পেজে কুপন কোড ব্যবহার করে উপভোগ করুন ইনস্ট্যান্ট ডিসকাউন্ট!`;
+  }
+
+  // 4. Check for Platform General Info / How to Order / Roles
+  if (q.includes("foodflow") || q.includes("ফুডফ্লো") || q.includes("কিভাবে") || q.includes("how to") || q.includes("order") || q.includes("ডেলিভারি চার্জ") || q.includes("delivery fee")) {
+    if (q.includes("চার্জ") || q.includes("fee")) {
+      return `FoodFlow-তে স্ট্যান্ডার্ড ডেলিভারি চার্জ মাত্র **৳৪০**। আমরা সাধারণত ২৫-৪০ মিনিটের মধ্যে গরম ও তাজা খাবার ডেলিভারি করে থাকি! 🚀`;
+    }
+    if (q.includes("রেস্টুরেন্ট") || q.includes("restaurant") || q.includes("partner") || q.includes("পার্টনার")) {
+      return `FoodFlow-তে রেস্টুরেন্ট পার্টনার হিসেবে যোগ দিতে Register পেজ থেকে Restaurant Role নির্বাচন করে আপনার রেস্টুরেন্টের তথ্য জমা দিন। অ্যাডমিন যাচাই শেষে দ্রুত অনুমোদন দেওয়া হবে।`;
+    }
+    if (q.includes("রাইডার") || q.includes("rider") || q.includes("delivery hero")) {
+      return `FoodFlow ডেলিভারি রাইডার হিসেবে যোগ দিতে Rider Role দিয়ে রেজিস্ট্রেশন করুন। প্রতিটি সফল ডেলিভারিতে আকর্ষণীয় কমিশন ও বোনাস পাবেন!`;
+    }
+    return `FoodFlow একটি আধুনিক অনলাইন ফুড ডেলিভারি প্ল্যাটফর্ম 🍔।\n\n১. মেনু থেকে পছন্দের খাবার সিলেক্ট করুন\n২. কার্টে যোগ করে চেকআউটে ঠিকানা দিন\n৩. কার্ড অথবা ক্যাশ অন ডেলিভারিতে অর্ডার কনফার্ম করুন এবং লাইভ ট্র্যাক করুন!`;
+  }
+
+  // 5. Food Recommendation Matching (Budget, Spicy, Category)
+  let matchedFoods = [...liveFoods];
+
+  // Budget filter
+  const budgetMatch = message.match(/(?:৳|tk|bdt|\$)?\s*(\d{2,4})\s*(?:টাকা|tk|bdt|taka)?/i);
+  const budget = budgetMatch ? parseInt(budgetMatch[1], 10) : null;
+
+  const isSpicyQuery = q.includes("ঝাল") || q.includes("spicy") || q.includes("ঝাল খাবার");
+  const isVegQuery = q.includes("ভেজিটেবল") || q.includes("নিরামিষ") || q.includes("vegetable") || q.includes("veg") || q.includes("salad");
+  const isPizzaQuery = q.includes("pizza") || q.includes("পিজ্জা");
+  const isBurgerQuery = q.includes("burger") || q.includes("বার্গার");
+  const isBiryaniQuery = q.includes("biryani") || q.includes("বিরিয়ানি");
+
+  if (isSpicyQuery) {
+    const spicyFoods = matchedFoods.filter(f => f.isSpicy || f.name.toLowerCase().includes("spicy") || f.name.toLowerCase().includes("pizza") || f.name.toLowerCase().includes("burger"));
+    if (spicyFoods.length > 0) matchedFoods = spicyFoods;
+  }
+
+  if (isVegQuery) {
+    const vegFoods = matchedFoods.filter(f => f.isVegetarian || f.category.toLowerCase().includes("veg") || f.name.toLowerCase().includes("salad"));
+    if (vegFoods.length > 0) matchedFoods = vegFoods;
+  }
+
+  if (isPizzaQuery) {
+    const pizzaFoods = matchedFoods.filter(f => f.category.toLowerCase().includes("pizza") || f.name.toLowerCase().includes("pizza"));
+    if (pizzaFoods.length > 0) matchedFoods = pizzaFoods;
+  } else if (isBurgerQuery) {
+    const burgerFoods = matchedFoods.filter(f => f.category.toLowerCase().includes("burger") || f.name.toLowerCase().includes("burger"));
+    if (burgerFoods.length > 0) matchedFoods = burgerFoods;
+  } else if (isBiryaniQuery) {
+    const biryaniFoods = matchedFoods.filter(f => f.category.toLowerCase().includes("biryani") || f.name.toLowerCase().includes("biriyani"));
+    if (biryaniFoods.length > 0) matchedFoods = biryaniFoods;
+  }
+
+  if (budget) {
+    const withinBudget = matchedFoods.filter(f => (f.discountPrice || f.price) <= budget);
+    if (withinBudget.length > 0) {
+      matchedFoods = withinBudget;
+    }
+  }
+
+  // Pick top 2-3 items
+  const recommendations = matchedFoods.slice(0, 3);
+
+  if (recommendations.length > 0) {
+    const foodNames = recommendations.map(f => `${f.name} (৳${f.discountPrice || f.price})`).join(" এবং ");
+    const budgetText = budget ? `আপনার ৳${budget} বাজেটের মধ্যে ` : "";
+    const spicyText = isSpicyQuery ? "ঝাল ও মজাদার " : "";
+
+    return `${budgetText}সেরা ${spicyText}খাবারের অপশন হলো **${foodNames}**। ডেলিভারি চার্জ ৳৪০ সহ সহজেই অর্ডার করতে পারেন!\n\n\`\`\`food_recommendations\n${JSON.stringify(recommendations, null, 2)}\n\`\`\`\n\`\`\`action_buttons\n[{"type":"CHECKOUT","label":"চেকআউট করুন"}]\n\`\`\``;
+  }
+
+  return `FoodFlow-তে আপনাকে স্বাগতম! আপনার পছন্দের খাবারের নাম, বাজেট অথবা যেকোনো সহায়তার জন্য আমাকে বলতে পারেন।`;
+}
+
 export async function POST(req: Request) {
   try {
     const body = await req.json();
@@ -115,17 +230,48 @@ export async function POST(req: Request) {
     let liveRestaurants: any[] = [];
     let userOrders: any[] = [];
     let activeCoupons: any[] = [];
+    const restaurantNameMap: Record<string, string> = {};
 
     const promises: Promise<any>[] = [];
 
-    // 1. Fetch available food items
+    // 1. Fetch restaurants list & build restaurant lookup map
+    promises.push(
+      (async () => {
+        try {
+          const restCol = await getRestaurantsCollection();
+          const rawRest = await restCol
+            .find(
+              { status: { $ne: "blocked" } },
+              { projection: { name: 1, cuisine: 1, rating: 1, deliveryTime: 1, address: 1 } }
+            )
+            .limit(15)
+            .toArray();
+
+          liveRestaurants = rawRest.map((r: any) => {
+            const rId = r._id?.toString() || "";
+            restaurantNameMap[rId] = r.name || "FoodFlow Restaurant";
+            return {
+              id: rId,
+              name: r.name,
+              cuisine: r.cuisine || "Multi-Cuisine",
+              rating: r.rating || 4.8,
+              deliveryTime: r.deliveryTime || "25-35 mins",
+            };
+          });
+        } catch (e) {
+          console.error("AI liveRestaurants fetch error:", e);
+        }
+      })()
+    );
+
+    // 2. Fetch available food items
     promises.push(
       (async () => {
         try {
           const foodCol = await getFoodCollection();
           const rawFoods = await foodCol
             .find(
-              { $or: [{ status: "available" }, { isAvailable: true }, { isAvailable: "true" }] },
+              { $or: [{ status: "available" }, { isAvailable: true }, { isAvailable: "true" }, { status: { $exists: false } }] },
               {
                 projection: {
                   name: 1,
@@ -142,50 +288,27 @@ export async function POST(req: Request) {
               }
             )
             .sort({ createdAt: -1 })
-            .limit(12)
+            .limit(20)
             .toArray();
 
-          liveFoods = rawFoods.map((f: any) => ({
-            id: f._id?.toString(),
-            restaurantId: f.restaurantId?.toString() || "",
-            name: f.name,
-            category: f.category || "Main",
-            price: Number(f.price) || 0,
-            discountPrice: f.discountPrice ? Number(f.discountPrice) : undefined,
-            image: sanitizeImageUrl(f.image),
-            isSpicy: Boolean(f.isSpicy),
-            isVegetarian: Boolean(f.isVegetarian),
-            restaurantName: f.restaurantName || "FoodFlow Express",
-            rating: f.rating ? Number(f.rating) : 4.8,
-          }));
+          liveFoods = rawFoods.map((f: any) => {
+            const restId = f.restaurantId?.toString() || "";
+            return {
+              id: f._id?.toString(),
+              restaurantId: restId,
+              name: f.name,
+              category: f.category || "Dishes",
+              price: Number(f.price) || 0,
+              discountPrice: f.discountPrice ? Number(f.discountPrice) : undefined,
+              image: sanitizeImageUrl(f.image),
+              isSpicy: Boolean(f.isSpicy),
+              isVegetarian: Boolean(f.isVegetarian),
+              restaurantName: f.restaurantName || restaurantNameMap[restId] || "FoodFlow Kitchen",
+              rating: f.rating ? Number(f.rating) : 4.8,
+            };
+          });
         } catch (e) {
           console.error("AI liveFoods fetch error:", e);
-        }
-      })()
-    );
-
-    // 2. Fetch restaurants list
-    promises.push(
-      (async () => {
-        try {
-          const restCol = await getRestaurantCollection();
-          const rawRest = await restCol
-            .find(
-              { status: { $ne: "blocked" } },
-              { projection: { name: 1, cuisine: 1, rating: 1, deliveryTime: 1 } }
-            )
-            .limit(5)
-            .toArray();
-
-          liveRestaurants = rawRest.map((r: any) => ({
-            id: r._id?.toString(),
-            name: r.name,
-            cuisine: r.cuisine || "Multi-Cuisine",
-            rating: r.rating || 4.7,
-            deliveryTime: r.deliveryTime || "25-35 mins",
-          }));
-        } catch (e) {
-          console.error("AI liveRestaurants fetch error:", e);
         }
       })()
     );
@@ -244,12 +367,13 @@ export async function POST(req: Request) {
           const couponCol = await getCouponsCollection();
           const rawCoupons = await couponCol
             .find({ isActive: { $ne: false } })
-            .limit(3)
+            .limit(5)
             .toArray();
 
           activeCoupons = rawCoupons.map((c: any) => ({
             code: c.code,
-            discount: c.discountPercentage ? `${c.discountPercentage}% OFF` : `৳${c.discountAmount} OFF`,
+            discount: c.discountValue ? `${c.discountValue}% OFF` : (c.discountAmount ? `৳${c.discountAmount} OFF` : "Special Discount"),
+            minOrder: c.minOrderValue || 0,
           }));
         } catch (e) {
           console.error("AI coupons fetch error:", e);
@@ -272,7 +396,6 @@ export async function POST(req: Request) {
       grandTotal: 0,
     };
 
-    // First check cartItems from client body
     if (Array.isArray(cartItems) && cartItems.length > 0) {
       const items = cartItems.map((ci: any) => {
         const qty = Number(ci.quantity) || 1;
@@ -333,35 +456,48 @@ export async function POST(req: Request) {
 
     await Promise.all(promises);
 
+    // Make sure food items have restaurant names filled
+    liveFoods = liveFoods.map(f => ({
+      ...f,
+      restaurantName: f.restaurantName || restaurantNameMap[f.restaurantId] || "FoodFlow Kitchen"
+    }));
+
     const systemInstruction = `
-You are FoodFlow AI, an ultra-fast, helpful, and CONCISE food assistant for FoodFlow.
+You are FoodFlow AI, an ultra-smart, helpful, friendly Food Recommendation and Support Assistant for the FoodFlow platform.
 
-CORE INSTRUCTIONS:
-1. 🎯 SHORT & DIRECT ANSWERS:
-   - Always reply in SHORT, clear, friendly Bengali (বাংলা).
-   - Maximum 2 to 4 sentences. NEVER write long walls of text or long calculation lists.
-   - If user asks for food suggestions, recommend at most 2-3 best matching dishes.
-   - If nothing is found or information is unavailable, politely and concisely say so in 1 sentence.
+PLATFORM INFORMATION:
+- Platform: FoodFlow (Leading online food delivery platform in Bangladesh).
+- Delivery: Base delivery fee is ৳40. Fast delivery within 25-40 minutes.
+- Payment Methods: Stripe (Cards), Cash on Delivery (COD), Mobile Banking.
+- Roles:
+  * Customer: Order delicious food, live order tracking, reviews.
+  * Restaurant: Register/Login, manage menu items, accept & prepare incoming orders, check payouts.
+  * Rider: Accept delivery trips, navigate to customer, verify OTP, earn commissions.
+  * Admin: Platform management, approve restaurants/riders, system settings.
+- Active Coupons: ${JSON.stringify(activeCoupons)}
 
-2. 🛒 USER CART INQUIRIES:
-   - When the user asks about their cart (e.g. "আমার কার্টে কি কিছু আছে?", "আমার কার্ট দেখাও", "cart summary"):
-     * IF USER CART has items (totalItems > 0): List the food items with quantity, the subtotal, delivery fee (৳40), and grand total clearly in 2 friendly Bengali sentences (e.g. "আপনার কার্টে ৩টি আইটেম রয়েছে: ... মোট ৳XYZ (ডেলিভারিসহ)। আপনি চাইলে এখনই সরাসরি চেকআউট করতে পারেন!").
-     * IF USER CART is empty (totalItems = 0): Tell them politely that their cart is currently empty and suggest adding some tasty dishes from our menu.
+CORE GUIDELINES:
+1. 🌟 COMPREHENSIVE SUPPORT:
+   - Answer ANY question about FoodFlow, dishes, recommendations, orders, prices, delivery, restaurant joining, rider joining, coupons, etc. accurately.
+   - Reply in natural, friendly Bengali (বাংলা) by default. If the user writes in English, reply in English.
+   - Keep answers clear, courteous, and helpful (typically 2 to 4 concise sentences).
 
-3. 💰 BUDGET & MOOD:
-   - When user provides a budget (e.g. ৳200, ৳500), pick 2-3 delicious dishes from LIVE FOODS within that budget.
-   - Mention total price simply: "খাবার মূল্য + ৳৪০ ডেলিভারি চার্জ = মোট ৳XYZ"।
+2. 🍔 SMART FOOD RECOMMENDATIONS:
+   - When user asks for food suggestions or specifies budget/taste (e.g. "আমার বাজেট ৫০০ টাকা, ঝাল খাবার চাই, ২ জনের জন্য"):
+     * Select 2-3 best matching dishes from LIVE FOODS below.
+     * If user asks for spicy (ঝাল), prioritize dishes with isSpicy: true or spicy category (Pizza, Burger, Biryani).
+     * If user asks for 2 people, calculate package total (e.g., 2 burgers or 1 pizza + side) + ৳40 delivery fee within budget.
+     * ALWAYS append the recommended foods JSON block at the very end so that UI cards with "Add to Cart" and "Buy Now" are rendered.
 
-4. 📦 TRACKING & SUPPORT:
-   - For order status, give exact status, rider info, and ETA in 2 lines.
+3. 🛒 CART & ORDER STATUS:
+   - If user asks about their cart, report the live cart items, subtotal, ৳40 delivery charge, and grand total.
+   - If user asks about their order, report the status, rider details, and ETA.
 
-5. 🚫 NO RAW JSON / BASE64 IN TEXT:
-   - NEVER write raw JSON code or base64 images inside your conversational sentences.
-   - To render interactive UI cards, append the JSON code block strictly at the VERY END:
+4. 📦 STRUCTURED JSON BLOCKS (Only append at the END when recommending foods or showing status):
 \`\`\`food_recommendations
 [
   {
-    "id": "<id>",
+    "id": "<id_from_live_foods>",
     "restaurantId": "<restaurantId>",
     "name": "<name>",
     "price": <price>,
@@ -375,11 +511,14 @@ CORE INSTRUCTIONS:
 ]
 \`\`\`
 
-USER CART: ${JSON.stringify(userCart)}
+\`\`\`action_buttons
+[{"type":"CHECKOUT","label":"চেকআউট করুন"}]
+\`\`\`
+
 LIVE FOODS: ${JSON.stringify(liveFoods)}
 RESTAURANTS: ${JSON.stringify(liveRestaurants)}
+USER CART: ${JSON.stringify(userCart)}
 USER ORDERS: ${JSON.stringify(userOrders)}
-ACTIVE COUPONS: ${JSON.stringify(activeCoupons)}
 `;
 
     // Trim history to prevent token blowout
@@ -397,11 +536,17 @@ ACTIVE COUPONS: ${JSON.stringify(activeCoupons)}
       },
       generationConfig: {
         temperature: 0.6,
-        maxOutputTokens: 600,
+        maxOutputTokens: 800,
       },
     };
 
-    const reply = await callGeminiRestWithFailover(geminiPayload);
+    let reply: string;
+    try {
+      reply = await callGeminiRestWithFailover(geminiPayload);
+    } catch (llmErr) {
+      console.warn("[Next AI Chat] Gemini API failed, using intelligent local fallback:", llmErr);
+      reply = generateLocalFallbackResponse(message, liveFoods, userOrders, userCart, activeCoupons);
+    }
 
     return NextResponse.json({
       success: true,
@@ -418,3 +563,4 @@ ACTIVE COUPONS: ${JSON.stringify(activeCoupons)}
     );
   }
 }
+

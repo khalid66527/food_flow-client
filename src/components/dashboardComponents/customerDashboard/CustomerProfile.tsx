@@ -113,8 +113,7 @@ export default function CustomerProfile() {
     setIsUploadingImage(true);
     try {
       const imgbbKey =
-        process.env.NEXT_PUBLIC_IMGBB_API_KEY ||
-        "1df7c1808e4ce1d5ed45c19880ec2082";
+        process.env.NEXT_PUBLIC_IMGBB_API_KEY;
 
       const formData = new FormData();
       formData.append("image", file);

@@ -36,17 +36,17 @@ export async function getOrdersCollection(): Promise<Collection> {
 
 export async function getSuccessOrdersCollection(): Promise<Collection> {
   const db = await getDatabase();
-  return db.collection("successOrders");
+  return db.collection("successorders");
 }
 
 export async function getCartCollection(): Promise<Collection> {
   const db = await getDatabase();
-  return db.collection("carts");
+  return db.collection("cart");
 }
 
 export async function getSettingsCollection(): Promise<Collection> {
   const db = await getDatabase();
-  return db.collection("settings");
+  return db.collection("platform_settings");
 }
 
 export async function getCouponsCollection(): Promise<Collection> {
@@ -66,19 +66,19 @@ export async function getReviewsCollection(): Promise<Collection> {
 
 export async function getUsersCollection(): Promise<Collection> {
   const db = await getDatabase();
-  return db.collection("users");
+  return db.collection("user");
 }
 
 export async function getRestaurantsCollection(): Promise<Collection> {
   const db = await getDatabase();
-  return db.collection("restaurants");
+  return db.collection("restaurant");
 }
 
 export const getRestaurantCollection = getRestaurantsCollection;
 
 export async function getFoodCollection(): Promise<Collection> {
   const db = await getDatabase();
-  return db.collection("foodItems");
+  return db.collection("food");
 }
 
 export { clientPromise };
