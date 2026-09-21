@@ -165,12 +165,6 @@ const HowItWorks = () => {
                                 <motion.div
                                     key={step.number}
                                     variants={cardVariants}
-                                    whileHover={{ y: -6 }}
-                                    transition={{
-                                        type: "spring",
-                                        stiffness: 300,
-                                        damping: 20,
-                                    }}
                                     className="relative flex flex-col items-center text-center"
                                 >
                                     {/* Number Badge */}
