@@ -264,7 +264,7 @@ const session = await auth.api.getSession({ headers: req.headers });
 
 ```ts
 const IMGBB_API_KEY =
-  process.env.NEXT_PUBLIC_IMGBB_API_KEY || "203d60bb9fab7d8774cd2e6e230ff932";
+  process.env.NEXT_PUBLIC_IMGBB_API_KEY;
 ```
 
 The key is committed to git, embedded in a client component, and duplicated as a server-side fallback. `NEXT_PUBLIC_IMGBB_API_KEY` is also, by definition, public — so the configured key leaks too (`CustomerProfile.tsx:116`).
