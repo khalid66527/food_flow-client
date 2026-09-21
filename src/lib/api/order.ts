@@ -14,6 +14,8 @@ function buildIdentityHeaders(userId?: string, userEmail?: string): Record<strin
   return getAuthHeaders(userId, userEmail);
 }
 
+import { emitNewOrderEvent, emitOrderStatusUpdateEvent } from "@/lib/socket";
+
 /**
  * Create a new order (COD or Stripe) via POST /api/orders
  */
@@ -37,6 +39,9 @@ export async function createOrderApi(
     });
 
     const data = await res.json();
+    if (data?.success && data?.data) {
+      emitNewOrderEvent(data.data);
+    }
     return data as TOrderApiResponse;
   } catch (err: unknown) {
     return {
@@ -224,6 +229,15 @@ export async function updateOrderStatusApi(
       body: JSON.stringify(payload),
     });
     const data = await res.json();
+    if (data?.success && data?.data) {
+      emitOrderStatusUpdateEvent({
+        orderId,
+        orderStatus: payload.orderStatus,
+        paymentStatus: payload.paymentStatus,
+        order: data.data,
+        ...data.data,
+      });
+    }
     return data as TOrderApiResponse;
   } catch (err: unknown) {
     return {

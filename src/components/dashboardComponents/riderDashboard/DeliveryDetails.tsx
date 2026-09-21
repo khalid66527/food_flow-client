@@ -93,18 +93,26 @@ export default function DeliveryDetails() {
       );
     };
 
+    const onNewOrder = (order: any) => {
+      fetchOrders();
+    };
+
     socket.on("connect", onConnect);
     socket.on("disconnect", onDisconnect);
+    socket.on("new_order_placed", onNewOrder);
+    socket.on("order:created", onNewOrder);
+    socket.on("new_delivery_available", onNewOrder);
     socket.on("order_status_updated", onStatusUpdated);
 
     return () => {
       socket.off("connect", onConnect);
       socket.off("disconnect", onDisconnect);
+      socket.off("new_order_placed", onNewOrder);
+      socket.off("order:created", onNewOrder);
+      socket.off("new_delivery_available", onNewOrder);
       socket.off("order_status_updated", onStatusUpdated);
     };
-  }, [sessionPending, user?.id]);
-
-  useEffect(() => () => disconnectOrderSocket(), []);
+  }, [sessionPending, user?.id, fetchOrders]);
 
   // ─── Accept Order ────────────────────────────────────────────
   const acceptOrder = async (order: TOrder) => {
