@@ -23,8 +23,9 @@ import {
   ChevronLeft,
   ChevronRight,
 } from "lucide-react";
-import { getAllAdminReviewsApi, IAdminReviewsSummary, IReview } from "@/lib/api/review";
+import { getAllAdminReviewsApi, toggleFeaturedReviewApi, IAdminReviewsSummary, IReview } from "@/lib/api/review";
 import LoadingSpinner from "@/lib/api/LoadingSpinner";
+import { toast } from "react-toastify";
 
 export default function AdminReviews() {
   const [data, setData] = useState<IAdminReviewsSummary | null>(null);
@@ -70,6 +71,34 @@ export default function AdminReviews() {
       setRefreshing(false);
     }
   }, [targetTypeFilter, starFilter, debouncedSearch]);
+
+  const handleToggleFeature = async (reviewId: string, currentFeatured?: boolean) => {
+    try {
+      const nextFeatured = !currentFeatured;
+      const res = await toggleFeaturedReviewApi(reviewId, nextFeatured);
+      if (res.success) {
+        if (nextFeatured) {
+          toast.success("Review featured on Homepage successfully!");
+        } else {
+          toast.info("Review removed from Homepage.");
+        }
+        setData((prev) => {
+          if (!prev) return prev;
+          return {
+            ...prev,
+            reviews: prev.reviews.map((r) =>
+              r._id === reviewId ? { ...r, isFeatured: nextFeatured } : r
+            ),
+          };
+        });
+      } else {
+        toast.error(res.message || "Failed to update feature status.");
+      }
+    } catch (err: any) {
+      console.error("Error toggling feature status:", err);
+      toast.error(err.message || "Error updating feature status.");
+    }
+  };
 
   useEffect(() => {
     setCurrentPage(1);
@@ -350,15 +379,30 @@ export default function AdminReviews() {
                     </p>
                   </div>
 
-                  {/* Footer Metadata */}
-                  <div className="flex items-center justify-between text-[11px] text-gray-400 font-semibold pt-2 border-t border-gray-100">
+                  {/* Footer Metadata & Feature Toggle */}
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between text-[11px] text-gray-400 font-semibold pt-3 border-t border-gray-100 gap-2">
                     <span className="flex items-center gap-1">
                       <Calendar className="w-3.5 h-3.5" />
                       {rev.createdAt ? new Date(rev.createdAt).toLocaleString("en-US", { month: "short", day: "numeric", year: "numeric" }) : "Recent"}
                     </span>
-                    <span className="inline-flex items-center gap-1 text-emerald-600 font-extrabold">
-                      <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" /> Verified Rating
-                    </span>
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => rev._id && handleToggleFeature(rev._id, rev.isFeatured)}
+                        className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-black transition cursor-pointer border shadow-xs ${
+                          rev.isFeatured
+                            ? "bg-amber-500 text-white border-amber-600 shadow-amber-500/20 hover:bg-amber-600"
+                            : "bg-gray-50 text-gray-700 border-gray-200 hover:bg-orange-50 hover:text-orange-600 hover:border-orange-200"
+                        }`}
+                        title={rev.isFeatured ? "Click to remove from Homepage" : "Click to feature on Homepage"}
+                      >
+                        <Sparkles className={`w-3.5 h-3.5 ${rev.isFeatured ? "text-amber-100 fill-amber-100" : "text-amber-500"}`} />
+                        {rev.isFeatured ? "Featured on Home ✓" : "Feature on Home"}
+                      </button>
+                      <span className="inline-flex items-center gap-1 text-emerald-600 font-extrabold">
+                        <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" /> Verified
+                      </span>
+                    </div>
                   </div>
                 </div>
               );
