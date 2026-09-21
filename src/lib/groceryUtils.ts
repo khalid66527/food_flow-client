@@ -677,16 +677,23 @@ export const exportGroceryListToPdf = async (
     }
 
     // 3. Client-Side Safe Dynamic Import of html2pdf.js
-    const html2pdfModule = await import("html2pdf.js");
-    const html2pdf =
-      (html2pdfModule as any).default?.default ||
-      (html2pdfModule as any).default ||
-      html2pdfModule;
+    let html2pdf: any = null;
+    try {
+      const html2pdfModule = await import("html2pdf.js");
+      html2pdf =
+        (html2pdfModule as any).default?.default ||
+        (html2pdfModule as any).default ||
+        html2pdfModule;
+    } catch (importErr) {
+      console.warn("[PDF Export] Dynamic import of html2pdf.js failed, using print fallback:", importErr);
+    }
 
     if (typeof html2pdf !== "function") {
-      console.error("[PDF Export Error] html2pdf library could not be initialized properly:", html2pdfModule);
-      return false;
+      // Fallback: Use browser native print dialog
+      window.print();
+      return true;
     }
+
 
     // 4. Executive Standard PDF Configuration with Lab/OKLCH Color Sanitizer
     const opt = {
