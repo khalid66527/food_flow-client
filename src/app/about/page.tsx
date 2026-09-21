@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import AboutStats from "@/components/about/AboutStats";
 import {
   Bike,
   Clock,
@@ -18,13 +19,6 @@ export const metadata: Metadata = {
   description:
     "Learn how Food Flow connects hungry customers, local restaurants and riders to deliver fresh food fast.",
 };
-
-const stats = [
-  { value: "1,200+", label: "Partner restaurants" },
-  { value: "50K+", label: "Orders delivered" },
-  { value: "800+", label: "Active riders" },
-  { value: "28 min", label: "Average delivery" },
-];
 
 const values = [
   {
@@ -141,20 +135,7 @@ export default function AboutPage() {
       </section>
 
       {/* Stats */}
-      <section className="border-b border-gray-100">
-        <div className="mx-auto grid max-w-7xl grid-cols-2 gap-px overflow-hidden bg-gray-100 px-4 sm:px-6 lg:grid-cols-4 lg:px-8">
-          {stats.map((stat) => (
-            <div key={stat.label} className="bg-white px-4 py-8 text-center">
-              <p className="text-2xl font-extrabold text-orange-500 sm:text-3xl">
-                {stat.value}
-              </p>
-              <p className="mt-1 text-xs font-medium text-gray-500 sm:text-sm">
-                {stat.label}
-              </p>
-            </div>
-          ))}
-        </div>
-      </section>
+      <AboutStats />
 
       {/* Story */}
       <section className="mx-auto max-w-7xl px-4 py-16 sm:px-6 sm:py-20 lg:px-8">
@@ -269,7 +250,7 @@ export default function AboutPage() {
                 key={step.title}
                 className="relative rounded-2xl border border-gray-100 bg-white p-6"
               >
-                <span className="absolute right-6 top-6 text-4xl font-extrabold text-orange-50">
+                <span className="absolute right-6 top-6 text-4xl font-black text-orange-500/40 sm:text-5xl select-none tracking-tighter">
                   0{index + 1}
                 </span>
                 <div className="flex h-11 w-11 items-center justify-center rounded-full bg-orange-500 text-white shadow-md shadow-orange-500/20">
