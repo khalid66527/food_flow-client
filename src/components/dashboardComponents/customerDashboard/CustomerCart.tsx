@@ -16,9 +16,14 @@ import {
 } from "lucide-react";
 import { useCart } from "@/contexts/CartContext";
 import { useSession } from "@/lib/auth-client";
+import { getPlatformSettings } from "@/lib/api/settings";
+import { getAllZones } from "@/lib/api/zone";
+import { getAddresses } from "@/lib/api/address";
+import { getSingleRestaurantById } from "@/lib/api/restaurant";
+import { resolveZoneDeliveryFee } from "@/lib/utils/deliveryFee";
+import { IZone } from "@/types/zone";
+import { TAddress } from "@/types/address";
 
-const DELIVERY_FEE = 40;
-const FREE_DELIVERY_THRESHOLD = 500;
 const ITEMS_PER_PAGE = 6;
 
 export default function CustomerCart() {
@@ -35,8 +40,76 @@ export default function CustomerCart() {
   const { data: session } = useSession();
   const user = session?.user;
 
-  const deliveryFee =
-    totalPrice === 0 || totalPrice >= FREE_DELIVERY_THRESHOLD ? 0 : DELIVERY_FEE;
+  const [deliveryFeeBase, setDeliveryFeeBase] = useState<number>(40);
+  const [freeDeliveryThreshold, setFreeDeliveryThreshold] = useState<number>(500);
+  const [allZones, setAllZones] = useState<IZone[]>([]);
+  const [defaultAddress, setDefaultAddress] = useState<TAddress | null>(null);
+  const [restaurant, setRestaurant] = useState<any | null>(null);
+
+  // Fetch settings & zones
+  React.useEffect(() => {
+    const loadSettingsAndZones = async () => {
+      try {
+        const [settingsRes, zonesRes] = await Promise.all([
+          getPlatformSettings(),
+          getAllZones({ isActive: "true" }),
+        ]);
+
+        if (settingsRes.success && settingsRes.data) {
+          setDeliveryFeeBase(settingsRes.data.deliveryFeeBase ?? 40);
+          setFreeDeliveryThreshold(settingsRes.data.freeDeliveryThreshold ?? 500);
+        }
+
+        if (zonesRes.success && Array.isArray(zonesRes.data)) {
+          setAllZones(zonesRes.data);
+        }
+      } catch (err) {
+        console.warn("Failed to load settings or zones in cart:", err);
+      }
+    };
+    loadSettingsAndZones();
+  }, []);
+
+  // Fetch user default address
+  React.useEffect(() => {
+    if (user?.id) {
+      getAddresses(user.id, user.email || "").then((res) => {
+        if (res.success && Array.isArray(res.data) && res.data.length > 0) {
+          const def = res.data.find((a: TAddress) => a.isDefault) || res.data[0];
+          setDefaultAddress(def);
+        }
+      }).catch(() => {});
+    }
+  }, [user?.id, user?.email]);
+
+  // Fetch restaurant
+  React.useEffect(() => {
+    const restId = items[0]?.foodItem?.restaurantId;
+    if (restId) {
+      getSingleRestaurantById(restId)
+        .then((res) => {
+          if (res.success && res.data) {
+            setRestaurant(res.data);
+          }
+        })
+        .catch(() => {});
+    }
+  }, [items]);
+
+  const resolvedDelivery = useMemo(() => {
+    if (totalPrice === 0) {
+      return { deliveryFee: 0, zoneName: null };
+    }
+    return resolveZoneDeliveryFee({
+      address: defaultAddress,
+      allZones,
+      restaurant,
+      fallbackBaseFee: deliveryFeeBase,
+    });
+  }, [totalPrice, defaultAddress, allZones, restaurant, deliveryFeeBase]);
+
+  const deliveryFee = resolvedDelivery.deliveryFee;
+  const detectedZoneName = resolvedDelivery.zoneName;
   const estimatedTotal = totalPrice + deliveryFee;
 
   const sortedItems = useMemo(
@@ -249,7 +322,14 @@ export default function CustomerCart() {
                   </span>
                 </div>
                 <div className="flex items-center justify-between">
-                  <span className="text-gray-500">Delivery Fee</span>
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    <span className="text-gray-500">Delivery Fee</span>
+                    {detectedZoneName && (
+                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-orange-100 text-[#FF6B35]">
+                        {detectedZoneName}
+                      </span>
+                    )}
+                  </div>
                   <span className="font-semibold text-gray-900">
                     {deliveryFee === 0 ? (
                       <span className="text-emerald-600">FREE</span>
@@ -259,10 +339,10 @@ export default function CustomerCart() {
                   </span>
                 </div>
 
-                {deliveryFee > 0 && (
+                {deliveryFee > 0 && freeDeliveryThreshold > totalPrice && (
                   <div className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-orange-50 border border-orange-100 text-xs text-orange-600">
                     <Sparkles className="w-3.5 h-3.5 shrink-0" />
-                    Add Tk {(FREE_DELIVERY_THRESHOLD - totalPrice).toFixed(2)} more for free
+                    Add Tk {(freeDeliveryThreshold - totalPrice).toFixed(2)} more for free
                     delivery!
                   </div>
                 )}

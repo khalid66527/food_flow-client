@@ -1,13 +1,7 @@
 import { ApiResponse, IRestaurant } from "@/lib/api/restaurant";
 import { IMenuItem } from "@/types/restaurant";
-
-const SERVER_BASE_URL = (
-  process.env.NEXT_PUBLIC_SERVER_API_URL ||
-  process.env.NEXT_PUBLIC_SERVER_URL ||
-  "http://localhost:5000"
-).replace(/\/api\/?$/, "").replace(/\/$/, "");
-
-const API_BASE_URL = `${SERVER_BASE_URL}/api`;
+import { getApiBaseUrl } from "@/lib/api/config";
+import { getAuthHeaders } from "@/lib/jwt";
 
 // -------------------------------------------------------------
 // Mutating Actions (POST, PATCH, DELETE) for Restaurant
@@ -20,10 +14,12 @@ export async function createRestaurantProfile(
   payload: Partial<IRestaurant>
 ): Promise<ApiResponse<IRestaurant>> {
   try {
-    const res = await fetch(`${API_BASE_URL}/restaurants`, {
+    const authHeaders = await getAuthHeaders();
+    const res = await fetch(`${getApiBaseUrl()}/restaurants`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
+        ...authHeaders,
       },
       body: JSON.stringify(payload),
     });
@@ -47,13 +43,15 @@ export async function updateRestaurantProfile(
   payload: Partial<IRestaurant>
 ): Promise<ApiResponse<IRestaurant>> {
   try {
-    const url = new URL(`${API_BASE_URL}/restaurants/my-profile`);
+    const authHeaders = await getAuthHeaders();
+    const url = new URL(`${getApiBaseUrl()}/restaurants/my-profile`);
     url.searchParams.append("ownerEmail", ownerEmail);
 
     const res = await fetch(url.toString(), {
       method: "PATCH",
       headers: {
         "Content-Type": "application/json",
+        ...authHeaders,
       },
       body: JSON.stringify(payload),
     });
@@ -77,10 +75,12 @@ export async function toggleRestaurantStatus(
   isOpen: boolean
 ): Promise<ApiResponse<IRestaurant>> {
   try {
-    const res = await fetch(`${API_BASE_URL}/restaurants/toggle-status`, {
+    const authHeaders = await getAuthHeaders();
+    const res = await fetch(`${getApiBaseUrl()}/restaurants/toggle-status`, {
       method: "PATCH",
       headers: {
         "Content-Type": "application/json",
+        ...authHeaders,
       },
       body: JSON.stringify({ ownerEmail, isOpen }),
     });
@@ -103,10 +103,12 @@ export async function createFoodItem(
   payload: Partial<IMenuItem> & { status?: "available" | "unavailable" }
 ): Promise<ApiResponse<IMenuItem>> {
   try {
-    const res = await fetch(`${API_BASE_URL}/restaurants/food`, {
+    const authHeaders = await getAuthHeaders();
+    const res = await fetch(`${getApiBaseUrl()}/restaurants/food`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
+        ...authHeaders,
       },
       body: JSON.stringify(payload),
     });
@@ -130,13 +132,15 @@ export async function deleteRestaurantProfile(
   ownerEmail?: string
 ): Promise<ApiResponse<IRestaurant>> {
   try {
-    const url = new URL(`${API_BASE_URL}/restaurants/${id}`);
+    const authHeaders = await getAuthHeaders();
+    const url = new URL(`${getApiBaseUrl()}/restaurants/${id}`);
     if (ownerEmail) url.searchParams.append("ownerEmail", ownerEmail);
 
     const res = await fetch(url.toString(), {
       method: "DELETE",
       headers: {
         "Content-Type": "application/json",
+        ...authHeaders,
       },
     });
 
@@ -159,10 +163,12 @@ export async function updateFoodItemAction(
   payload: Partial<IMenuItem>
 ): Promise<ApiResponse<IMenuItem>> {
   try {
-    const res = await fetch(`${API_BASE_URL}/restaurants/food/${foodId}`, {
+    const authHeaders = await getAuthHeaders();
+    const res = await fetch(`${getApiBaseUrl()}/restaurants/food/${foodId}`, {
       method: "PATCH",
       headers: {
         "Content-Type": "application/json",
+        ...authHeaders,
       },
       body: JSON.stringify(payload),
     });
@@ -186,10 +192,12 @@ export async function toggleFoodItemAvailabilityAction(
   isAvailable: boolean
 ): Promise<ApiResponse<IMenuItem>> {
   try {
-    const res = await fetch(`${API_BASE_URL}/restaurants/food/${foodId}/status`, {
+    const authHeaders = await getAuthHeaders();
+    const res = await fetch(`${getApiBaseUrl()}/restaurants/food/${foodId}/status`, {
       method: "PATCH",
       headers: {
         "Content-Type": "application/json",
+        ...authHeaders,
       },
       body: JSON.stringify({ isAvailable, status: isAvailable ? "available" : "unavailable" }),
     });
@@ -212,10 +220,12 @@ export async function deleteFoodItemAction(
   foodId: string
 ): Promise<ApiResponse<null>> {
   try {
-    const res = await fetch(`${API_BASE_URL}/restaurants/food/${foodId}`, {
+    const authHeaders = await getAuthHeaders();
+    const res = await fetch(`${getApiBaseUrl()}/restaurants/food/${foodId}`, {
       method: "DELETE",
       headers: {
         "Content-Type": "application/json",
+        ...authHeaders,
       },
     });
 
@@ -229,4 +239,3 @@ export async function deleteFoodItemAction(
     };
   }
 }
-

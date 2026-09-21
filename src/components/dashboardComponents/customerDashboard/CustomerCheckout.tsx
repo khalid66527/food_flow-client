@@ -36,10 +36,11 @@ import { getAddresses } from "@/lib/api/address";
 import { createOrderApi } from "@/lib/api/order";
 import { getPlatformSettings } from "@/lib/api/settings";
 import { applyCouponApi, getCoupons, TCoupon } from "@/lib/api/coupon";
+import { getAllZones } from "@/lib/api/zone";
+import { IZone } from "@/types/zone";
+import { getSingleRestaurantById } from "@/lib/api/restaurant";
+import { resolveZoneDeliveryFee } from "@/lib/utils/deliveryFee";
 import AddressQuickSwitcherModal from "./AddressQuickSwitcherModal";
-
-const DELIVERY_FEE = 40;
-const FREE_DELIVERY_THRESHOLD = 500;
 
 export default function CustomerCheckout() {
   const router = useRouter();
@@ -96,9 +97,11 @@ export default function CustomerCheckout() {
 
 
 
-  // Platform Settings State
+  // Platform Settings & Zones State
   const [vatPercentage, setVatPercentage] = useState<number>(5);
   const [deliveryFeeBase, setDeliveryFeeBase] = useState<number>(40);
+  const [allZones, setAllZones] = useState<IZone[]>([]);
+  const [restaurant, setRestaurant] = useState<any | null>(null);
 
   // Coupon Engine State
   const [availableCoupons, setAvailableCoupons] = useState<TCoupon[]>([]);
@@ -111,21 +114,43 @@ export default function CustomerCheckout() {
   const [couponLoading, setCouponLoading] = useState<boolean>(false);
   const [couponMessage, setCouponMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
 
-  // Fetch Platform Settings
+  // Fetch Platform Settings & All Delivery Zones
   useEffect(() => {
-    const loadSettings = async () => {
+    const loadSettingsAndZones = async () => {
       try {
-        const res = await getPlatformSettings();
-        if (res.success && res.data) {
-          setVatPercentage(res.data.vatPercentage);
-          setDeliveryFeeBase(res.data.deliveryFeeBase);
+        const [settingsRes, zonesRes] = await Promise.all([
+          getPlatformSettings(),
+          getAllZones({ isActive: "true" }),
+        ]);
+
+        if (settingsRes.success && settingsRes.data) {
+          setVatPercentage(settingsRes.data.vatPercentage);
+          setDeliveryFeeBase(settingsRes.data.deliveryFeeBase);
+        }
+
+        if (zonesRes.success && Array.isArray(zonesRes.data)) {
+          setAllZones(zonesRes.data);
         }
       } catch (err) {
-        console.warn("Failed to load platform settings:", err);
+        console.warn("Failed to load platform settings or zones:", err);
       }
     };
-    loadSettings();
+    loadSettingsAndZones();
   }, []);
+
+  // Fetch restaurant details for active items to resolve restaurant zone if needed
+  useEffect(() => {
+    const restId = activeItems[0]?.foodItem?.restaurantId;
+    if (restId) {
+      getSingleRestaurantById(restId)
+        .then((res) => {
+          if (res.success && res.data) {
+            setRestaurant(res.data);
+          }
+        })
+        .catch((e) => console.warn("Could not fetch restaurant details:", e));
+    }
+  }, [activeItems]);
 
   // Fetch Available Active Coupons for Daraz-style Selection List (Personalized for User)
   useEffect(() => {
@@ -145,9 +170,31 @@ export default function CustomerCheckout() {
     loadCoupons();
   }, [userId]);
 
-  // Dynamic Delivery Fee based strictly on system settings rules
+  // Dynamic Zone-Wise Delivery Fee Calculation
+  const resolvedDelivery = React.useMemo(() => {
+    if (activeSubtotal === 0) {
+      return {
+        deliveryFee: 0,
+        baseFee: 0,
+        perKmFee: 0,
+        zoneName: null,
+        matchedZone: null,
+        distanceKm: undefined,
+        resolutionSource: "GLOBAL_FALLBACK" as const,
+      };
+    }
+    return resolveZoneDeliveryFee({
+      address: selectedAddress,
+      allZones,
+      restaurant,
+      fallbackBaseFee: deliveryFeeBase,
+    });
+  }, [activeSubtotal, selectedAddress, allZones, restaurant, deliveryFeeBase]);
+
   const vatAmount = Math.round(activeSubtotal * (vatPercentage / 100) * 100) / 100;
-  const deliveryFee = activeSubtotal === 0 ? 0 : deliveryFeeBase;
+  const deliveryFee = resolvedDelivery.deliveryFee;
+  const detectedZoneName = resolvedDelivery.zoneName;
+  const distanceKm = resolvedDelivery.distanceKm;
   const couponDiscount = appliedCoupon ? appliedCoupon.discountAmount : 0;
   const grandTotal = Math.max(0, activeSubtotal + vatAmount + deliveryFee - couponDiscount);
 
@@ -706,9 +753,38 @@ export default function CustomerCheckout() {
               </div>
 
               <div className="flex items-center justify-between text-gray-600">
-                <span>Delivery Fee</span>
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  <span>Delivery Fee</span>
+                  {detectedZoneName && (
+                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-orange-100 text-[#FF6B35]">
+                      {detectedZoneName}
+                    </span>
+                  )}
+                </div>
                 <span className="font-bold text-gray-900">
                   +Tk {deliveryFee.toFixed(2)}
+                </span>
+              </div>
+
+              {/* Distance Breakdown in Small Text */}
+              <div className="flex items-center justify-between text-[11px] text-gray-400 font-medium -mt-1 pl-0.5">
+                <span className="flex items-center gap-1">
+                  <span>
+                    📍 Distance:{" "}
+                    <strong className="text-gray-600 font-semibold">
+                      {distanceKm !== undefined
+                        ? `${distanceKm} km`
+                        : "Within 2.0 km"}
+                    </strong>
+                  </span>
+                  {resolvedDelivery.perKmFee > 0 && (
+                    <span className="text-[10px] text-gray-400">
+                      (Base ৳{resolvedDelivery.baseFee}{resolvedDelivery.perKmFee ? ` • +৳${resolvedDelivery.perKmFee}/km` : ""})
+                    </span>
+                  )}
+                </span>
+                <span className="text-[10px] text-gray-400">
+                  Zone Rate
                 </span>
               </div>
 

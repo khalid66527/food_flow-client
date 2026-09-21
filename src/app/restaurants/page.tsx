@@ -25,7 +25,8 @@ import { getGlobalCategories } from '@/lib/api/category';
 import FoodCard from '@/components/restaurants/FoodCard';
 import { useCart } from '@/contexts/CartContext';
 import LoadingSpinner from '@/lib/api/LoadingSpinner';
-import { getRealTimeLocation, subscribeLocation, detectRealTimeLocation, ILocationInfo } from '@/lib/location';
+import { getRealTimeLocation, subscribeLocation, detectRealTimeLocation, ILocationInfo, DEFAULT_INITIAL_LOCATION } from '@/lib/location';
+import LocationModal from '@/components/common/LocationModal';
 
 // ---------------------------------------------------------------------------
 // SIDEBAR CATEGORY DEFINITIONS
@@ -175,13 +176,17 @@ function ExploreFoodContent() {
 
   // Mobile sidebar overlay
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [isMounted, setIsMounted] = useState(false);
+  const [isLocationReady, setIsLocationReady] = useState(false);
 
   // Dynamic Real-Time Location State
-  const [locationInfo, setLocationInfo] = useState<ILocationInfo>(() => getRealTimeLocation());
+  const [locationInfo, setLocationInfo] = useState<ILocationInfo>(DEFAULT_INITIAL_LOCATION);
 
   useEffect(() => {
+    setIsMounted(true);
     const initialLoc = getRealTimeLocation();
     setLocationInfo({ ...initialLoc });
+    setIsLocationReady(true);
 
     const unsubscribe = subscribeLocation(() => {
       const latest = getRealTimeLocation();
@@ -238,32 +243,32 @@ function ExploreFoodContent() {
     fetchCategories();
   }, []);
 
-  // Fetch restaurants for the top-bar dropdown strictly filtered by active location
+  // Fetch restaurants for the top-bar dropdown strictly filtered by active delivery zone
   useEffect(() => {
     const fetchRestaurants = async () => {
       try {
-        const params: Record<string, any> = {};
-        if (locationFilterMode === 'upazila' && locationInfo.upazila) {
-          params.upazila = locationInfo.upazila;
-        } else if (locationFilterMode === 'district' && locationInfo.district) {
-          params.district = locationInfo.district;
-        } else if (locationFilterMode === 'division' && locationInfo.division) {
-          params.division = locationInfo.division;
-        } else if (locationFilterMode === 'auto') {
-          if (activeMatchedTier === 'upazila' && locationInfo.upazila) {
-            params.upazila = locationInfo.upazila;
-          } else if (activeMatchedTier === 'district' && locationInfo.district) {
-            params.district = locationInfo.district;
-          } else if (activeMatchedTier === 'division' && locationInfo.division) {
-            params.division = locationInfo.division;
-          } else if (locationInfo.district) {
-            params.district = locationInfo.district;
-          } else if (locationInfo.division) {
-            params.division = locationInfo.division;
-          }
+        const activeZoneIds =
+          locationInfo.candidateZoneIds && locationInfo.candidateZoneIds.length > 0
+            ? locationInfo.candidateZoneIds
+            : locationInfo.currentZoneId
+            ? [locationInfo.currentZoneId]
+            : [];
+
+        if (activeZoneIds.length === 0) {
+          setAvailableRestaurants([]);
+          setSelectedRestaurant('all');
+          return;
         }
 
-        const res = await getAllRestaurants(params);
+        const queryParams: Record<string, string> = {
+          zoneId: activeZoneIds.join(','),
+        };
+        if (locationInfo.lat && locationInfo.lng) {
+          queryParams.lat = String(locationInfo.lat);
+          queryParams.lng = String(locationInfo.lng);
+        }
+
+        const res = await getAllRestaurants(queryParams);
         if (res.success && Array.isArray(res.data)) {
           const list = res.data
             .map((r) => ({
@@ -273,15 +278,23 @@ function ExploreFoodContent() {
             .filter((r) => r.id);
 
           setAvailableRestaurants(list);
+          setSelectedRestaurant((prev) => (list.some((r) => r.id === prev) ? prev : 'all'));
         } else {
           setAvailableRestaurants([]);
+          setSelectedRestaurant('all');
         }
       } catch {
         setAvailableRestaurants([]);
+        setSelectedRestaurant('all');
       }
     };
     fetchRestaurants();
-  }, [locationInfo, activeMatchedTier, locationFilterMode]);
+  }, [
+    locationInfo.currentZoneId,
+    (locationInfo.candidateZoneIds || []).join(','),
+    locationInfo.lat,
+    locationInfo.lng,
+  ]);
 
   // Reset to page 1 when responsive limit changes (viewport resize)
   useEffect(() => {
@@ -307,10 +320,15 @@ function ExploreFoodContent() {
     return items.filter((item) => isMatchingCategory(item.category, selectedCategory));
   };
 
+  // Dynamic location modal state
+  const [isLocationModalOpen, setIsLocationModalOpen] = useState(false);
+
   // ---------------------------------------------------------------------------
-  // CASCADING HIERARCHICAL FETCH ALGORITHM (উপজেলা -> জেলা -> বিভাগ -> All)
+  // STRICT ZONE-BASED GEOFENCING DELIVERY DISCOVERY
   // ---------------------------------------------------------------------------
   const fetchFoodItems = useCallback(async () => {
+    if (!isLocationReady) return;
+
     setLoading(true);
     setError(null);
 
@@ -320,10 +338,6 @@ function ExploreFoodContent() {
       sortBy,
     };
 
-    if (locationInfo.lat !== undefined && locationInfo.lng !== undefined) {
-      baseQuery.lat = String(locationInfo.lat);
-      baseQuery.lng = String(locationInfo.lng);
-    }
     if (debouncedSearch.trim()) baseQuery.search = debouncedSearch.trim();
     if (selectedRestaurant !== 'all') baseQuery.restaurantId = selectedRestaurant;
     if (selectedCategory !== 'all') baseQuery.category = selectedCategory;
@@ -331,149 +345,46 @@ function ExploreFoodContent() {
     if (isSpicy) baseQuery.isSpicy = 'true';
 
     try {
-      // 1. User selected explicit Upazila filter
-      if (locationFilterMode === 'upazila') {
-        const query = { ...baseQuery, upazila: locationInfo.upazila || locationInfo.area || '' };
-        const res = await getAllGlobalFoodItems(query);
-        if (res.success && Array.isArray(res.data) && res.data.length > 0) {
-          setFoodItems(filterBySelectedCategory(res.data));
-          setActiveMatchedTier('upazila');
-          if ((res as unknown as { pagination?: typeof pagination }).pagination) {
-            setPagination((res as unknown as { pagination: typeof pagination }).pagination);
-          }
-        } else {
-          setFoodItems([]);
-          setActiveMatchedTier('upazila');
-        }
-        return;
-      }
+      // 1. Strict Delivery Geofence: Query by resolved Delivery Zone IDs
+      const activeZoneIds =
+        locationInfo.candidateZoneIds && locationInfo.candidateZoneIds.length > 0
+          ? locationInfo.candidateZoneIds
+          : locationInfo.currentZoneId
+          ? [locationInfo.currentZoneId]
+          : [];
 
-      // 2. User selected explicit District filter
-      if (locationFilterMode === 'district') {
-        const query = { ...baseQuery, district: locationInfo.district || locationInfo.city || '' };
-        const res = await getAllGlobalFoodItems(query);
-        if (res.success && Array.isArray(res.data) && res.data.length > 0) {
-          setFoodItems(filterBySelectedCategory(res.data));
-          setActiveMatchedTier('district');
-          if ((res as unknown as { pagination?: typeof pagination }).pagination) {
-            setPagination((res as unknown as { pagination: typeof pagination }).pagination);
-          }
-        } else {
-          setFoodItems([]);
-          setActiveMatchedTier('district');
-        }
-        return;
-      }
-
-      // 3. User selected explicit Division filter
-      if (locationFilterMode === 'division') {
-        const query = { ...baseQuery, division: locationInfo.division || locationInfo.city || '' };
-        const res = await getAllGlobalFoodItems(query);
-        if (res.success && Array.isArray(res.data) && res.data.length > 0) {
-          setFoodItems(filterBySelectedCategory(res.data));
-          setActiveMatchedTier('division');
-          if ((res as unknown as { pagination?: typeof pagination }).pagination) {
-            setPagination((res as unknown as { pagination: typeof pagination }).pagination);
-          }
-        } else {
-          setFoodItems([]);
-          setActiveMatchedTier('division');
-        }
-        return;
-      }
-
-      // 4. User selected explicit All regions filter
-      if (locationFilterMode === 'all') {
-        const res = await getAllGlobalFoodItems(baseQuery);
-        if (res.success && Array.isArray(res.data)) {
-          setFoodItems(filterBySelectedCategory(res.data));
-          setActiveMatchedTier('all');
-          if ((res as unknown as { pagination?: typeof pagination }).pagination) {
-            setPagination((res as unknown as { pagination: typeof pagination }).pagination);
-          }
-        } else {
-          setFoodItems([]);
-        }
-        return;
-      }
-
-      // 5. DEFAULT SMART CASCADING & PRIORITY MODE ('auto'):
-      const userUpazila = locationInfo.hasRealLocation ? locationInfo.upazila?.trim() : '';
-      const userDistrict = locationInfo.hasRealLocation ? (locationInfo.district || locationInfo.city || '').trim() : '';
-      const userDivision = locationInfo.hasRealLocation ? (locationInfo.division || locationInfo.city || '').trim() : '';
-
-      // Step A: If user has a specific Upazila, try Upazila dishes first
-      if (userUpazila) {
-        const upazilaRes = await getAllGlobalFoodItems({
+      if (activeZoneIds.length > 0) {
+        const foodQuery: Record<string, string> = {
           ...baseQuery,
-          upazila: userUpazila,
-        });
+          zoneId: activeZoneIds.join(','),
+        };
+        if (locationInfo.lat && locationInfo.lng) {
+          foodQuery.lat = String(locationInfo.lat);
+          foodQuery.lng = String(locationInfo.lng);
+        }
 
-        if (upazilaRes.success && Array.isArray(upazilaRes.data) && upazilaRes.data.length > 0) {
-          const filtered = filterBySelectedCategory(upazilaRes.data);
-          if (filtered.length > 0) {
-            setFoodItems(filtered);
-            setActiveMatchedTier('upazila');
-            if ((upazilaRes as unknown as { pagination?: typeof pagination }).pagination) {
-              setPagination((upazilaRes as unknown as { pagination: typeof pagination }).pagination);
-            }
-            return;
+        const zoneRes = await getAllGlobalFoodItems(foodQuery);
+
+        if (zoneRes.success && Array.isArray(zoneRes.data) && zoneRes.data.length > 0) {
+          const filtered = filterBySelectedCategory(zoneRes.data);
+          setFoodItems(filtered);
+          if ((zoneRes as unknown as { pagination?: typeof pagination }).pagination) {
+            setPagination((zoneRes as unknown as { pagination: typeof pagination }).pagination);
           }
+          return;
         }
       }
 
-      // Step B: Try User's District
-      if (userDistrict) {
-        const districtRes = await getAllGlobalFoodItems({
-          ...baseQuery,
-          district: userDistrict,
-        });
-
-        if (districtRes.success && Array.isArray(districtRes.data) && districtRes.data.length > 0) {
-          const filtered = filterBySelectedCategory(districtRes.data);
-          if (filtered.length > 0) {
-            setFoodItems(filtered);
-            setActiveMatchedTier('district');
-            if ((districtRes as unknown as { pagination?: typeof pagination }).pagination) {
-              setPagination((districtRes as unknown as { pagination: typeof pagination }).pagination);
-            }
-            return;
-          }
-        }
-      }
-
-      // Step C: Try User's Division
-      if (userDivision) {
-        const divisionRes = await getAllGlobalFoodItems({
-          ...baseQuery,
-          division: userDivision,
-        });
-
-        if (divisionRes.success && Array.isArray(divisionRes.data) && divisionRes.data.length > 0) {
-          const filtered = filterBySelectedCategory(divisionRes.data);
-          if (filtered.length > 0) {
-            setFoodItems(filtered);
-            setActiveMatchedTier('division');
-            if ((divisionRes as unknown as { pagination?: typeof pagination }).pagination) {
-              setPagination((divisionRes as unknown as { pagination: typeof pagination }).pagination);
-            }
-            return;
-          }
-        }
-      }
-
-      // Step D: Fallback to all global food items
-      const globalRes = await getAllGlobalFoodItems(baseQuery);
-      if (globalRes.success && Array.isArray(globalRes.data)) {
-        setFoodItems(filterBySelectedCategory(globalRes.data));
-        setActiveMatchedTier('all');
-        if ((globalRes as unknown as { pagination?: typeof pagination }).pagination) {
-          setPagination((globalRes as unknown as { pagination: typeof pagination }).pagination);
-        }
-      } else {
-        setFoodItems([]);
-        setActiveMatchedTier('all');
-      }
+      // 2. Outside Service Area / 0 restaurants delivering to this area
+      setFoodItems([]);
+      setPagination({
+        currentPage: 1,
+        totalPages: 1,
+        totalItems: 0,
+        itemsPerPage: 12,
+        hasNextPage: false,
+        hasPrevPage: false,
+      });
     } catch {
       setFoodItems([]);
       setError('Something went wrong while fetching dishes. Please try again.');
@@ -491,6 +402,7 @@ function ExploreFoodContent() {
     responsiveLimit,
     locationFilterMode,
     locationInfo,
+    isLocationReady,
   ]);
 
   useEffect(() => {
@@ -685,30 +597,38 @@ function ExploreFoodContent() {
                 <span>Smart Location Discovery</span>
               </div>
               <h1 className="text-2xl md:text-3xl font-extrabold tracking-tight text-white">
-                Explore Dishes Near You
+                Explore Delivery Zone Dishes
               </h1>
               <p className="text-orange-100 text-xs sm:text-sm mt-1 max-w-xl">
-                Automatically checking restaurants in your <strong>Upazila</strong>, <strong>District</strong>, and <strong>Division</strong> for express doorstep delivery.
+                Serving verified restaurants within your active delivery geofence with express doorstep delivery.
               </p>
             </div>
 
             <div className="flex flex-wrap items-center gap-3">
-              {/* Location display badge */}
+              {/* Location display badge (Click to open zone modal) */}
               <button
                 type="button"
-                onClick={() => detectRealTimeLocation()}
+                onClick={() => setIsLocationModalOpen(true)}
                 className="flex items-center gap-2 bg-white/15 hover:bg-white/25 backdrop-blur-md border border-white/25 rounded-2xl px-4 py-2.5 text-white text-xs font-medium shadow-inner transition-colors cursor-pointer text-left"
-                title="Click to detect GPS location"
+                title="Click to select or change delivery zone"
               >
                 <MapPin className="w-4 h-4 text-amber-300 shrink-0 animate-bounce" />
                 <div className="flex flex-col text-left">
                   <span className="text-[10px] text-amber-200 uppercase font-extrabold tracking-wider">
-                    {locationInfo.hasRealLocation ? "Detected Location" : "Location"}
+                    {isMounted && locationInfo.zoneName
+                      ? "Delivery Zone"
+                      : isMounted && !locationInfo.isInsideServiceArea && locationInfo.hasRealLocation
+                      ? "Outside Service Area"
+                      : isMounted && locationInfo.hasRealLocation
+                      ? "Detected Location"
+                      : "Location"}
                   </span>
                   <span className="truncate max-w-[200px] font-bold text-white text-xs">
-                    {locationInfo.hasRealLocation
-                      ? (locationInfo.upazila ? `${locationInfo.upazila}, ` : '') + (locationInfo.district || locationInfo.city)
-                      : "Location Off"}
+                    {isMounted
+                      ? (locationInfo.zoneName
+                          ? locationInfo.zoneName
+                          : locationInfo.upazila || locationInfo.district || locationInfo.city || "Location Off")
+                      : "Location"}
                   </span>
                 </div>
               </button>
@@ -718,9 +638,16 @@ function ExploreFoodContent() {
                 <select
                   value={selectedRestaurant}
                   onChange={(e) => { setSelectedRestaurant(e.target.value); setCurrentPage(1); }}
-                  className="appearance-none bg-white text-gray-800 text-xs sm:text-sm font-medium py-2.5 pl-3.5 pr-8 rounded-xl shadow-sm border border-orange-200 focus:outline-none focus:ring-2 focus:ring-amber-300 cursor-pointer"
+                  disabled={availableRestaurants.length === 0}
+                  className={`appearance-none bg-white text-gray-800 text-xs sm:text-sm font-medium py-2.5 pl-3.5 pr-8 rounded-xl shadow-sm border border-orange-200 focus:outline-none focus:ring-2 focus:ring-amber-300 cursor-pointer ${
+                    availableRestaurants.length === 0 ? 'opacity-75 cursor-not-allowed bg-gray-50' : ''
+                  }`}
                 >
-                  <option value="all">All Partner Restaurants</option>
+                  <option value="all">
+                    {availableRestaurants.length > 0
+                      ? 'All Zone Restaurants'
+                      : 'No Restaurants Available'}
+                  </option>
                   {availableRestaurants.map((r) => (
                     <option key={r.id} value={r.id}>{r.name}</option>
                   ))}
@@ -918,31 +845,34 @@ function ExploreFoodContent() {
               </motion.div>
             )}
 
-            {/* EMPTY */}
+            {/* EMPTY / OUTSIDE SERVICE AREA */}
             {!loading && !error && foodItems.length === 0 && (
-              <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="text-center py-20 bg-white rounded-3xl border border-gray-100 p-8 shadow-xs">
-                <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-orange-50 border border-orange-200 mb-4">
-                  <UtensilsCrossed className="w-8 h-8 text-orange-400" />
+              <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="text-center py-16 bg-white rounded-3xl border border-gray-100 p-8 shadow-xs max-w-2xl mx-auto">
+                <div className="inline-flex items-center justify-center w-16 h-16 rounded-3xl bg-orange-50 border border-orange-200 mb-4 text-orange-500 shadow-inner">
+                  <MapPin className="w-8 h-8 animate-bounce" />
                 </div>
-                <h3 className="text-base font-bold text-gray-800 mb-1">No dishes found in this area</h3>
-                <p className="text-xs text-gray-500 max-w-md mx-auto mb-6">
-                  {locationFilterMode !== 'all'
-                    ? `No partner restaurants have published dishes matching your search in ${locationFilterMode.toUpperCase()} scope. Try broadening your location to "All Locations".`
-                    : 'Try adjusting your search keywords or clearing active filters.'}
+                <h3 className="text-lg font-black text-gray-800 mb-2">
+                  {locationInfo.zoneName
+                    ? `Delivery Not Available in ${locationInfo.zoneName}`
+                    : `Delivery Not Available in ${locationInfo.district || locationInfo.upazila || locationInfo.city || 'Your Area'}`}
+                </h3>
+                <p className="text-xs sm:text-sm text-gray-500 max-w-md mx-auto mb-6 leading-relaxed">
+                  Our delivery partners have not started service in this specific area yet. Please select an active delivery zone to view available restaurants and dishes.
                 </p>
                 <div className="flex flex-wrap items-center justify-center gap-3">
-                  {locationFilterMode !== 'all' && (
-                    <button
-                      type="button"
-                      onClick={() => { setLocationFilterMode('all'); setCurrentPage(1); }}
-                      className="px-5 py-2.5 bg-gray-900 hover:bg-black text-white text-xs font-bold rounded-xl transition cursor-pointer shadow-sm"
-                    >
-                      Show All Locations
+                  <button
+                    type="button"
+                    onClick={() => setIsLocationModalOpen(true)}
+                    className="px-6 py-3 bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white text-xs font-bold rounded-2xl transition-all shadow-md shadow-orange-500/20 cursor-pointer flex items-center gap-2"
+                  >
+                    <MapPin className="w-4 h-4" />
+                    Change Delivery Zone
+                  </button>
+                  {hasActiveFilters && (
+                    <button type="button" onClick={handleResetFilters} className="px-5 py-3 border border-gray-200 text-gray-700 hover:bg-gray-50 text-xs font-bold rounded-2xl transition cursor-pointer">
+                      Reset Filters
                     </button>
                   )}
-                  <button type="button" onClick={handleResetFilters} className="px-5 py-2.5 bg-orange-500 hover:bg-orange-600 text-white text-xs font-bold rounded-xl transition cursor-pointer shadow-sm shadow-orange-500/20">
-                    Reset All Filters
-                  </button>
                 </div>
               </motion.div>
             )}
@@ -995,6 +925,12 @@ function ExploreFoodContent() {
           </main>
         </div>
       </div>
+
+      {/* Location / Zone Selection Modal */}
+      <LocationModal
+        isOpen={isLocationModalOpen}
+        onClose={() => setIsLocationModalOpen(false)}
+      />
     </div>
   );
 }

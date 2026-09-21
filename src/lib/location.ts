@@ -1,13 +1,21 @@
 "use client";
 
 import { BANGLADESH_LOCATIONS } from "@/data/bangladeshLocations";
+import { detectZone } from "@/lib/api/zone";
 
 export interface ILocationInfo {
   city: string;
   area: string;
+  formattedAddress?: string;
   division?: string;
   district?: string;
   upazila?: string;
+  currentZoneId?: string;
+  zoneName?: string;
+  candidateZoneIds?: string[];
+  maxDeliveryRadiusKm?: number;
+  isInsideServiceArea?: boolean;
+  isManualPreference?: boolean;
   isDetecting: boolean;
   hasRealLocation: boolean;
   error?: string | null;
@@ -15,7 +23,7 @@ export interface ILocationInfo {
   lng?: number;
 }
 
-const DEFAULT_INITIAL_LOCATION: ILocationInfo = {
+export const DEFAULT_INITIAL_LOCATION: ILocationInfo = {
   city: "Bangladesh",
   area: "All Bangladesh",
   division: "",
@@ -27,10 +35,16 @@ const DEFAULT_INITIAL_LOCATION: ILocationInfo = {
 
 let cachedLocation: ILocationInfo = { ...DEFAULT_INITIAL_LOCATION };
 
-// Clear any stale cached location from localStorage on load
+// Load user saved location preference from localStorage if present
 if (typeof window !== "undefined") {
   try {
-    localStorage.removeItem("food_flow_user_location");
+    const saved = localStorage.getItem("food_flow_user_location");
+    if (saved) {
+      const parsed = JSON.parse(saved);
+      if (parsed && parsed.hasRealLocation) {
+        cachedLocation = { ...DEFAULT_INITIAL_LOCATION, ...parsed, isDetecting: false };
+      }
+    }
   } catch {}
 }
 
@@ -269,7 +283,13 @@ export function updateRealTimeLocation(
   area?: string,
   lat?: number,
   lng?: number,
-  hierarchy?: { division?: string; district?: string; upazila?: string }
+  hierarchy?: { division?: string; district?: string; upazila?: string },
+  zoneInfo?: {
+    currentZoneId?: string;
+    zoneName?: string;
+    candidateZoneIds?: string[];
+    maxDeliveryRadiusKm?: number;
+  }
 ) {
   const cleanCity = city.trim();
   const cleanArea = area ? area.trim() : `${cleanCity} Central`;
@@ -278,60 +298,137 @@ export function updateRealTimeLocation(
     lastResolvedCoords = { lat, lng };
   }
 
-  const newLoc = {
+  const newLoc: ILocationInfo = {
     city: cleanCity,
     area: cleanArea,
-    division: hierarchy?.division || cachedLocation.division || cleanCity,
-    district: hierarchy?.district || cachedLocation.district || cleanCity,
-    upazila: hierarchy?.upazila || cachedLocation.upazila || cleanArea,
+    formattedAddress: cleanArea,
+    division: hierarchy?.division || "",
+    district: hierarchy?.district || cleanCity,
+    upazila: hierarchy?.upazila || cleanArea,
+    currentZoneId: zoneInfo ? (zoneInfo.currentZoneId ?? "") : (cachedLocation.currentZoneId ?? ""),
+    zoneName: zoneInfo ? (zoneInfo.zoneName ?? "") : (cachedLocation.zoneName ?? ""),
+    candidateZoneIds: zoneInfo ? (zoneInfo.candidateZoneIds ?? []) : (cachedLocation.candidateZoneIds ?? []),
+    maxDeliveryRadiusKm: zoneInfo?.maxDeliveryRadiusKm ?? 6.0,
+    isInsideServiceArea: Boolean(zoneInfo?.currentZoneId),
+    isManualPreference: true,
     lat: lat ?? cachedLocation.lat,
     lng: lng ?? cachedLocation.lng,
     isDetecting: false,
     hasRealLocation: true,
   };
 
-  const isChanged =
-    cachedLocation.district !== newLoc.district ||
-    cachedLocation.upazila !== newLoc.upazila ||
-    cachedLocation.division !== newLoc.division ||
-    !cachedLocation.hasRealLocation;
-
   cachedLocation = newLoc;
 
-  if (isChanged) {
-    notifyLocationListeners();
+  if (typeof window !== "undefined") {
+    try {
+      localStorage.setItem("food_flow_user_location", JSON.stringify(newLoc));
+    } catch {}
   }
+
+  notifyLocationListeners();
 }
 
-export async function detectRealTimeLocation(): Promise<ILocationInfo> {
+export async function fetchIpBasedLocationFallback(): Promise<ILocationInfo | null> {
+  try {
+    const res = await fetch("https://ipwho.is/", { signal: AbortSignal.timeout(3500) });
+    if (res.ok) {
+      const data = await res.json();
+      if (data && data.success !== false && data.latitude && data.longitude) {
+        const lat = data.latitude;
+        const lon = data.longitude;
+        const parsed = await reverseGeocodeCoordinates(lat, lon);
+
+        let zoneData: any = null;
+        try {
+          const zoneRes = await detectZone(lat, lon);
+          if (zoneRes?.success && zoneRes.data) {
+            zoneData = zoneRes.data;
+          }
+        } catch {}
+
+        const city = parsed.city || data.city || "Dhaka";
+        const district = parsed.district || data.region || "Dhaka";
+        const division = parsed.division || data.region || "Dhaka";
+        const zId =
+          zoneData?.primaryZone?.zoneId !== undefined
+            ? String(zoneData.primaryZone.zoneId)
+            : zoneData?.primaryZone?._id || "";
+
+        return {
+          city,
+          area: parsed.area || `${city} Area`,
+          division,
+          district,
+          upazila: parsed.upazila || "",
+          currentZoneId: zId,
+          zoneName: zoneData?.primaryZone?.name || "",
+          candidateZoneIds:
+            zoneData?.candidateZoneIds && zoneData.candidateZoneIds.length > 0
+              ? zoneData.candidateZoneIds.map(String)
+              : zId
+              ? [zId]
+              : [],
+          maxDeliveryRadiusKm: zoneData?.maxDeliveryRadiusKm || 5.0,
+          isInsideServiceArea: Boolean(zoneData?.isInsideServiceArea && zoneData?.primaryZone),
+          lat,
+          lng: lon,
+          isDetecting: false,
+          hasRealLocation: true,
+        };
+      }
+    }
+  } catch {}
+  return null;
+}
+
+export async function detectRealTimeLocation(force: boolean = false): Promise<ILocationInfo> {
   if (typeof window === "undefined") return cachedLocation;
+
+  // If user previously manually selected a location and this is an automatic background check, keep user choice!
+  if (!force && cachedLocation.isManualPreference && cachedLocation.hasRealLocation) {
+    return cachedLocation;
+  }
 
   return new Promise((resolve) => {
     if (!navigator.geolocation) {
-      cachedLocation = { ...DEFAULT_INITIAL_LOCATION, isDetecting: false };
-      return resolve(cachedLocation);
+      if (cachedLocation.hasRealLocation) {
+        return resolve(cachedLocation);
+      }
+      fetchIpBasedLocationFallback().then((ipLoc) => {
+        if (ipLoc) {
+          cachedLocation = ipLoc;
+          notifyLocationListeners();
+          return resolve(cachedLocation);
+        }
+        cachedLocation = { ...DEFAULT_INITIAL_LOCATION, isDetecting: false };
+        resolve(cachedLocation);
+      });
+      return;
     }
 
     const geoOptions: PositionOptions = {
-      enableHighAccuracy: true, // Force hardware GPS when available
-      timeout: 10000,           // 10 second timeout limit
-      maximumAge: 5000,          // Use recent cached position within 5s to avoid constant jumps
+      enableHighAccuracy: true,
+      timeout: 10000,
+      maximumAge: 5000,
     };
 
     navigator.geolocation.getCurrentPosition(
       async (position) => {
         try {
+          // If user set manual preference while async geolocation was in flight, abort and preserve user choice
+          if (!force && cachedLocation.isManualPreference && cachedLocation.hasRealLocation) {
+            return resolve(cachedLocation);
+          }
+
           const lat = position.coords.latitude;
           const lon = position.coords.longitude;
           const accuracy = position.coords.accuracy;
 
-          // 1. Accuracy Threshold: If accuracy radius is bad (> 2500m) and we already have a location, ignore jitter
           if (accuracy && accuracy > MAX_ACCEPTABLE_ACCURACY && cachedLocation.hasRealLocation) {
             return resolve(cachedLocation);
           }
 
-          // 2. Distance Threshold: If movement from last position is less than MIN_DISTANCE_METERS, do not jump
-          if (lastResolvedCoords && cachedLocation.hasRealLocation) {
+          if (lastResolvedCoords && cachedLocation.hasRealLocation && !force) {
             const distance = getDistanceFromLatLonInMeters(
               lastResolvedCoords.lat,
               lastResolvedCoords.lng,
@@ -347,12 +444,44 @@ export async function detectRealTimeLocation(): Promise<ILocationInfo> {
           const parsed = await reverseGeocodeCoordinates(lat, lon);
           lastResolvedCoords = { lat, lng: lon };
 
+          if (!force && cachedLocation.isManualPreference && cachedLocation.hasRealLocation) {
+            return resolve(cachedLocation);
+          }
+
+          let zoneData: any = null;
+          try {
+            const zoneRes = await detectZone(lat, lon);
+            if (zoneRes?.success && zoneRes.data) {
+              zoneData = zoneRes.data;
+            }
+          } catch {}
+
+          if (!force && cachedLocation.isManualPreference && cachedLocation.hasRealLocation) {
+            return resolve(cachedLocation);
+          }
+
+          const detectedZoneId =
+            zoneData?.primaryZone?.zoneId !== undefined
+              ? String(zoneData.primaryZone.zoneId)
+              : zoneData?.primaryZone?._id || "";
+
           const newLoc: ILocationInfo = {
             city: parsed.city,
             area: parsed.area,
             division: parsed.division,
             district: parsed.district,
             upazila: parsed.upazila,
+            currentZoneId: detectedZoneId,
+            zoneName: zoneData?.primaryZone?.name || "",
+            candidateZoneIds:
+              zoneData?.candidateZoneIds && zoneData.candidateZoneIds.length > 0
+                ? zoneData.candidateZoneIds.map(String)
+                : detectedZoneId
+                ? [detectedZoneId]
+                : [],
+            maxDeliveryRadiusKm: zoneData?.maxDeliveryRadiusKm || 5.0,
+            isInsideServiceArea: Boolean(zoneData?.isInsideServiceArea && zoneData?.primaryZone),
+            isManualPreference: false,
             lat,
             lng: lon,
             isDetecting: false,
@@ -367,22 +496,43 @@ export async function detectRealTimeLocation(): Promise<ILocationInfo> {
 
           cachedLocation = newLoc;
 
+          if (typeof window !== "undefined") {
+            try {
+              localStorage.setItem("food_flow_user_location", JSON.stringify(newLoc));
+            } catch {}
+          }
+
           if (isChanged) {
             notifyLocationListeners();
           }
           resolve(cachedLocation);
         } catch {
+          if (cachedLocation.hasRealLocation) {
+            return resolve(cachedLocation);
+          }
+          const ipLoc = await fetchIpBasedLocationFallback();
+          if (ipLoc) {
+            cachedLocation = ipLoc;
+            notifyLocationListeners();
+            return resolve(cachedLocation);
+          }
           cachedLocation = { ...DEFAULT_INITIAL_LOCATION, isDetecting: false };
           resolve(cachedLocation);
         }
       },
-      (err) => {
+      async (err) => {
         console.warn("Geolocation permission or timeout fallback:", err.message);
-        const wasReal = cachedLocation.hasRealLocation;
-        cachedLocation = { ...DEFAULT_INITIAL_LOCATION, isDetecting: false, error: err.message };
-        if (wasReal) {
-          notifyLocationListeners();
+        // If user already has a valid location, do NOT overwrite it with a distant IP fallback
+        if (cachedLocation.hasRealLocation) {
+          return resolve(cachedLocation);
         }
+        const ipLoc = await fetchIpBasedLocationFallback();
+        if (ipLoc) {
+          cachedLocation = ipLoc;
+          notifyLocationListeners();
+          return resolve(cachedLocation);
+        }
+        cachedLocation = { ...DEFAULT_INITIAL_LOCATION, isDetecting: false, error: err.message };
         resolve(cachedLocation);
       },
       geoOptions

@@ -23,8 +23,10 @@ import {
   getRealTimeLocation, 
   detectRealTimeLocation, 
   subscribeLocation, 
-  ILocationInfo 
+  ILocationInfo,
+  DEFAULT_INITIAL_LOCATION 
 } from "@/lib/location";
+import LocationModal from "@/components/common/LocationModal";
 
 // Better Auth session ba user object-er type definition (Real implementation er jonno)
 type UserRole = "customer" | "restaurant" | "rider" | "admin" | string | null;
@@ -57,7 +59,8 @@ export default function Navbar({
   const [isMounted, setIsMounted] = useState<boolean>(false);
   const [isDropdownOpen, setIsDropdownOpen] = useState<boolean>(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState<boolean>(false);
-  const [locationInfo, setLocationInfo] = useState<ILocationInfo>(() => getRealTimeLocation());
+  const [isLocationModalOpen, setIsLocationModalOpen] = useState<boolean>(false);
+  const [locationInfo, setLocationInfo] = useState<ILocationInfo>(DEFAULT_INITIAL_LOCATION);
 
   const dropdownRef = useRef<HTMLDivElement>(null);
 
@@ -211,14 +214,22 @@ export default function Navbar({
           {/* Real-Time Auto-Detected Location Badge (Beside Cart Button) */}
           <button
             type="button"
-            onClick={() => detectRealTimeLocation()}
+            onClick={() => setIsLocationModalOpen(true)}
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-orange-50/90 hover:bg-orange-100 text-orange-700 border border-orange-200/80 text-xs font-bold shadow-2xs transition-colors cursor-pointer"
-            title="Click to detect GPS location"
+            title={
+              isMounted && locationInfo.zoneName
+                ? `Zone: ${locationInfo.zoneName} (Click to change location)`
+                : isMounted && !locationInfo.isInsideServiceArea && locationInfo.hasRealLocation
+                ? `Outside Service Area (${locationInfo.upazila || locationInfo.district || locationInfo.city}) - Click to change`
+                : "Click to select or change delivery location"
+            }
           >
             <MapPin className="h-3.5 w-3.5 text-orange-500 shrink-0 animate-pulse" />
-            <span className="truncate max-w-[90px] sm:max-w-[125px]">
+            <span className="truncate max-w-[95px] sm:max-w-[135px]">
               {isMounted
-                ? (locationInfo.hasRealLocation
+                ? (locationInfo.zoneName
+                    ? locationInfo.zoneName
+                    : locationInfo.hasRealLocation
                     ? (locationInfo.upazila || locationInfo.district || locationInfo.city)
                     : "Location Off")
                 : "Location"}
@@ -413,6 +424,12 @@ export default function Navbar({
           )}
         </div>
       )}
+
+      {/* Location Selection & Zone Modal */}
+      <LocationModal
+        isOpen={isLocationModalOpen}
+        onClose={() => setIsLocationModalOpen(false)}
+      />
     </header>
   );
 }

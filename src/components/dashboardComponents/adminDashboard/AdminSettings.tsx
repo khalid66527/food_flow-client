@@ -360,7 +360,7 @@ export default function AdminSettings() {
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-1.5">
                 <label className="text-xs font-bold text-gray-700 uppercase tracking-wider">
-                  Base Delivery Fee (Tk)
+                  Fallback Base Delivery Fee (Tk)
                 </label>
                 <div className="relative">
                   <Truck className="w-4 h-4 text-gray-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
@@ -374,6 +374,9 @@ export default function AdminSettings() {
                     className="w-full pl-10 pr-4 py-3 rounded-2xl bg-gray-50/80 border border-gray-200 focus:bg-white focus:border-indigo-600 outline-none text-sm font-semibold transition"
                   />
                 </div>
+                <p className="text-[11px] text-gray-400 leading-tight">
+                  Applied as a fallback if no specific delivery zone matches the order address. Zone-wise rates are configured in <strong>Delivery Zones</strong>.
+                </p>
               </div>
 
               <div className="space-y-1.5">

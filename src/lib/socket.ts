@@ -1,21 +1,12 @@
-"use client";
-
 import { io, Socket } from "socket.io-client";
-
-const SERVER_BASE_URL = (
-  process.env.NEXT_PUBLIC_SERVER_API_URL ||
-  process.env.NEXT_PUBLIC_SERVER_URL ||
-  "http://localhost:5000"
-)
-  .replace(/\/api\/?$/, "")
-  .replace(/\/$/, "");
+import { getServerBaseUrl } from "@/lib/api/config";
 
 let socket: Socket | null = null;
 const activeRooms = new Set<string>();
 
 export function getSocket(): Socket {
   if (!socket) {
-    socket = io(SERVER_BASE_URL, {
+    socket = io(getServerBaseUrl(), {
       transports: ["polling", "websocket"],
       reconnection: true,
       reconnectionAttempts: 10,
