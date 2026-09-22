@@ -1,0 +1,488 @@
+import { IMenuItem, IGlobalFoodItem } from "@/types/restaurant";
+import { getAuthHeaders } from "@/lib/jwt";
+
+export type TOpeningHoursDay = {
+  open: string;
+  close: string;
+  isOpen: boolean;
+};
+
+export type TOpeningHours = {
+  monday?: TOpeningHoursDay;
+  tuesday?: TOpeningHoursDay;
+  wednesday?: TOpeningHoursDay;
+  thursday?: TOpeningHoursDay;
+  friday?: TOpeningHoursDay;
+  saturday?: TOpeningHoursDay;
+  sunday?: TOpeningHoursDay;
+};
+
+export type TAddress = {
+  street: string;
+  city: string;
+  state?: string;
+  division?: string;
+  district?: string;
+  upazila?: string;
+  postalCode?: string;
+  country?: string;
+  latitude?: number;
+  longitude?: number;
+  coordinates?: {
+    latitude: number;
+    longitude: number;
+  };
+  zoneId?: string;
+  fullAddress?: string;
+  area?: string;
+};
+
+export type TPricing = {
+  minOrderAmount: number;
+  deliveryFee: number;
+  estimatedDeliveryTime: string;
+  costForTwo?: number;
+  priceRange?: string;
+  [key: string]: any;
+};
+
+export type TFeatures = {
+  hasDelivery: boolean;
+  hasTakeaway: boolean;
+  hasDineIn: boolean;
+  isPureVeg: boolean;
+  isHalal: boolean;
+  freeDelivery?: boolean;
+  openNow?: boolean;
+  [key: string]: any;
+};
+
+export type TSocialLinks = {
+  facebook?: string;
+  instagram?: string;
+  twitter?: string;
+  website?: string;
+};
+
+export interface IRestaurant {
+  _id?: string;
+  id?: string;
+  ownerId?: string;
+  ownerEmail: string;
+  ownerName?: string;
+  ownerPhone?: string;
+  restaurantName: string;
+  name?: string;
+  slug?: string;
+  tagline?: string;
+  description: string;
+  cuisineTypes: string[];
+  cuisines?: string[];
+  logo: string;
+  bannerImage: string;
+  contactNumber: string;
+  contactEmail: string;
+  website?: string;
+  address: TAddress;
+  openingHours?: TOpeningHours;
+  generalOpenTime?: string;
+  generalCloseTime?: string;
+  pricing: TPricing;
+  features?: TFeatures;
+  socialLinks?: TSocialLinks;
+  rating?: number;
+  totalReviews?: number;
+  reviewCount?: number;
+  deliveryTimeMin?: number;
+  deliveryTimeMax?: number;
+  deliveryFee?: number;
+  minOrderAmount?: number;
+  priceRange?: string;
+  isOpen: boolean;
+  status: "pending" | "active" | "suspended" | "closed";
+  isFeatured?: boolean;
+  discountOffer?: string;
+  zoneId?: string | number;
+  numericZoneId?: number;
+  zoneMongoId?: string;
+  zoneName?: string;
+  latitude?: number;
+  longitude?: number;
+  coordinates?: {
+    latitude: number;
+    longitude: number;
+  };
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export type RestaurantFormData = {
+  restaurantName: string;
+  tagline: string;
+  description: string;
+  cuisineTypes: string[];
+  logo: string;
+  bannerImage: string;
+  contactNumber: string;
+  contactEmail: string;
+  website: string;
+  street: string;
+  city: string;
+  state: string;
+  postalCode: string;
+  country: string;
+  generalOpenTime: string;
+  generalCloseTime: string;
+  minOrderAmount: number | string;
+  deliveryFee: number | string;
+  estimatedDeliveryTime: string;
+  costForTwo: number | string;
+  hasDelivery: boolean;
+  hasTakeaway: boolean;
+  hasDineIn: boolean;
+  isPureVeg: boolean;
+  isHalal: boolean;
+  facebook: string;
+  instagram: string;
+  twitter: string;
+  latitude?: number;
+  longitude?: number;
+  zoneId?: string | number;
+  numericZoneId?: number;
+  zoneName?: string;
+};
+
+export interface ApiResponse<T> {
+  success: boolean;
+  message: string;
+  data?: T;
+  meta?: {
+    page: number;
+    limit: number;
+    total: number;
+    totalPage: number;
+  };
+  error?: any;
+}
+
+import { getApiBaseUrl, getServerBaseUrl } from "@/lib/api/config";
+
+// -------------------------------------------------------------
+// GET Requests / Queries for Restaurant
+// -------------------------------------------------------------
+
+/**
+ * Fetch logged-in user's restaurant profile by owner email / id
+ */
+export async function getMyRestaurantProfile(
+  ownerEmail: string,
+  ownerId?: string
+): Promise<ApiResponse<IRestaurant>> {
+  try {
+    const url = new URL(`${getApiBaseUrl()}/restaurants/my-profile`);
+    if (ownerEmail) url.searchParams.append("ownerEmail", ownerEmail);
+    if (ownerId) url.searchParams.append("ownerId", ownerId);
+
+    const res = await fetch(url.toString(), {
+      method: "GET",
+      headers: getAuthHeaders(ownerId, ownerEmail),
+      cache: "no-store",
+    });
+
+    const data = await res.json();
+    return data;
+  } catch (err: any) {
+    console.error("Error fetching my restaurant profile:", err);
+    return {
+      success: false,
+      message: err.message || "Could not connect to restaurant server.",
+    };
+  }
+}
+
+/**
+ * Fetch all active restaurants for top-bar filter dropdown
+ */
+export async function getAllRestaurants(
+  query: Record<string, string> = {}
+): Promise<ApiResponse<IRestaurant[]>> {
+  try {
+    const url = new URL(`${getApiBaseUrl()}/restaurants`);
+    url.searchParams.append("limit", "100");
+    Object.entries(query).forEach(([key, val]) => {
+      if (val) url.searchParams.append(key, val);
+    });
+
+    const res = await fetch(url.toString(), {
+      method: "GET",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      cache: "no-store",
+    });
+
+    const data = await res.json();
+    return { ...data, data: Array.isArray(data?.data) ? data.data : [] };
+  } catch (err: any) {
+    return {
+      success: false,
+      message: err.message || "Failed to fetch restaurants.",
+      data: [],
+    };
+  }
+}
+
+/**
+ * Get all global food items across all restaurants with filters/pagination
+ */
+export async function getAllGlobalFoodItems(
+  query: Record<string, string> = {}
+): Promise<ApiResponse<IGlobalFoodItem[]>> {
+  try {
+    const url = new URL(`${getApiBaseUrl()}/food`);
+    Object.entries(query).forEach(([key, val]) => {
+      if (val) url.searchParams.append(key, val);
+    });
+
+    const res = await fetch(url.toString(), {
+      method: "GET",
+      headers: {
+        "Content-Type": "application/json",
+      },
+    });
+
+    const data = await res.json();
+    return { ...data, data: Array.isArray(data?.data) ? data.data : [] };
+  } catch (err: any) {
+    return {
+      success: false,
+      message: err.message || "Failed to retrieve food items.",
+      data: [],
+    };
+  }
+}
+
+/**
+ * Get all distinct food categories from the database
+ */
+export async function getFoodCategories(): Promise<ApiResponse<string[]>> {
+  try {
+    const res = await fetch(`${getApiBaseUrl()}/food/categories`, {
+      method: "GET",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      cache: "no-store",
+    });
+
+    const data = await res.json();
+    return { ...data, data: Array.isArray(data?.data) ? data.data : [] };
+  } catch (err: any) {
+    return {
+      success: false,
+      message: err.message || "Failed to fetch categories.",
+      data: [],
+    };
+  }
+}
+
+/**
+ * Get a single food item by ID
+ */
+export async function getSingleFoodItem(
+  foodId: string
+): Promise<ApiResponse<IGlobalFoodItem>> {
+  try {
+    if (!foodId) {
+      return { success: false, message: "Food ID is required." };
+    }
+
+    const res = await fetch(`${getApiBaseUrl()}/food/${foodId}`, {
+      method: "GET",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      cache: "no-store",
+    });
+
+    const data = await res.json();
+    return data;
+  } catch (err: any) {
+    return {
+      success: false,
+      message: err.message || "Failed to fetch food item.",
+    };
+  }
+}
+
+/**
+ * Get a single restaurant profile by ID or Slug
+ */
+export async function getSingleRestaurantById(
+  restaurantId: string
+): Promise<ApiResponse<IRestaurant>> {
+  try {
+    if (!restaurantId) {
+      return { success: false, message: "Restaurant ID is required." };
+    }
+
+    const res = await fetch(`${getApiBaseUrl()}/restaurants/${restaurantId}`, {
+      method: "GET",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      cache: "no-store",
+    });
+
+    const data = await res.json();
+    return data;
+  } catch (err: any) {
+    return {
+      success: false,
+      message: err.message || "Failed to fetch restaurant profile.",
+    };
+  }
+}
+
+/**
+ * Get all menu items for a specific restaurant
+ */
+export async function getRestaurantMenuItems(
+  restaurantId: string
+): Promise<ApiResponse<IMenuItem[]>> {
+  try {
+    if (!restaurantId) {
+      return { success: false, message: "Restaurant ID is required." };
+    }
+
+    const res = await fetch(
+      `${getApiBaseUrl()}/restaurants/food/${restaurantId}`,
+      {
+        method: "GET",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        cache: "no-store",
+      }
+    );
+
+    const data = await res.json();
+    return { ...data, data: Array.isArray(data?.data) ? data.data : [] };
+  } catch (err) {
+    return {
+      success: false,
+      message:
+        err instanceof Error ? err.message : "Failed to fetch menu items.",
+      data: [],
+    };
+  }
+}
+
+/**
+ * Get Grocery Food Items strictly for a specific Restaurant (Protected)
+ */
+export async function getRestaurantGroceryItems(
+  restaurantId: string,
+  ownerId?: string,
+  ownerEmail?: string
+): Promise<ApiResponse<any[]>> {
+  try {
+    if (!restaurantId) {
+      return { success: false, message: "Restaurant ID is required." };
+    }
+
+    const res = await fetch(
+      `${getApiBaseUrl()}/restaurants/grocery/${restaurantId}`,
+      {
+        method: "GET",
+        headers: getAuthHeaders(ownerId, ownerEmail),
+        cache: "no-store",
+      }
+    );
+
+    const data = await res.json();
+    return { ...data, data: Array.isArray(data?.data) ? data.data : [] };
+  } catch (err) {
+    return {
+      success: false,
+      message:
+        err instanceof Error ? err.message : "Failed to fetch restaurant grocery items.",
+      data: [],
+    };
+  }
+}
+
+/**
+ * Aggregate Grocery Ingredient List for a specific Restaurant (Protected)
+ */
+export async function aggregateRestaurantGroceryList(
+  restaurantId: string,
+  selectedItems: Array<{ foodId: string; portions: number }>,
+  ownerId?: string,
+  ownerEmail?: string
+): Promise<ApiResponse<any>> {
+  try {
+    if (!restaurantId) {
+      return { success: false, message: "Restaurant ID is required." };
+    }
+
+    const res = await fetch(
+      `${getApiBaseUrl()}/restaurants/grocery/aggregate`,
+      {
+        method: "POST",
+        headers: getAuthHeaders(ownerId, ownerEmail),
+        body: JSON.stringify({
+          restaurantId,
+          selectedItems,
+        }),
+      }
+    );
+
+    const data = await res.json();
+    return data;
+  } catch (err) {
+    return {
+      success: false,
+      message:
+        err instanceof Error ? err.message : "Failed to aggregate grocery list.",
+    };
+  }
+}
+
+/**
+ * Update Secret Grocery Ingredients / Raw Materials for a specific food item (Protected)
+ */
+export async function updateFoodSecretRecipe(
+  foodId: string,
+  ingredients: string[],
+  ownerId?: string,
+  ownerEmail?: string
+): Promise<ApiResponse<any>> {
+  try {
+    if (!foodId) {
+      return { success: false, message: "Food ID is required." };
+    }
+
+    const res = await fetch(
+      `${getApiBaseUrl()}/restaurants/grocery/food/${foodId}/recipe`,
+      {
+        method: "PATCH",
+        headers: getAuthHeaders(ownerId, ownerEmail),
+        body: JSON.stringify({
+          ingredients,
+        }),
+      }
+    );
+
+    const data = await res.json();
+    return data;
+  } catch (err) {
+    return {
+      success: false,
+      message:
+        err instanceof Error ? err.message : "Failed to save secret recipe ingredients.",
+    };
+  }
+}
+
+
