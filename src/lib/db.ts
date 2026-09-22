@@ -108,5 +108,3 @@ export async function getRiderCollection(): Promise<Collection> {
 
 export { clientPromise };
 export default getDatabase;
-
-

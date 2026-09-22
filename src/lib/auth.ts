@@ -1,3 +1,6 @@
+import dns from "node:dns";
+dns.setServers(["8.8.8.8", "8.8.4.4"]);
+
 import "@/lib/setup-dns";
 import { betterAuth } from "better-auth";
 import { mongodbAdapter } from "@better-auth/mongo-adapter";
@@ -25,10 +28,16 @@ export const auth = betterAuth({
     "http://192.168.110.110:3000",
     "http://localhost:5000",
     "http://192.168.110.110:5000",
-    ...(process.env.BETTER_AUTH_TRUSTED_ORIGINS ? process.env.BETTER_AUTH_TRUSTED_ORIGINS.split(",") : []),
+    ...(process.env.BETTER_AUTH_TRUSTED_ORIGINS
+      ? process.env.BETTER_AUTH_TRUSTED_ORIGINS.split(",")
+      : []),
     ...(process.env.BETTER_AUTH_URL ? [process.env.BETTER_AUTH_URL] : []),
-    ...(process.env.NEXT_PUBLIC_BETTER_AUTH_URL ? [process.env.NEXT_PUBLIC_BETTER_AUTH_URL] : []),
-    ...(process.env.NEXT_PUBLIC_APP_URL ? [process.env.NEXT_PUBLIC_APP_URL] : []),
+    ...(process.env.NEXT_PUBLIC_BETTER_AUTH_URL
+      ? [process.env.NEXT_PUBLIC_BETTER_AUTH_URL]
+      : []),
+    ...(process.env.NEXT_PUBLIC_APP_URL
+      ? [process.env.NEXT_PUBLIC_APP_URL]
+      : []),
   ],
 
   emailAndPassword: {
