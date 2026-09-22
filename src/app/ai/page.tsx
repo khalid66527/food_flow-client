@@ -2,8 +2,6 @@
 
 import React, { useState, useRef, useEffect, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import ReactMarkdown from "react-markdown";
-import remarkGfm from "remark-gfm";
 import AiMarkdownRenderer from "@/components/ai/AiMarkdownRenderer";
 import {
   Send,
@@ -29,7 +27,6 @@ import {
   Volume2,
   VolumeX,
   ShoppingBag,
-<<<<<<< HEAD
   Heart,
   Store,
   Bike,
@@ -39,9 +36,7 @@ import {
   ExternalLink,
   Banknote,
   LayoutDashboard,
-=======
   MapPin,
->>>>>>> ed99c2d (Added: Multi-Model Ai Service Provider Added Like: Groq)
 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -112,11 +107,8 @@ interface ParsedMessageContent {
   recommendedFoods: RecommendedFood[];
   orderStatus: OrderStatusData | null;
   actionButtons: ActionButton[];
-<<<<<<< HEAD
   actionExecute: ActionExecuteDirective | null;
-=======
   cartAction?: any;
->>>>>>> ed99c2d (Added: Multi-Model Ai Service Provider Added Like: Groq)
 }
 
 interface ChatMessage {
@@ -131,7 +123,7 @@ interface ChatMessage {
 }
 
 /* ------------------------------------------------------------------ */
-/*  Parser Helper for Structured AI Tokens                             */
+/*  Parser Helper for Structured AI Tokens                            */
 /* ------------------------------------------------------------------ */
 
 function sanitizeFoodImage(img?: string): string {
@@ -139,14 +131,12 @@ function sanitizeFoodImage(img?: string): string {
     return "https://images.unsplash.com/photo-1513104890138-7c749659a591?auto=format&fit=crop&w=400&q=80";
   }
   const trimmed = img.trim();
-  // Allow valid base64 data URIs (valid base64 images are at least 500 characters)
   if (trimmed.startsWith("data:image/")) {
     if (trimmed.length > 500) {
       return trimmed;
     }
     return "https://images.unsplash.com/photo-1513104890138-7c749659a591?auto=format&fit=crop&w=400&q=80";
   }
-  // Allow valid web URLs
   if (trimmed.startsWith("http://") || trimmed.startsWith("https://") || trimmed.startsWith("/")) {
     return trimmed;
   }
@@ -158,8 +148,8 @@ function parseMessageContent(raw: string): ParsedMessageContent {
   let recommendedFoods: RecommendedFood[] = [];
   let orderStatus: OrderStatusData | null = null;
   let actionButtons: ActionButton[] = [];
-<<<<<<< HEAD
   let actionExecute: ActionExecuteDirective | null = null;
+  let cartAction: any = null;
 
   // 1. Action Execute block: ```action_execute ... ```
   const actionExecRegex = /```(?:action_execute|json:action)?\s*(\{\s*"action"[\s\S]*?\}\s*)\s*```?/i;
@@ -173,14 +163,20 @@ function parseMessageContent(raw: string): ParsedMessageContent {
     text = text.replace(actionExecRegex, "").trim();
   }
 
-  // 2. Food Recommendations block: ```food_recommendations ... ```
-  const foodBlockRegex = /```(?:food_recommendations|json)?\s*(\[\s*\{[\s\S]*?"id"[\s\S]*?\}\s*\])\s*```?/i;
-=======
-  let cartAction: any = null;
+  // 2. Cart action block: ```cart_action ... ```
+  const cartBlockRegex = /```(?:cart_action|json:cart)?\s*(\{\s*[\s\S]*?"(?:ADD_TO_CART|type)"[\s\S]*?\}\s*)\s*```?/i;
+  const cartMatch = text.match(cartBlockRegex);
+  if (cartMatch) {
+    try {
+      cartAction = JSON.parse(cartMatch[1].trim());
+    } catch (e) {
+      console.warn("Could not parse cart action JSON", e);
+    }
+    text = text.replace(cartBlockRegex, "").trim();
+  }
 
-  // 1. Food Recommendations block (with codeblock or raw json)
+  // 3. Food Recommendations block: ```food_recommendations ... ```
   const foodBlockRegex = /```(?:food_recommendations|json:foods|json)?\s*(\[[\s\S]*?\])\s*```?/i;
->>>>>>> ed99c2d (Added: Multi-Model Ai Service Provider Added Like: Groq)
   const foodMatch = text.match(foodBlockRegex);
   if (foodMatch) {
     try {
@@ -197,7 +193,7 @@ function parseMessageContent(raw: string): ParsedMessageContent {
     text = text.replace(foodBlockRegex, "").trim();
   }
 
-  // 1b. Fallback: Parse individual food objects if array is truncated, unclosed, or lacks codeblocks
+  // 3b. Fallback: Parse individual food objects if array is truncated, unclosed, or lacks codeblocks
   if (recommendedFoods.length === 0) {
     const objectRegex = /\{[^{}]*?"id"\s*:\s*"([^"]+)"[^{}]*?"name"\s*:\s*"([^"]+)"[^{}]*?\}/g;
     let match;
@@ -210,23 +206,14 @@ function parseMessageContent(raw: string): ParsedMessageContent {
             image: sanitizeFoodImage(item.image),
           });
         }
-<<<<<<< HEAD
       } catch {
         // ignore
       }
     }
   }
 
-  // 3. Order Status block: ```order_status ... ```
-  const orderBlockRegex = /```(?:order_status|json)?\s*(\{\s*"orderId"[\s\S]*?\}\s*)\s*```?/i;
-=======
-      } catch (e) {}
-    }
-  }
-
-  // 2. Order Status block
+  // 4. Order Status block: ```order_status ... ```
   const orderBlockRegex = /```(?:order_status|json:order|json)?\s*(\{\s*"orderId"[\s\S]*?\}\s*)\s*```?/i;
->>>>>>> ed99c2d (Added: Multi-Model Ai Service Provider Added Like: Groq)
   const orderMatch = text.match(orderBlockRegex);
   if (orderMatch) {
     try {
@@ -237,13 +224,8 @@ function parseMessageContent(raw: string): ParsedMessageContent {
     text = text.replace(orderBlockRegex, "").trim();
   }
 
-<<<<<<< HEAD
-  // 4. Action buttons block: ```action_buttons ... ```
-  const actionBlockRegex = /```(?:action_buttons|json)?\s*(\[\s*\{[\s\S]*?"type"[\s\S]*?\}\s*\])\s*```?/i;
-=======
-  // 3. Action buttons block
+  // 5. Action buttons block: ```action_buttons ... ```
   const actionBlockRegex = /```(?:action_buttons|json:actions|json)?\s*(\[\s*\{[\s\S]*?"type"[\s\S]*?\}\s*\])\s*```?/i;
->>>>>>> ed99c2d (Added: Multi-Model Ai Service Provider Added Like: Groq)
   const actionMatch = text.match(actionBlockRegex);
   if (actionMatch) {
     try {
@@ -257,41 +239,21 @@ function parseMessageContent(raw: string): ParsedMessageContent {
     text = text.replace(actionBlockRegex, "").trim();
   }
 
-<<<<<<< HEAD
-  // Strip any leftover unclosed markdown codeblock tags
-  text = text.replace(/```(?:action_execute|food_recommendations|order_status|action_buttons)?/gi, "").trim();
-=======
-  // 4. Cart action block
-  const cartBlockRegex = /```(?:cart_action|json:cart)?\s*(\{\s*[\s\S]*?"(?:ADD_TO_CART|type)"[\s\S]*?\}\s*)\s*```?/i;
-  const cartMatch = text.match(cartBlockRegex);
-  if (cartMatch) {
-    try {
-      cartAction = JSON.parse(cartMatch[1].trim());
-    } catch (e) {
-      console.warn("Could not parse cart action JSON", e);
-    }
-    text = text.replace(cartBlockRegex, "").trim();
-  }
-
-  // 5. Aggressive cleanup: Strip any remaining raw JSON array or codeblock remnant so text is always 100% clean
+  // 6. Aggressive cleanup: Strip any remaining raw JSON array or codeblock remnant so text is always 100% clean
   text = text
-    .replace(/```(?:food_recommendations|order_status|action_buttons|cart_action|json)?[\s\S]*/gi, "")
+    .replace(/```(?:action_execute|cart_action|food_recommendations|order_status|action_buttons|json)?[\s\S]*/gi, "")
     .replace(/\[\s*\{\s*"id"[\s\S]*/gi, "")
     .replace(/\{\s*"orderId"[\s\S]*/gi, "")
     .replace(/\[\s*\{\s*"type"[\s\S]*/gi, "")
     .trim();
->>>>>>> ed99c2d (Added: Multi-Model Ai Service Provider Added Like: Groq)
 
   return {
     cleanMarkdown: text,
     recommendedFoods,
     orderStatus,
     actionButtons,
-<<<<<<< HEAD
     actionExecute,
-=======
     cartAction,
->>>>>>> ed99c2d (Added: Multi-Model Ai Service Provider Added Like: Groq)
   };
 }
 
@@ -375,21 +337,6 @@ export default function AIAssistantPage() {
   const [isListening, setIsListening] = useState(false);
   const [speakingMsgId, setSpeakingMsgId] = useState<string | null>(null);
 
-<<<<<<< HEAD
-  const messagesContainerRef = useRef<HTMLDivElement>(null);
-  const inputRef = useRef<HTMLTextAreaElement>(null);
-
-  // Sync user role on mount or session changes
-  useEffect(() => {
-    setUserRole(getNormalizedRole(user?.role));
-  }, [user?.role]);
-
-  // Auto-scroll only the internal messages container without jumping the browser window
-  useEffect(() => {
-    if (messagesContainerRef.current) {
-      messagesContainerRef.current.scrollTo({
-        top: messagesContainerRef.current.scrollHeight,
-=======
   // Real-Time Location & Mood & Suggested Prompts
   const [locationInfo, setLocationInfo] = useState<ILocationInfo>(DEFAULT_INITIAL_LOCATION);
   const [selectedMood, setSelectedMood] = useState<string | null>(null);
@@ -402,10 +349,14 @@ export default function AIAssistantPage() {
     { id: "6", label: "🎉 ৪ জনের প্ল্যাটটার", message: "৪-৫ জনের আড্ডার জন্য একটা পারফেক্ট প্ল্যাটটার সাজিয়ে দাও।" },
   ]);
 
-  const messagesEndRef = useRef<HTMLDivElement>(null);
   const chatContainerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const historyLoadedRef = useRef(false);
+
+  // Sync user role on mount or session changes
+  useEffect(() => {
+    setUserRole(getNormalizedRole(user?.role));
+  }, [user?.role]);
 
   // Sync real-time location and settings on mount
   useEffect(() => {
@@ -470,12 +421,10 @@ export default function AIAssistantPage() {
     if (chatContainerRef.current) {
       chatContainerRef.current.scrollTo({
         top: chatContainerRef.current.scrollHeight,
->>>>>>> ed99c2d (Added: Multi-Model Ai Service Provider Added Like: Groq)
         behavior: "smooth",
       });
     }
   }, [messages, isLoading]);
-
 
   // Load User Favorites
   const loadUserFavorites = useCallback(async () => {
@@ -499,20 +448,18 @@ export default function AIAssistantPage() {
     loadUserFavorites();
   }, [loadUserFavorites]);
 
-  // Initialize Welcome Message on First Load
+  // Initialize Welcome Message on First Load if no history exists
   useEffect(() => {
     if (messages.length === 0) {
       let initialGreeting = "";
-      if (userRole === "customer") {
-        initialGreeting = `স্বাগতম **${user?.name || "Customer"}**! 👋 আমি **FoodFlow AI Super Assistant**।\n\nআপনি সাইটে যা যা করতে চান (যেমন: খাবার কার্টে যোগ করা, ফেভারিট সেভ বা ডিলিট করা, অর্ডার ট্র্যাক করা, বা সরাসরি চেকআউট) সবকিছু আমাকে লিখে বা বলে করাতে পারেন! 🍔`;
-      } else if (userRole === "restaurant") {
+      if (userRole === "restaurant") {
         initialGreeting = `স্বাগতম **${user?.name || "Restaurant Partner"}**! 🏪 আমি আপনার **FoodFlow Restaurant Assistant**।\n\nআপনি রানিং অর্ডার চেক করতে, মেনু খাবার দেখতে বা সেলস ও রেভিনিউ হিসাব জানতে আমাকে প্রশ্ন করতে পারেন।`;
       } else if (userRole === "rider") {
         initialGreeting = `স্বাগতম **${user?.name || "Rider Hero"}**! 🛵 আমি আপনার ডেলিভারি ও রুট গাইড। আজকের ট্রিপ, আয় হিসাব বা যেকোনো সহায়তার জন্য আমাকে জানান।`;
       } else if (userRole === "admin") {
         initialGreeting = `স্বাগতম **Admin Panel Manager**! 🛡️ প্ল্যাটফর্মের ডেটা ওভারভিউ, সিস্টেম কনফিগারেশন বা যেকোনো সহায়তা প্রস্তুত।`;
       } else {
-        initialGreeting = `স্বাগতম FoodFlow-তে! 👋 আপনার পছন্দের খাবার খুঁজে নিতে, মেনু দেখতে বা অর্ডার করতে আমাকে যেকোনো প্রশ্ন করতে পারেন।`;
+        initialGreeting = `স্বাগতম **${user?.name || "Customer"}**! 👋 আমি **FoodFlow AI Super Assistant**।\n\nআপনি সাইটে যা যা করতে চান (যেমন: খাবার কার্টে যোগ করা, ফেভারিট সেভ বা ডিলিট করা, অর্ডার ট্র্যাক করা, বা সরাসরি চেকআউট) সবকিছু আমাকে লিখে বা বলে করাতে পারেন! 🍔`;
       }
 
       setMessages([
@@ -644,15 +591,10 @@ export default function AIAssistantPage() {
             role: m.role,
             content: m.content,
           })),
-<<<<<<< HEAD
-          userId: user?.id,
-          userEmail: user?.email,
-          userName: user?.name,
+          userId: session?.user?.id || user?.id,
+          userEmail: session?.user?.email || user?.email,
+          userName: session?.user?.name || user?.name,
           userRole: userRole,
-=======
-          userId: session?.user?.id,
-          userEmail: session?.user?.email,
-          userName: session?.user?.name,
           userLocation: {
             zoneName: locationInfo.zoneName || locationInfo.upazila || locationInfo.district || locationInfo.city || "All Bangladesh",
             currentZoneId: locationInfo.currentZoneId,
@@ -666,7 +608,6 @@ export default function AIAssistantPage() {
             isInsideServiceArea: locationInfo.isInsideServiceArea,
           },
           userMood: selectedMood,
->>>>>>> ed99c2d (Added: Multi-Model Ai Service Provider Added Like: Groq)
           cartItems: cartItems.map((item) => ({
             id: item.foodItem?._id || (item as any)?.foodId || (item as any)?.id,
             name: item.foodItem?.name || (item as any)?.name || "খাবার আইটেম",
@@ -685,12 +626,12 @@ export default function AIAssistantPage() {
       if (data.success && data.reply) {
         const parsed = parseMessageContent(data.reply);
 
-<<<<<<< HEAD
         // If AI emitted an autonomous action execution directive, execute it automatically!
         if (parsed.actionExecute) {
           executeAgentAction(parsed.actionExecute);
-=======
-        // Auto-execute Cart Action if user commanded an item to be added to cart
+        }
+
+        // Auto-execute Cart Action if payload contains cartAction
         const cartActionToRun = data.cartAction || parsed.cartAction;
         if (cartActionToRun && (cartActionToRun.type === "ADD_TO_CART" || cartActionToRun.action === "ADD_TO_CART") && cartActionToRun.food) {
           const item = cartActionToRun.food;
@@ -722,7 +663,6 @@ export default function AIAssistantPage() {
           setTimeout(() => {
             setAddedItems((prev) => ({ ...prev, [foodItemPayload._id]: false }));
           }, 2500);
->>>>>>> ed99c2d (Added: Multi-Model Ai Service Provider Added Like: Groq)
         }
 
         const assistantMessage: ChatMessage = {
@@ -1028,7 +968,6 @@ export default function AIAssistantPage() {
       {/* Main Content Area */}
       <div className="max-w-5xl mx-auto w-full flex-1 flex flex-col px-3 sm:px-6 py-4">
         
-<<<<<<< HEAD
         {/* Interactive Role-Based Quick Preset Chips */}
         <div className="mb-3 overflow-x-auto pb-1 flex items-center gap-2 select-none no-scrollbar">
           <span className="text-[11px] font-bold uppercase tracking-wider text-gray-400 shrink-0 flex items-center gap-1">
@@ -1045,11 +984,11 @@ export default function AIAssistantPage() {
             </button>
           ))}
         </div>
-=======
+
         {/* Message Feed Card */}
-        <div
+        <div 
           ref={chatContainerRef}
-          className="flex-1 bg-white rounded-3xl border border-gray-200/90 shadow-sm p-4 sm:p-6 overflow-y-auto flex flex-col space-y-4 min-h-[60vh] max-h-[68vh]"
+          className="flex-1 bg-white rounded-3xl border border-gray-200/90 shadow-sm p-4 sm:p-6 overflow-y-auto flex flex-col space-y-4 min-h-[56vh] max-h-[66vh]"
         >
           
           {/* Minimal Empty State when no messages */}
@@ -1084,14 +1023,7 @@ export default function AIAssistantPage() {
               </div>
             </div>
           )}
->>>>>>> ed99c2d (Added: Multi-Model Ai Service Provider Added Like: Groq)
 
-        {/* Message Feed Card */}
-        <div 
-          ref={messagesContainerRef}
-          className="flex-1 bg-white rounded-3xl border border-gray-200/90 shadow-sm p-4 sm:p-6 overflow-y-auto flex flex-col space-y-4 min-h-[56vh] max-h-[66vh]"
-        >
-          
           {messages.map((message) => {
             const isUser = message.role === "user";
             const parsed = message.parsed;
@@ -1132,7 +1064,7 @@ export default function AIAssistantPage() {
                       {/* Rich AI Markdown Rendering */}
                       <AiMarkdownRenderer content={parsed?.cleanMarkdown || message.content} />
 
-                      {/* 1. Recommended Food Cards (Only for Customer role) */}
+                      {/* 1. Recommended Food Cards (Only for Customer / Guest role) */}
                       {userRole !== "restaurant" && parsed?.recommendedFoods && parsed.recommendedFoods.length > 0 && (
                         <div className="mt-3.5 space-y-2.5">
                           <p className="text-xs font-bold text-gray-700 flex items-center gap-1.5">
@@ -1451,21 +1383,6 @@ export default function AIAssistantPage() {
           )}
         </div>
 
-<<<<<<< HEAD
-
-        {/* Input Bar */}
-        <div className="mt-3 bg-white rounded-2xl border border-gray-200 shadow-sm p-2 flex items-center gap-2">
-          {/* Voice Input Button */}
-          <button
-            type="button"
-            onClick={toggleListening}
-            className={`p-2.5 rounded-xl transition-all cursor-pointer ${
-              isListening
-                ? "bg-red-500 text-white animate-pulse"
-                : "bg-gray-100 hover:bg-gray-200 text-gray-600"
-            }`}
-            title={isListening ? "ভয়েস শোনা হচ্ছে... ক্লিক করে থামান" : "ভয়েস দিয়ে বলুন (বাংলা/English)"}
-=======
         {/* Mood / Craving Quick Pills */}
         <div className="mt-3 px-3 py-1.5 bg-white rounded-xl border border-gray-200/80 flex items-center gap-2 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
           <span className="text-[11px] font-bold uppercase tracking-wider text-gray-400 shrink-0 flex items-center gap-1">
@@ -1501,14 +1418,17 @@ export default function AIAssistantPage() {
         </div>
 
         {/* Input Bar & Controls */}
-        <div className="mt-2 bg-white rounded-2xl border border-gray-200 shadow-sm p-2 sm:p-3">
-          <form
-            onSubmit={(e) => {
-              e.preventDefault();
-              handleSendMessage();
-            }}
-            className="flex items-end gap-2"
->>>>>>> ed99c2d (Added: Multi-Model Ai Service Provider Added Like: Groq)
+        <div className="mt-2 bg-white rounded-2xl border border-gray-200 shadow-sm p-2 sm:p-3 flex items-center gap-2">
+          {/* Voice Input Button */}
+          <button
+            type="button"
+            onClick={toggleListening}
+            className={`p-2.5 rounded-xl transition-all cursor-pointer shrink-0 ${
+              isListening
+                ? "bg-red-500 text-white animate-pulse"
+                : "bg-gray-100 hover:bg-gray-200 text-gray-600"
+            }`}
+            title={isListening ? "ভয়েস শোনা হচ্ছে... ক্লিক করে থামান" : "ভয়েস দিয়ে বলুন (বাংলা/English)"}
           >
             {isListening ? <MicOff className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
           </button>
@@ -1538,7 +1458,7 @@ export default function AIAssistantPage() {
             type="button"
             disabled={!inputMessage.trim() || isLoading}
             onClick={() => handleSendMessage()}
-            className="p-2.5 rounded-xl bg-orange-500 hover:bg-orange-600 disabled:opacity-50 text-white transition-all cursor-pointer disabled:cursor-not-allowed shadow-xs"
+            className="p-2.5 rounded-xl bg-orange-500 hover:bg-orange-600 disabled:opacity-50 text-white transition-all cursor-pointer disabled:cursor-not-allowed shadow-xs shrink-0"
             title="বার্তা পাঠান"
           >
             {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
