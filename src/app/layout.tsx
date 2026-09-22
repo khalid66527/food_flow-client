@@ -36,6 +36,7 @@ export const metadata: Metadata = {
   },
 };
 
+import { NotificationProvider } from "@/contexts/NotificationContext";
 import OrderNotificationManager from "@/components/notifications/OrderNotificationManager";
 
 export default function RootLayout({
@@ -57,14 +58,16 @@ export default function RootLayout({
         <ScrollToHash />
         <LocationGuard>
           <CartProvider>
-            <JwtTokenSync />
-            <Navbar session={null} cartItemCount={0} />
-            <main className="flex-grow">{children}</main>
-            <Footer></Footer>
-            <CartSidebar />
-            <AIChatbot />
-            <ToastProvider />
-            <OrderNotificationManager />
+            <NotificationProvider>
+              <JwtTokenSync />
+              <Navbar session={null} cartItemCount={0} />
+              <main className="flex-grow">{children}</main>
+              <Footer></Footer>
+              <CartSidebar />
+              <AIChatbot />
+              <ToastProvider />
+              <OrderNotificationManager />
+            </NotificationProvider>
           </CartProvider>
         </LocationGuard>
       </body>
