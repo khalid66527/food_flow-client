@@ -6,6 +6,7 @@ import {
   getRestaurantsCollection, 
   getCouponsCollection,
   getCartCollection,
+<<<<<<< HEAD
   getFavoritesCollection,
   getUsersCollection,
   getAddressCollection,
@@ -41,49 +42,22 @@ async function callGeminiRestWithFailover(payload: any): Promise<string> {
   const totalKeys = keyPool.length;
   if (totalKeys === 0) {
     throw new Error("No Gemini API keys found in environment.");
+=======
+  getSettingsCollection,
+} from "@/lib/db";
+import { ObjectId } from "mongodb";
+
+// Extract true image from DB document (supports direct image, images array, base64 data URIs, or web URLs)
+function getTrueFoodImage(f: any): string {
+  if (!f) return "";
+  if (typeof f.image === "string" && f.image.trim()) {
+    return f.image.trim();
+>>>>>>> ed99c2d (Added: Multi-Model Ai Service Provider Added Like: Groq)
   }
-  let attempts = 0;
-  let lastError: any = null;
-
-  while (attempts < totalKeys) {
-    const activeKey = keyPool[workingKeyIndex];
-
-    for (const model of models) {
-      try {
-        const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${activeKey}`;
-        const res = await fetch(url, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload),
-        });
-
-        if (res.ok) {
-          const json = await res.json();
-          const text = json?.candidates?.[0]?.content?.parts?.[0]?.text;
-          if (text) {
-            cachedWorkingModel = model;
-            return text;
-          }
-        }
-
-        const errJson = await res.json().catch(() => null);
-        lastError = errJson || res.statusText;
-
-        if (res.status === 404) {
-          continue; // Try next model
-        }
-
-        if (res.status === 429 || res.status === 403 || String(lastError?.error?.message).includes("quota")) {
-          break; // rotate to next API key
-        }
-      } catch (err) {
-        lastError = err;
-      }
-    }
-
-    workingKeyIndex = (workingKeyIndex + 1) % totalKeys;
-    attempts++;
+  if (Array.isArray(f.images) && f.images.length > 0 && typeof f.images[0] === "string" && f.images[0].trim()) {
+    return f.images[0].trim();
   }
+<<<<<<< HEAD
 
   throw new Error(`All Gemini API keys failed: ${JSON.stringify(lastError)}`);
 }
@@ -139,14 +113,21 @@ async function callOpenRouterChat(systemPrompt: string, chatHistory: any[], user
 }
 
 // Helper to sanitize images
+=======
+  return "";
+}
+
+// Sanitizer for images (supports base64 data URIs and valid web URLs)
+>>>>>>> ed99c2d (Added: Multi-Model Ai Service Provider Added Like: Groq)
 function sanitizeImageUrl(rawImg?: string): string {
-  if (!rawImg || typeof rawImg !== "string") {
+  if (!rawImg || typeof rawImg !== "string" || !rawImg.trim()) {
     return "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=400&q=80";
   }
-  if (rawImg.startsWith("data:") || rawImg.length > 250) {
-    return "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=400&q=80";
+  const trimmed = rawImg.trim();
+  if (trimmed.startsWith("data:image/") || trimmed.startsWith("http://") || trimmed.startsWith("https://") || trimmed.startsWith("/")) {
+    return trimmed;
   }
-  return rawImg;
+  return "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=400&q=80";
 }
 
 /**
@@ -158,6 +139,7 @@ function generateLocalFallbackResponse(
   liveFoods: any[], 
   userOrders: any[], 
   userCart: any, 
+<<<<<<< HEAD
   userFavorites: any[],
   userAddresses: any[],
   activeCoupons: any[],
@@ -167,6 +149,11 @@ function generateLocalFallbackResponse(
   riderProfile: any,
   riderOrders: any[],
   adminStats: any
+=======
+  activeCoupons: any[],
+  location?: any,
+  mood?: any
+>>>>>>> ed99c2d (Added: Multi-Model Ai Service Provider Added Like: Groq)
 ): string {
   const q = message.toLowerCase();
 
@@ -366,11 +353,21 @@ function generateLocalFallbackResponse(
     return `আপনাকে চেকআউট পেজে নিয়ে যাওয়া হচ্ছে... 🚀\n\n\`\`\`action_execute\n${JSON.stringify(actionObj, null, 2)}\n\`\`\`\n\`\`\`action_buttons\n[{"type":"CHECKOUT","label":"চেকআউট করুন"}]\n\`\`\``;
   }
 
+<<<<<<< HEAD
   // J. Food Recommendation Matching (Budget, Spicy, Category)
+=======
+  // 4. Check for Platform General Info / Delivery charge
+  if (q.includes("চার্জ") || q.includes("fee") || q.includes("delivery")) {
+    return `FoodFlow-তে স্ট্যান্ডার্ড ডেলিভারি চার্জ মাত্র **৳৪০**। আমরা সাধারণত ২৫-৪০ মিনিটের মধ্যে গরম ও তাজা খাবার ডেলিভারি করে থাকি! 🚀`;
+  }
+
+  // 5. Food Recommendation Matching (Budget, Mood, Location)
+>>>>>>> ed99c2d (Added: Multi-Model Ai Service Provider Added Like: Groq)
   let matchedFoods = [...liveFoods];
   const budgetMatch = message.match(/(?:৳|tk|bdt|\$)?\s*(\d{2,4})\s*(?:টাকা|tk|bdt|taka)?/i);
   const budget = budgetMatch ? parseInt(budgetMatch[1], 10) : null;
 
+<<<<<<< HEAD
   const isSpicyQuery = q.includes("ঝাল") || q.includes("spicy");
   const isVegQuery = q.includes("ভেজিটেবল") || q.includes("নিরামিষ") || q.includes("veg");
   const isPizzaQuery = q.includes("pizza") || q.includes("পিজ্জা");
@@ -395,6 +392,20 @@ function generateLocalFallbackResponse(
     const biryaniFoods = matchedFoods.filter(f => f.category?.toLowerCase().includes("biryani") || f.name.toLowerCase().includes("biriyani"));
     if (biryaniFoods.length > 0) matchedFoods = biryaniFoods;
   }
+=======
+  const isSpicyQuery = q.includes("ঝাল") || q.includes("spicy") || mood === "spicy";
+  const isHealthyQuery = q.includes("ভেজিটেবল") || q.includes("healthy") || q.includes("diet") || q.includes("সালাদ") || mood === "healthy";
+
+  if (isSpicyQuery) {
+    const spicyFoods = matchedFoods.filter(f => f.isSpicy || f.name.toLowerCase().includes("spicy") || f.name.toLowerCase().includes("burger"));
+    if (spicyFoods.length > 0) matchedFoods = spicyFoods;
+  }
+
+  if (isHealthyQuery) {
+    const vegFoods = matchedFoods.filter(f => f.isVegetarian || f.category.toLowerCase().includes("veg") || f.category.toLowerCase().includes("salad"));
+    if (vegFoods.length > 0) matchedFoods = vegFoods;
+  }
+>>>>>>> ed99c2d (Added: Multi-Model Ai Service Provider Added Like: Groq)
 
   if (budget) {
     const withinBudget = matchedFoods.filter(f => (f.discountPrice || f.price) <= budget);
@@ -402,15 +413,296 @@ function generateLocalFallbackResponse(
   }
 
   const recommendations = matchedFoods.slice(0, 3);
+<<<<<<< HEAD
+=======
+  const locText = location?.zoneName || location?.area ? `আপনার এলাকা **${location.zoneName || location.area}**-এ ` : "";
+
+>>>>>>> ed99c2d (Added: Multi-Model Ai Service Provider Added Like: Groq)
   if (recommendations.length > 0) {
     const foodNames = recommendations.map(f => `${f.name} (৳${f.discountPrice || f.price})`).join(" এবং ");
     const budgetText = budget ? `আপনার ৳${budget} বাজেটের মধ্যে ` : "";
     const spicyText = isSpicyQuery ? "ঝাল ও মজাদার " : "";
 
+<<<<<<< HEAD
     return `${budgetText}সেরা ${spicyText}খাবারের অপশন হলো **${foodNames}**। ডেলিভারি চার্জ ৳৪০ সহ সহজেই কার্টে যোগ করে অর্ডার করতে পারেন!\n\n\`\`\`food_recommendations\n${JSON.stringify(recommendations, null, 2)}\n\`\`\`\n\`\`\`action_buttons\n[{"type":"CHECKOUT","label":"চেকআউট করুন"}]\n\`\`\``;
+=======
+    return `${locText}${budgetText}সেরা ${spicyText}খাবারের অপশন হলো **${foodNames}**। ডেলিভারি চার্জ ৳৪০ সহ সহজেই অর্ডার করতে পারেন!\n\n\`\`\`food_recommendations\n${JSON.stringify(recommendations, null, 2)}\n\`\`\`\n\`\`\`action_buttons\n[{"type":"CHECKOUT","label":"চেকআউট করুন"}]\n\`\`\``;
+>>>>>>> ed99c2d (Added: Multi-Model Ai Service Provider Added Like: Groq)
   }
 
   return `FoodFlow AI Assistant-এ আপনাকে স্বাগতম! আপনি কি খাবারের পরামর্শ চান, কার্টে খাবার যোগ করতে চান, নাকি কোনো অর্ডার ট্র্যাক করতে চান?`;
+}
+
+function extractRawKeyString(item: any): string {
+  if (!item) return "";
+  if (typeof item === "string") return item.trim();
+  return typeof item.key === "string" ? item.key.trim() : "";
+}
+
+/**
+ * Record usage count and health status for the used API key in MongoDB
+ */
+async function recordKeyUsage(
+  provider: "groq" | "agentrouter" | "gemini",
+  usedRawKey: string,
+  status: "active" | "rate_limited" | "error" = "active"
+) {
+  try {
+    const col = await getSettingsCollection();
+    const doc = await col.findOne({ key: "ai_configuration" });
+    if (!doc) return;
+
+    const field =
+      provider === "groq"
+        ? "groqKeys"
+        : provider === "agentrouter"
+        ? "agentRouterKeys"
+        : "geminiKeys";
+
+    const keysArray = Array.isArray(doc[field]) ? doc[field] : [];
+    let matched = false;
+
+    const updatedArray = keysArray.map((item: any, idx: number) => {
+      const raw = typeof item === "string" ? item.trim() : (item?.key?.trim() || "");
+      if (raw && raw === usedRawKey.trim()) {
+        matched = true;
+        const currentCount =
+          typeof item === "object" && typeof item.usageCount === "number"
+            ? item.usageCount
+            : 0;
+        return {
+          id: typeof item === "object" && item.id ? item.id : `k-${idx}`,
+          key: raw,
+          usageCount: status === "active" ? currentCount + 1 : currentCount,
+          lastUsedAt: new Date().toISOString(),
+          status: status,
+          addedAt: typeof item === "object" && item.addedAt ? item.addedAt : new Date().toISOString(),
+        };
+      }
+      return item;
+    });
+
+    if (matched) {
+      await col.updateOne(
+        { key: "ai_configuration" },
+        { $set: { [field]: updatedArray } }
+      );
+    }
+  } catch (e) {
+    console.warn(`[recordKeyUsage] Error updating usage for ${provider}:`, e);
+  }
+}
+
+/**
+ * Call Groq with key pool failover & usage tracking
+ */
+async function callGroqWithFailover(
+  keys: any[],
+  model: string,
+  messages: Array<{ role: string; content: string }>,
+  temperature: number,
+  maxTokens: number
+): Promise<string> {
+  const rawList = (keys || []).map(extractRawKeyString).filter(Boolean);
+  const mergedKeys = Array.from(new Set([
+    ...rawList,
+    ...(process.env.GROQ_API_KEYS ? process.env.GROQ_API_KEYS.split(",").map(k => k.trim()) : []),
+    ...(process.env.GROQ_API_KEY ? [process.env.GROQ_API_KEY.trim()] : []),
+  ])).filter(Boolean);
+
+  if (mergedKeys.length === 0) throw new Error("No Groq keys configured");
+
+  let lastError: any = null;
+  for (const key of mergedKeys) {
+    try {
+      const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${key}`,
+        },
+        body: JSON.stringify({
+          model: model || "qwen/qwen3.8-27b",
+          messages,
+          temperature,
+          max_tokens: maxTokens,
+        }),
+      });
+
+      if (res.ok) {
+        const json = await res.json();
+        const text = json?.choices?.[0]?.message?.content;
+        if (text) {
+          recordKeyUsage("groq", key, "active").catch(() => {});
+          return text;
+        }
+      }
+
+      if (res.status === 429) {
+        recordKeyUsage("groq", key, "rate_limited").catch(() => {});
+      } else if (res.status === 401 || res.status === 403) {
+        recordKeyUsage("groq", key, "error").catch(() => {});
+      }
+
+      const errJson = await res.json().catch(() => null);
+      lastError = errJson?.error?.message || `HTTP ${res.status}`;
+    } catch (err: any) {
+      lastError = err?.message || err;
+    }
+  }
+
+  throw new Error(`All Groq keys failed. ${lastError}`);
+}
+
+/**
+ * Call Agent Router with SSE stream reader & usage tracking
+ */
+async function callAgentRouterWithFailover(
+  keys: any[],
+  messages: Array<{ role: string; content: string }>,
+  temperature: number,
+  maxTokens: number
+): Promise<string> {
+  const rawList = (keys || []).map(extractRawKeyString).filter(Boolean);
+  const mergedKeys = Array.from(new Set([
+    ...rawList,
+    ...(process.env.AGENTROUTER_API_KEYS ? process.env.AGENTROUTER_API_KEYS.split(",").map(k => k.trim()) : []),
+    ...(process.env.AGENTROUTER_API_KEY ? [process.env.AGENTROUTER_API_KEY.trim()] : []),
+  ])).filter(Boolean);
+
+  if (mergedKeys.length === 0) throw new Error("No Agent Router keys configured");
+
+  let lastError: any = null;
+  for (const key of mergedKeys) {
+    try {
+      const res = await fetch("https://agentrouter.org/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${key}`,
+          Originator: "codex_cli_rs",
+          Version: "0.114.0",
+          "anthropic-dangerous-direct-browser-access": "true",
+          "x-app": "cli",
+        },
+        body: JSON.stringify({
+          model: "deepseek-v4-flash",
+          messages,
+          temperature,
+          max_tokens: maxTokens,
+          stream: true,
+        }),
+      });
+
+      if (res.ok && res.body) {
+        const reader = res.body.getReader();
+        const decoder = new TextDecoder();
+        let content = "";
+        let buffer = "";
+
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          buffer += decoder.decode(value, { stream: true });
+          const lines = buffer.split("\n");
+          buffer = lines.pop() || "";
+
+          for (const line of lines) {
+            const clean = line.trim();
+            if (clean.startsWith("data:") && !clean.includes("[DONE]")) {
+              try {
+                const parsed = JSON.parse(clean.slice(5).trim());
+                const delta = parsed?.choices?.[0]?.delta?.content;
+                if (delta) content += delta;
+              } catch {}
+            }
+          }
+        }
+
+        if (content.trim()) {
+          recordKeyUsage("agentrouter", key, "active").catch(() => {});
+          return content.trim();
+        }
+      }
+
+      if (res.status === 429) {
+        recordKeyUsage("agentrouter", key, "rate_limited").catch(() => {});
+      } else if (res.status === 401 || res.status === 403) {
+        recordKeyUsage("agentrouter", key, "error").catch(() => {});
+      }
+
+      const errJson = await res.json().catch(() => null);
+      lastError = errJson?.error?.message || `HTTP ${res.status}`;
+    } catch (err: any) {
+      lastError = err?.message || err;
+    }
+  }
+
+  throw new Error(`All Agent Router keys failed. ${lastError}`);
+}
+
+/**
+ * Call Gemini REST with key failover & usage tracking
+ */
+async function callGeminiRestWithFailover(
+  keys: any[],
+  model: string,
+  payload: any
+): Promise<string> {
+  const rawList = (keys || []).map(extractRawKeyString).filter(Boolean);
+  const mergedKeys = Array.from(new Set([
+    ...rawList,
+    ...(process.env.GEMINI_API_KEYS ? process.env.GEMINI_API_KEYS.split(",").map(k => k.trim()) : []),
+    ...(process.env.GEMINI_API_KEY ? [process.env.GEMINI_API_KEY.trim()] : []),
+  ])).filter(Boolean);
+
+  if (mergedKeys.length === 0) throw new Error("No Gemini keys configured");
+
+  const models = [
+    model || "gemini-2.5-flash",
+    "gemini-2.5-flash",
+    "gemini-2.5-flash-lite",
+    "gemini-2.0-flash",
+    "gemini-1.5-flash",
+  ].filter((v, i, a) => a.indexOf(v) === i);
+
+  let lastError: any = null;
+  for (const activeKey of mergedKeys) {
+    for (const m of models) {
+      try {
+        const url = `https://generativelanguage.googleapis.com/v1beta/models/${m}:generateContent?key=${activeKey}`;
+        const res = await fetch(url, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+
+        if (res.ok) {
+          const json = await res.json();
+          const text = json?.candidates?.[0]?.content?.parts?.[0]?.text;
+          if (text) {
+            recordKeyUsage("gemini", activeKey, "active").catch(() => {});
+            return text;
+          }
+        }
+
+        if (res.status === 429) {
+          recordKeyUsage("gemini", activeKey, "rate_limited").catch(() => {});
+        } else if (res.status === 401 || res.status === 403) {
+          recordKeyUsage("gemini", activeKey, "error").catch(() => {});
+        }
+
+        const errJson = await res.json().catch(() => null);
+        lastError = errJson || res.statusText;
+        if (res.status === 404) continue;
+        if (res.status === 429 || res.status === 403) break;
+      } catch (err) {
+        lastError = err;
+      }
+    }
+  }
+
+  throw new Error(`All Gemini keys failed. ${JSON.stringify(lastError)}`);
 }
 
 export async function POST(req: Request) {
@@ -423,7 +715,9 @@ export async function POST(req: Request) {
       userId, 
       userEmail, 
       userName,
-      cartItems = [] 
+      cartItems = [],
+      userLocation,
+      userMood,
     } = body;
 
     if (!message || typeof message !== "string" || !message.trim()) {
@@ -433,6 +727,7 @@ export async function POST(req: Request) {
       );
     }
 
+<<<<<<< HEAD
     // 1. Genuine Role Discovery from MongoDB
     let effectiveRole = String(rawUserRole || "customer").toLowerCase().trim();
     let restaurantProfile: any = null;
@@ -513,15 +808,40 @@ export async function POST(req: Request) {
     const orderIdMatch = message.match(/(?:FF-[A-Za-z0-9_-]+|[a-f0-9]{24})/i);
     const extractedOrderId = orderIdMatch ? orderIdMatch[0] : null;
 
+=======
+    const orderIdMatch = message.match(/(?:FF-[A-Za-z0-9_-]+|[a-f0-9]{24})/i);
+    const extractedOrderId = orderIdMatch ? orderIdMatch[0] : null;
+
+    // Load AI Configuration from DB
+    let aiSettings: any = null;
+    try {
+      const settingsCol = await getSettingsCollection();
+      aiSettings = await settingsCol.findOne({ key: "ai_configuration" });
+    } catch (e) {
+      console.warn("Could not load AI configuration from DB:", e);
+    }
+
+    const activeProvider = aiSettings?.activeProvider || "gemini";
+    const activeModel = aiSettings?.activeModel || "gemini-2.5-flash";
+    const geminiKeys: string[] = Array.isArray(aiSettings?.geminiKeys) ? aiSettings.geminiKeys : [];
+    const groqKeys: string[] = Array.isArray(aiSettings?.groqKeys) ? aiSettings.groqKeys : [];
+    const agentRouterKeys: string[] = Array.isArray(aiSettings?.agentRouterKeys) ? aiSettings.agentRouterKeys : [];
+    const temperature = Number(aiSettings?.temperature ?? 0.6);
+    const maxTokens = Math.max(Number(aiSettings?.maxOutputTokens ?? 2048), 1800);
+
+    // Concurrently fetch real live context from MongoDB
+>>>>>>> ed99c2d (Added: Multi-Model Ai Service Provider Added Like: Groq)
     let liveFoods: any[] = [];
     let liveRestaurants: any[] = [];
     let userOrders: any[] = [];
     let userFavorites: any[] = [];
     let activeCoupons: any[] = [];
     const restaurantNameMap: Record<string, string> = {};
+    const foodLookup = new Map<string, any>();
 
     const promises: Promise<any>[] = [];
 
+<<<<<<< HEAD
     // 2. Role-specific Data Fetching
     if (effectiveRole === "restaurant") {
       promises.push(
@@ -628,58 +948,178 @@ export async function POST(req: Request) {
     promises.push(
       (async () => {
         try {
+=======
+    // 1 & 2. Fetch restaurants and foods strictly geofenced to the customer's active delivery zone
+    promises.push(
+      (async () => {
+        try {
+          const restCol = await getRestaurantsCollection();
+          const foodCol = await getFoodCollection();
+
+          const userLoc = userLocation || {};
+          const rawZoneIds: string[] = (
+            Array.isArray(userLoc.candidateZoneIds) && userLoc.candidateZoneIds.length > 0
+              ? userLoc.candidateZoneIds.map(String)
+              : userLoc.currentZoneId
+              ? [String(userLoc.currentZoneId)]
+              : []
+          ).filter(Boolean);
+
+          const zoneNameStr = (userLoc.zoneName || "").trim();
+          const districtStr = (userLoc.district || "").trim();
+          const upazilaStr = (userLoc.upazila || "").trim();
+          const cityStr = (userLoc.city || "").trim();
+          const areaStr = (userLoc.area || "").trim();
+
+          const hasSpecificLocation = Boolean(
+            rawZoneIds.length > 0 ||
+            (zoneNameStr && zoneNameStr !== "All Bangladesh" && zoneNameStr !== "Bangladesh") ||
+            (districtStr && districtStr !== "All Bangladesh" && districtStr !== "Bangladesh") ||
+            (cityStr && cityStr !== "All Bangladesh" && cityStr !== "Bangladesh")
+          );
+
+          let restaurantQuery: any = { status: { $ne: "blocked" } };
+
+          if (rawZoneIds.length > 0) {
+            // Strict Delivery Geofence by Zone ID (matches dishes page behavior)
+            const numericIds = rawZoneIds.map(Number).filter((n) => !isNaN(n));
+            const allMatches: (string | number)[] = [...rawZoneIds, ...numericIds];
+            restaurantQuery = {
+              status: { $ne: "blocked" },
+              $or: [
+                { zoneId: { $in: allMatches } },
+                { numericZoneId: { $in: allMatches } },
+                { zoneIds: { $in: allMatches } },
+                { numericZoneIds: { $in: allMatches } },
+                { "address.zoneId": { $in: allMatches } },
+                { zoneMongoIdStr: { $in: rawZoneIds } },
+              ],
+            };
+          } else if (hasSpecificLocation) {
+            // Fallback to text area matching only when zone ID is absent
+            const textMatchers = [zoneNameStr, upazilaStr, districtStr, areaStr, cityStr]
+              .filter((t) => t && t !== "All Bangladesh" && t !== "Bangladesh");
+            const zoneMatchConditions: any[] = [];
+
+            for (const text of textMatchers) {
+              const clean = text.replace(/(Hub|Zone|Food Hub)$/i, "").trim();
+              if (clean) {
+                const escaped = clean.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+                const reg = new RegExp(escaped, "i");
+                zoneMatchConditions.push(
+                  { "address.zoneName": reg },
+                  { "address.area": reg },
+                  { "address.upazila": reg },
+                  { "address.district": reg },
+                  { "address.city": reg },
+                  { city: reg }
+                );
+              }
+            }
+
+            if (zoneMatchConditions.length > 0) {
+              restaurantQuery = {
+                status: { $ne: "blocked" },
+                $or: zoneMatchConditions,
+              };
+            }
+          }
+
+>>>>>>> ed99c2d (Added: Multi-Model Ai Service Provider Added Like: Groq)
           const rawRest = await restCol
-            .find(
-              { status: { $ne: "blocked" } },
-              { projection: { name: 1, cuisine: 1, rating: 1, deliveryTime: 1, address: 1 } }
-            )
-            .limit(15)
+            .find(restaurantQuery, {
+              projection: {
+                name: 1,
+                restaurantName: 1,
+                cuisine: 1,
+                rating: 1,
+                deliveryTime: 1,
+                address: 1,
+                zone: 1,
+                zoneId: 1,
+              },
+            })
+            .limit(30)
             .toArray();
 
           liveRestaurants = rawRest.map((r: any) => {
             const rId = r._id?.toString() || "";
-            restaurantNameMap[rId] = r.name || "FoodFlow Restaurant";
+            const rName = r.restaurantName || r.name || "FoodFlow Restaurant";
+            restaurantNameMap[rId] = rName;
             return {
               id: rId,
-              name: r.name,
+              name: rName,
               cuisine: r.cuisine || "Multi-Cuisine",
               rating: r.rating || 4.8,
               deliveryTime: r.deliveryTime || "25-35 mins",
+              zone: r.address?.zoneName || r.zone || r.address?.city,
             };
           });
-        } catch (e) {
-          console.error("AI liveRestaurants fetch error:", e);
-        }
-      })()
-    );
 
+<<<<<<< HEAD
     promises.push(
       (async () => {
         try {
+=======
+          const matchingRestaurantIds = rawRest.map((r: any) => r._id?.toString()).filter(Boolean);
+          const matchingRestaurantObjectIds = matchingRestaurantIds
+            .filter((id: string) => ObjectId.isValid(id))
+            .map((id: string) => new ObjectId(id));
+
+          let foodQuery: any = {
+            $or: [
+              { status: "available" },
+              { isAvailable: true },
+              { isAvailable: "true" },
+              { status: { $exists: false } },
+            ],
+          };
+
+          if (hasSpecificLocation) {
+            if (matchingRestaurantIds.length > 0) {
+              foodQuery.restaurantId = {
+                $in: [...matchingRestaurantIds, ...matchingRestaurantObjectIds],
+              };
+            } else {
+              // 0 restaurants in this zone => exactly 0 foods available!
+              foodQuery = { _id: "NO_MATCHING_ZONE_FOODS" };
+            }
+          }
+
+>>>>>>> ed99c2d (Added: Multi-Model Ai Service Provider Added Like: Groq)
           const rawFoods = await foodCol
-            .find(
-              { $or: [{ status: "available" }, { isAvailable: true }, { isAvailable: "true" }, { status: { $exists: false } }] },
-              {
-                projection: {
-                  name: 1,
-                  price: 1,
-                  discountPrice: 1,
-                  category: 1,
-                  restaurantId: 1,
-                  restaurantName: 1,
-                  image: 1,
-                  isSpicy: 1,
-                  isVegetarian: 1,
-                  rating: 1,
-                },
-              }
-            )
+            .find(foodQuery, {
+              projection: {
+                name: 1,
+                price: 1,
+                discountPrice: 1,
+                category: 1,
+                restaurantId: 1,
+                restaurantName: 1,
+                image: 1,
+                images: 1,
+                isSpicy: 1,
+                isVegetarian: 1,
+                rating: 1,
+              },
+            })
             .sort({ createdAt: -1 })
+<<<<<<< HEAD
             .limit(25)
+=======
+            .limit(40)
+>>>>>>> ed99c2d (Added: Multi-Model Ai Service Provider Added Like: Groq)
             .toArray();
 
-          liveFoods = rawFoods.map((f: any) => {
+          rawFoods.forEach((f: any) => {
+            const id = f._id?.toString();
+            if (id) foodLookup.set(id, f);
+            if (f.name) foodLookup.set(f.name.toLowerCase().trim(), f);
+          });
+
+          let foods = rawFoods.map((f: any) => {
             const restId = f.restaurantId?.toString() || "";
+            const trueImg = getTrueFoodImage(f);
             return {
               id: f._id?.toString(),
               restaurantId: restId,
@@ -687,15 +1127,32 @@ export async function POST(req: Request) {
               category: f.category || "Dishes",
               price: Number(f.price) || 0,
               discountPrice: f.discountPrice ? Number(f.discountPrice) : undefined,
-              image: sanitizeImageUrl(f.image),
+              // Keep image compact for LLM prompt context; exact real image is restored during response post-processing
+              image: (trueImg.startsWith("data:") || trueImg.length > 250)
+                ? "https://images.unsplash.com/photo-1513104890138-7c749659a591?auto=format&fit=crop&w=400&q=80"
+                : (trueImg || "https://images.unsplash.com/photo-1513104890138-7c749659a591?auto=format&fit=crop&w=400&q=80"),
               isSpicy: Boolean(f.isSpicy),
               isVegetarian: Boolean(f.isVegetarian),
               restaurantName: f.restaurantName || restaurantNameMap[restId] || "FoodFlow Kitchen",
               rating: f.rating ? Number(f.rating) : 4.8,
             };
           });
+
+          // Sort by user mood if present
+          if (userMood) {
+            const m = String(userMood).toLowerCase();
+            if (m.includes("spicy") || m.includes("ঝাল")) {
+              foods = foods.sort((a: any, b: any) => (b.isSpicy ? 1 : 0) - (a.isSpicy ? 1 : 0));
+            } else if (m.includes("healthy") || m.includes("diet") || m.includes("হেলদি")) {
+              foods = foods.sort((a: any, b: any) => (b.isVegetarian ? 1 : 0) - (a.isVegetarian ? 1 : 0));
+            } else if (m.includes("budget") || m.includes("বাজেট")) {
+              foods = foods.sort((a: any, b: any) => (a.discountPrice || a.price) - (b.discountPrice || b.price));
+            }
+          }
+
+          liveFoods = foods.slice(0, 25);
         } catch (e) {
-          console.error("AI liveFoods fetch error:", e);
+          console.error("AI liveRestaurants & liveFoods fetch error:", e);
         }
       })()
     );
@@ -745,6 +1202,7 @@ export async function POST(req: Request) {
         })()
       );
 
+<<<<<<< HEAD
       // Fetch saved addresses
       promises.push(
         (async () => {
@@ -756,6 +1214,22 @@ export async function POST(req: Request) {
             userAddresses = rawAddrs.map((a: any) => ({
               label: a.label || a.type || "Address",
               address: a.address || a.street || "Delivery Address",
+=======
+          if (conds.length > 0) {
+            const [active, completed] = await Promise.all([
+              ordersCol.find({ $or: conds }).sort({ createdAt: -1 }).limit(3).toArray(),
+              successCol.find({ $or: conds }).sort({ createdAt: -1 }).limit(2).toArray(),
+            ]);
+
+            const merged = [...active, ...completed];
+            userOrders = merged.map((o: any) => ({
+              orderId: o.orderId || o._id?.toString(),
+              status: o.orderStatus || o.status || "Placed",
+              totalAmount: o.totalAmount || o.grandTotal || 0,
+              riderName: o.riderInfo?.name || o.riderName || "Searching for rider...",
+              riderPhone: o.riderInfo?.phone || o.riderPhone || null,
+              eta: o.estimatedTime || "20-30 mins",
+>>>>>>> ed99c2d (Added: Multi-Model Ai Service Provider Added Like: Groq)
             }));
           } catch (e) {
             console.error("AI address fetch error:", e);
@@ -795,10 +1269,7 @@ export async function POST(req: Request) {
       (async () => {
         try {
           const couponCol = await getCouponsCollection();
-          const rawCoupons = await couponCol
-            .find({ isActive: { $ne: false } })
-            .limit(5)
-            .toArray();
+          const rawCoupons = await couponCol.find({ isActive: { $ne: false } }).limit(5).toArray();
 
           activeCoupons = rawCoupons.map((c: any) => ({
             code: c.code,
@@ -811,6 +1282,7 @@ export async function POST(req: Request) {
       })()
     );
 
+<<<<<<< HEAD
     await Promise.all(promises);
 
     liveFoods = liveFoods.map(f => ({
@@ -889,22 +1361,153 @@ GENERAL RULES:
 - Reply in natural, polite Bengali (বাংলা) by default. If the user writes in English, reply in English.
 - Keep answers concise, clear, and action-oriented (2 to 4 sentences).
 - If outputting structured directives, append them cleanly at the end.
+=======
+    // 5. Fetch live user cart
+    let userCart: any = { items: [], totalItems: 0, subtotal: 0, deliveryCharge: 0, grandTotal: 0 };
+    if (Array.isArray(cartItems) && cartItems.length > 0) {
+      const items = cartItems.map((ci: any) => {
+        const qty = Number(ci.quantity) || 1;
+        const price = Number(ci.price) || 0;
+        return { name: ci.name || "খাবার আইটেম", quantity: qty, price, subtotal: price * qty };
+      });
+      const subtotal = items.reduce((acc: number, cur: any) => acc + cur.subtotal, 0);
+      const totalItems = items.reduce((acc: number, cur: any) => acc + cur.quantity, 0);
+      userCart = { items, totalItems, subtotal, deliveryCharge: totalItems > 0 ? 40 : 0, grandTotal: totalItems > 0 ? subtotal + 40 : 0 };
+    }
+
+    await Promise.all(promises);
+
+    // 6. Detect Add-To-Cart Intent
+    const lowerMsg = message.toLowerCase();
+    const isCartAddIntent =
+      /(?:cart|কার্ট|ঝুড়ি|কিনব|কিনতে|নেব|অর্ডার|order|যোগ|add)/i.test(lowerMsg) &&
+      /(?:add|যোগ|করো|দিন|দাও|কর|রাখো|ঢুকাও|ইনক্লুড|include|চাই|করুন|দিব|নেব|প্যাক)/i.test(lowerMsg);
+
+    let detectedCartItem: any = null;
+    if (isCartAddIntent && liveFoods.length > 0) {
+      for (const f of liveFoods) {
+        const cleanFoodName = f.name.toLowerCase().trim();
+        if (
+          lowerMsg.includes(cleanFoodName) ||
+          cleanFoodName.split(/\s+/).some((part: string) => part.length >= 4 && lowerMsg.includes(part))
+        ) {
+          const doc = foodLookup.get(f.id) || foodLookup.get(cleanFoodName) || f;
+          const trueImg = getTrueFoodImage(doc);
+          detectedCartItem = {
+            id: doc._id?.toString() || f.id,
+            name: doc.name || f.name,
+            price: Number(doc.price) || f.price,
+            discountPrice: doc.discountPrice ? Number(doc.discountPrice) : f.discountPrice,
+            restaurantId: doc.restaurantId?.toString() || f.restaurantId,
+            restaurantName: doc.restaurantName || restaurantNameMap[doc.restaurantId?.toString()] || f.restaurantName,
+            image: (trueImg && trueImg.length > 200) ? trueImg : (f.image || "https://images.unsplash.com/photo-1513104890138-7c749659a591?auto=format&fit=crop&w=400&q=80"),
+            category: doc.category || f.category || "Dishes",
+            isSpicy: Boolean(doc.isSpicy),
+            isVegetarian: Boolean(doc.isVegetarian),
+            quantity: 1,
+          };
+          break;
+        }
+      }
+    }
+
+    const locationStr = userLocation?.zoneName || userLocation?.area || userLocation?.city || "ঢাকা";
+    const moodStr = userMood || "সাধারণ ক্ষুধা";
+
+    const defaultPrompt = `You are FoodFlow's Lead Food Concierge & Gourmet Sales Executive. FoodFlow is a premier online food delivery platform in Bangladesh.
+Your mission: Entice, delight, and guide customers into ordering the best food deliverable to their location!
+
+PERSONALITY & SALES TONE:
+- Be warm, extremely polite, and mouthwateringly descriptive (বাংলায় কথা বলুন). Use appetizing sensory words (যেমন: মুচমুচে, গরম গরম, চিজি, ধোঁয়া ওঠা, স্পাইসি, সুগন্ধি বাসমতী চাল, অথেনটিক মসলা).
+- Proactive Sales Executive: If customer chooses a main dish, tempt them with a beverage, side, or dessert.
+- Keep responses concise (3-5 sentences) and persuasive.
+
+LOCATION CONTEXT ({{USER_LOCATION}}):
+- Prioritize dishes deliverable to user's area (সাধারণত ২৫-৪০ মিনিটে খাবার পৌঁছাবে).
+
+MOOD & CRAVINGS ({{USER_MOOD}}):
+- Match the user's vibe (ঝাল/স্পাইসি, চিট ডে, হেলদি, লেট নাইট, বাজেট কম্বো).
+
+BUDGET CALCULATION:
+- Standard delivery fee is ৳৪০. When recommending packages within a budget, always include the ৳৪০ delivery fee calculation clearly.
+
+STRUCTURED RECOMMENDATIONS:
+Whenever suggesting food, ALWAYS append the structured food recommendations and checkout action button codeblocks at the very end of your response:
+\`\`\`food_recommendations
+[{"id":"<food_id>","restaurantId":"<restaurant_id>","name":"<name>","price":<price>,"discountPrice":<discountPrice_or_null>,"restaurantName":"<restaurant_name>","image":"<image_url>","rating":4.8,"isSpicy":<true/false>}]
+\`\`\`
+\`\`\`action_buttons
+[{"type":"CHECKOUT","label":"চেকআউট করুন"}]
+\`\`\`
+>>>>>>> ed99c2d (Added: Multi-Model Ai Service Provider Added Like: Groq)
 `;
 
-    // Trim history to prevent token blowout
+    let customPrompt = aiSettings?.salesExecutivePrompt || defaultPrompt;
+    customPrompt = customPrompt
+      .replace(/{{USER_LOCATION}}/g, locationStr)
+      .replace(/{{USER_MOOD}}/g, String(moodStr))
+      .replace(/{{LIVE_FOODS}}/g, JSON.stringify(liveFoods))
+      .replace(/{{USER_CART}}/g, JSON.stringify(userCart))
+      .replace(/{{ACTIVE_COUPONS}}/g, JSON.stringify(activeCoupons));
+
+    const geofenceRules = `
+CRITICAL ZONE GEOFENCING & DISH AVAILABILITY RULES (MANDATORY):
+1. CUSTOMER'S ACTIVE LOCATION: ${locationStr}.
+2. DELIVERABLE FOODS: You are strictly and ONLY allowed to suggest and recommend dishes that appear in the LIVE FOODS list below (these are the ONLY items deliverable to ${locationStr}).
+   - Absolutely NEVER invent or recommend dishes from other cities, other zones, or restaurants not present in LIVE FOODS.
+   - Every recommended dish MUST be from LIVE FOODS with its exact name, restaurant, and price.
+3. IF LIVE FOODS IS EMPTY (${liveFoods.length === 0 ? "CURRENT STATUS: EMPTY / 0 DISHES" : "CURRENT STATUS: HAS DISHES"}):
+   - Clearly and politely explain in Bengali:
+     "দুঃখিত! আপনার এলাকা (${locationStr})-তে আমাদের ফুড ডেলিভারি সার্ভিস এখনো সক্রিয় হয়নি বা এই মুহূর্তে কোনো অনুমোদিত রেস্টুরেন্ট খোলা নেই।"
+   - Advise the customer to choose another nearby delivery area from the top location selector.
+   - NEVER output any \`\`\`food_recommendations\`\`\` codeblock when LIVE FOODS is empty.
+4. IF THE CUSTOMER ASKS FOR A FOOD NOT IN LIVE FOODS (e.g. they ask for Burger, Biryani, Coffee, etc., but that specific category/food is not in LIVE FOODS):
+   - First, politely acknowledge and inform them:
+     "দুঃখিত, আপনার বর্তমান লোকেশন (${locationStr})-তে এই মুহূর্তে কাঙ্ক্ষিত খাবারটি পাওয়া যাচ্ছে না।"
+   - Then, act as a passionate, friendly gourmet concierge and convince them to try the best dishes that ARE currently available from the active restaurants in their area:
+     "তবে আপনার এরিয়ার [Restaurant Name] থেকে গরম গরম [Food Name] (৳[Price]) এখনই অর্ডার করতে পারেন!"
+   - ONLY include the truly available dishes in the \`\`\`food_recommendations\`\`\` codeblock.
+`;
+
+    const systemInstruction = `
+${customPrompt}
+
+${geofenceRules}
+
+LIVE CONTEXT:
+- Location: ${locationStr}
+- Mood/Vibe: ${moodStr}
+- Live Foods: ${JSON.stringify(liveFoods)}
+- Live Restaurants: ${JSON.stringify(liveRestaurants)}
+- User Cart: ${JSON.stringify(userCart)}
+- User Orders: ${JSON.stringify(userOrders)}
+`;
+
+    // Format chat messages
     const trimmedHistory = chatHistory.slice(-4).map((m: any) => ({
-      role: m.role === "assistant" || m.role === "model" ? "model" : "user",
-      parts: [{ text: m.content || m.text || m.message || "" }],
+      role: m.role === "assistant" || m.role === "model" ? "assistant" : "user",
+      content: m.content || m.text || m.message || (m.parts && m.parts[0]?.text) || "",
     }));
 
-    const contents = [...trimmedHistory, { role: "user", parts: [{ text: message.trim() }] }];
+    const unifiedMessages = [
+      { role: "system", content: systemInstruction },
+      ...trimmedHistory,
+      { role: "user", content: message.trim() },
+    ];
 
     const geminiPayload = {
-      contents,
+      contents: [
+        ...trimmedHistory.map((m: any) => ({
+          role: m.role === "assistant" ? "model" : "user",
+          parts: [{ text: m.content }],
+        })),
+        { role: "user", parts: [{ text: message.trim() }] },
+      ],
       systemInstruction: {
         parts: [{ text: systemInstruction }],
       },
       generationConfig: {
+<<<<<<< HEAD
         temperature: 0.6,
         maxOutputTokens: 1000,
       },
@@ -937,6 +1540,126 @@ GENERAL RULES:
           riderOrders,
           adminStats
         );
+=======
+        temperature,
+        maxOutputTokens: maxTokens,
+      },
+    };
+
+    let reply = "";
+    let providerUsed = activeProvider;
+
+    // Provider cascade
+    const providerSequence = Array.from(new Set([
+      activeProvider,
+      activeProvider === "groq" ? "agentrouter" : "groq",
+      "gemini",
+    ]));
+
+    for (const provider of providerSequence) {
+      try {
+        if (provider === "groq") {
+          reply = await callGroqWithFailover(groqKeys, activeModel, unifiedMessages, temperature, maxTokens);
+          providerUsed = "groq";
+          break;
+        } else if (provider === "agentrouter") {
+          reply = await callAgentRouterWithFailover(agentRouterKeys, unifiedMessages, temperature, maxTokens);
+          providerUsed = "agentrouter";
+          break;
+        } else if (provider === "gemini") {
+          reply = await callGeminiRestWithFailover(geminiKeys, activeModel, geminiPayload);
+          providerUsed = "gemini";
+          break;
+        }
+      } catch (err) {
+        console.warn(`[Next AI Chat] Provider ${provider} failed, trying next:`, err);
+      }
+    }
+
+    if (!reply) {
+      console.warn("[Next AI Chat] All providers failed. Using local fallback.");
+      reply = generateLocalFallbackResponse(message, liveFoods, userOrders, userCart, activeCoupons, userLocation, userMood);
+      providerUsed = "fallback";
+    }
+
+    // Enforce exact real food images and verified dish metadata from MongoDB
+    if (reply && foodLookup.size > 0) {
+      reply = reply.replace(
+        /```(?:food_recommendations|json:foods|json)?\s*(\[[\s\S]*?\])\s*```?/gi,
+        (fullMatch, jsonStr) => {
+          try {
+            const list = JSON.parse(jsonStr);
+            if (Array.isArray(list)) {
+              const enriched = list.map((item: any) => {
+                const doc = (item.id && foodLookup.get(item.id)) ||
+                  (item.name && foodLookup.get(item.name.toLowerCase().trim()));
+                if (doc) {
+                  const trueImg = getTrueFoodImage(doc);
+                  return {
+                    ...item,
+                    id: doc._id?.toString() || item.id,
+                    name: doc.name || item.name,
+                    restaurantId: doc.restaurantId?.toString() || item.restaurantId,
+                    restaurantName: doc.restaurantName || restaurantNameMap[doc.restaurantId?.toString()] || item.restaurantName,
+                    price: Number(doc.price) || item.price,
+                    discountPrice: doc.discountPrice ? Number(doc.discountPrice) : item.discountPrice,
+                    image: (trueImg && trueImg.length > 200) ? trueImg : (item.image || "https://images.unsplash.com/photo-1513104890138-7c749659a591?auto=format&fit=crop&w=400&q=80"),
+                    rating: doc.rating ? Number(doc.rating) : item.rating || 4.8,
+                    isSpicy: Boolean(doc.isSpicy ?? item.isSpicy),
+                    isVegetarian: Boolean(doc.isVegetarian ?? item.isVegetarian),
+                  };
+                }
+                return item;
+              });
+              return "```food_recommendations\n" + JSON.stringify(enriched, null, 2) + "\n```";
+            }
+          } catch (e) {
+            // Keep original if JSON parsing fails
+          }
+          return fullMatch;
+        }
+      );
+    }
+
+    // Handle Cart Action detection & response encapsulation
+    let finalCartAction: any = detectedCartItem ? { type: "ADD_TO_CART", food: detectedCartItem } : null;
+
+    const cartMatch = reply.match(/```(?:cart_action|json:cart)?\s*(\{\s*[\s\S]*?"(?:ADD_TO_CART|type)"[\s\S]*?\}\s*)\s*```?/i);
+    if (cartMatch) {
+      try {
+        const parsedCart = JSON.parse(cartMatch[1]);
+        if (parsedCart && (parsedCart.type === "ADD_TO_CART" || parsedCart.action === "ADD_TO_CART")) {
+          const targetId = parsedCart.foodId || parsedCart.id || parsedCart.food?.id;
+          const targetName = parsedCart.name || parsedCart.food?.name;
+          const doc = (targetId && foodLookup.get(targetId)) ||
+            (targetName && foodLookup.get(targetName.toLowerCase().trim())) ||
+            detectedCartItem;
+          if (doc) {
+            const trueImg = getTrueFoodImage(doc);
+            finalCartAction = {
+              type: "ADD_TO_CART",
+              food: {
+                id: doc._id?.toString() || doc.id,
+                name: doc.name,
+                price: Number(doc.price),
+                discountPrice: doc.discountPrice ? Number(doc.discountPrice) : undefined,
+                restaurantId: doc.restaurantId?.toString(),
+                restaurantName: doc.restaurantName || restaurantNameMap[doc.restaurantId?.toString()],
+                image: (trueImg && trueImg.length > 200) ? trueImg : (doc.image || "https://images.unsplash.com/photo-1513104890138-7c749659a591?auto=format&fit=crop&w=400&q=80"),
+                category: doc.category || "Dishes",
+                isSpicy: Boolean(doc.isSpicy),
+                isVegetarian: Boolean(doc.isVegetarian),
+                quantity: Number(parsedCart.quantity) || 1,
+              },
+            };
+          }
+        }
+      } catch (e) {}
+    } else if (detectedCartItem) {
+      reply += `\n\n\`\`\`cart_action\n${JSON.stringify({ type: "ADD_TO_CART", food: detectedCartItem }, null, 2)}\n\`\`\``;
+      if (!reply.includes("action_buttons")) {
+        reply += `\n\`\`\`action_buttons\n[{"type":"CHECKOUT","label":"সরাসরি চেকআউট করুন 🛒"}]\n\`\`\``;
+>>>>>>> ed99c2d (Added: Multi-Model Ai Service Provider Added Like: Groq)
       }
     }
 
@@ -945,6 +1668,9 @@ GENERAL RULES:
       userRole: effectiveRole,
       restaurantName: restaurantProfile?.name,
       reply,
+      provider: providerUsed,
+      model: activeModel,
+      cartAction: finalCartAction,
     });
   } catch (error: any) {
     console.error("[Next AI Chat Route] Unhandled Error:", error);

@@ -42,9 +42,12 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
+import AiMarkdownRenderer from "./AiMarkdownRenderer";
 import { useSession } from "@/lib/auth-client";
 import { useCart } from "@/contexts/CartContext";
 import { IGlobalFoodItem } from "@/types/restaurant";
+import { toast } from "react-toastify";
+import { getRealTimeLocation, subscribeLocation, ILocationInfo, DEFAULT_INITIAL_LOCATION } from "@/lib/location";
 
 /* ------------------------------------------------------------------ */
 /*  Types & Interfaces (assistant-ui styled)                           */
@@ -87,6 +90,7 @@ interface ParsedMessageContent {
   recommendedFoods: RecommendedFood[];
   orderStatus: OrderStatusData | null;
   actionButtons: ActionButton[];
+  cartAction?: any;
 }
 
 interface ChatMessage {
@@ -96,6 +100,8 @@ interface ChatMessage {
   parsed?: ParsedMessageContent;
   timestamp: Date;
   feedback?: "like" | "dislike" | null;
+  provider?: string;
+  model?: string;
 }
 
 interface QuickAction {
@@ -263,10 +269,22 @@ function formatTime(d: Date): string {
  * Parses raw message text and extracts structured JSON tokens
  */
 function sanitizeFoodImage(img?: string): string {
-  if (!img || typeof img !== "string" || img.startsWith("data:") || img.length > 250) {
-    return "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=400&q=80";
+  if (!img || typeof img !== "string" || !img.trim()) {
+    return "https://images.unsplash.com/photo-1513104890138-7c749659a591?auto=format&fit=crop&w=400&q=80";
   }
-  return img;
+  const trimmed = img.trim();
+  // Allow valid base64 data URIs (valid base64 images are at least 500 characters)
+  if (trimmed.startsWith("data:image/")) {
+    if (trimmed.length > 500) {
+      return trimmed;
+    }
+    return "https://images.unsplash.com/photo-1513104890138-7c749659a591?auto=format&fit=crop&w=400&q=80";
+  }
+  // Allow valid web URLs
+  if (trimmed.startsWith("http://") || trimmed.startsWith("https://") || trimmed.startsWith("/")) {
+    return trimmed;
+  }
+  return "https://images.unsplash.com/photo-1513104890138-7c749659a591?auto=format&fit=crop&w=400&q=80";
 }
 
 function parseAssistantMessage(rawText: string): ParsedMessageContent {
@@ -274,9 +292,10 @@ function parseAssistantMessage(rawText: string): ParsedMessageContent {
   let recommendedFoods: RecommendedFood[] = [];
   let orderStatus: OrderStatusData | null = null;
   let actionButtons: ActionButton[] = [];
+  let cartAction: any = null;
 
   // 1. Extract ```food_recommendations ... ```
-  const foodRegex = /```(?:food_recommendations|json:foods|json)?\s*(\[\s*\{[\s\S]*?"id"[\s\S]*?\}\s*\])\s*```?/i;
+  const foodRegex = /```(?:food_recommendations|json:foods|json)?\s*(\[[\s\S]*?\])\s*```?/i;
   const foodMatch = text.match(foodRegex);
   if (foodMatch) {
     try {
@@ -291,22 +310,23 @@ function parseAssistantMessage(rawText: string): ParsedMessageContent {
       // ignore
     }
     text = text.replace(foodRegex, "").trim();
-  } else {
-    // Check for raw array without backticks
-    const rawArrayRegex = /\[\s*\{\s*"id"[\s\S]*?\}\s*\]/i;
-    const rawMatch = text.match(rawArrayRegex);
-    if (rawMatch) {
+  }
+
+  // 1b. Fallback: Parse individual food objects if array is truncated, unclosed, or lacks codeblocks
+  if (recommendedFoods.length === 0) {
+    const objectRegex = /\{[^{}]*?"id"\s*:\s*"([^"]+)"[^{}]*?"name"\s*:\s*"([^"]+)"[^{}]*?\}/g;
+    let match;
+    while ((match = objectRegex.exec(rawText)) !== null) {
       try {
-        const parsed = JSON.parse(rawMatch[0].trim());
-        if (Array.isArray(parsed) && parsed[0]?.name) {
-          recommendedFoods = parsed.map((f: any) => ({
-            ...f,
-            image: sanitizeFoodImage(f.image),
-          }));
-          text = text.replace(rawArrayRegex, "").trim();
+        const item = JSON.parse(match[0]);
+        if (item && item.id && item.name) {
+          recommendedFoods.push({
+            ...item,
+            image: sanitizeFoodImage(item.image),
+          });
         }
       } catch {
-        // ignore
+        // ignore malformed object
       }
     }
   }
@@ -341,13 +361,30 @@ function parseAssistantMessage(rawText: string): ParsedMessageContent {
     text = text.replace(actionRegex, "").trim();
   }
 
-  text = text.replace(/```(?:food_recommendations|order_status|action_buttons)?/gi, "").trim();
+  // 4. Extract ```cart_action ... ```
+  const cartBlockRegex = /```(?:cart_action|json:cart)?\s*(\{\s*[\s\S]*?"(?:ADD_TO_CART|type)"[\s\S]*?\}\s*)\s*```?/i;
+  const cartMatch = text.match(cartBlockRegex);
+  if (cartMatch) {
+    try {
+      cartAction = JSON.parse(cartMatch[1].trim());
+    } catch {}
+    text = text.replace(cartBlockRegex, "").trim();
+  }
+
+  // 5. Aggressive cleanup: Strip any remaining raw JSON array or codeblock remnant so text is always 100% clean
+  text = text
+    .replace(/```(?:food_recommendations|order_status|action_buttons|cart_action|json)?[\s\S]*/gi, "")
+    .replace(/\[\s*\{\s*"id"[\s\S]*/gi, "")
+    .replace(/\{\s*"orderId"[\s\S]*/gi, "")
+    .replace(/\[\s*\{\s*"type"[\s\S]*/gi, "")
+    .trim();
 
   return {
     text,
     recommendedFoods,
     orderStatus,
     actionButtons,
+    cartAction,
   };
 }
 
@@ -674,11 +711,7 @@ function MessageThreadItem({
           {isUser ? (
             <p className="whitespace-pre-wrap break-words">{msg.content}</p>
           ) : (
-            <div className="prose prose-sm max-w-none prose-headings:font-bold prose-headings:text-orange-600 prose-a:text-orange-600 prose-strong:text-gray-900 prose-ul:my-1 prose-li:my-0.5 prose-p:my-1 text-sm leading-relaxed">
-              <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                {parsed ? parsed.text : msg.content}
-              </ReactMarkdown>
-            </div>
+            <AiMarkdownRenderer content={parsed ? parsed.text : msg.content} />
           )}
 
           <div
@@ -687,6 +720,15 @@ function MessageThreadItem({
             }`}
           >
             <span>{formatTime(msg.timestamp)}</span>
+            {!isUser && msg.provider && (
+              <span
+                className="font-mono text-[9px] px-1.5 py-0.5 rounded bg-white/90 border border-gray-200 text-gray-600 uppercase tracking-wider flex items-center gap-1 shadow-2xs"
+                title={`Served by ${msg.provider} (${msg.model || "default"})`}
+              >
+                <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                {msg.provider} • {msg.model || "model"}
+              </span>
+            )}
           </div>
         </div>
 
@@ -804,9 +846,41 @@ export default function AIChatbot() {
   const [showScrollBottom, setShowScrollBottom] = useState(false);
   const greetedRef = useRef(false);
 
+  // Real-Time Location & Mood & Starter Chips State
+  const [locationInfo, setLocationInfo] = useState<ILocationInfo>(DEFAULT_INITIAL_LOCATION);
+  const [selectedMood, setSelectedMood] = useState<string | null>(null);
+  const [suggestedChips, setSuggestedChips] = useState<Array<{ id: string; label: string; message: string }>>([
+    { id: "1", label: "🔥 সেরা স্পাইসি খাবার", message: "আজকের সেরা স্পাইসি ও ঝাল খাবার কী আছে?" },
+    { id: "2", label: "💰 ৳৫০০ কম্বো (২ জন)", message: "আমার বাজেট ৫০০ টাকা, ২ জনের জন্য সেরা কম্বো খাবার সাজিয়ে দাও।" },
+    { id: "3", label: "⚡ দ্রুত ডেলিভারি", message: "আমার এরিয়াতে সবচেয়ে দ্রুত ডেলিভারি কোন খাবারের?" },
+    { id: "4", label: "🥗 হেলদি ডায়েট ফুড", message: "হেলদি ও লো-ক্যালরি ডায়েট ফুড অপশন দেখাও।" },
+    { id: "5", label: "🌙 লেট-নাইট স্ন্যাক্স", message: "রাতে খাওয়ার মতো হালকা ও মজার কিছু সাজেস্ট করো।" },
+    { id: "6", label: "🎉 ৪ জনের প্ল্যাটটার", message: "৪-৫ জনের আড্ডার জন্য একটা পারফেক্ট প্ল্যাটটার সাজিয়ে দাও।" },
+  ]);
+
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  // Sync real-time location and settings on mount
+  useEffect(() => {
+    setLocationInfo(getRealTimeLocation());
+
+    const unsubscribe = subscribeLocation(() => {
+      setLocationInfo(getRealTimeLocation());
+    });
+
+    fetch("/api/ai/settings")
+      .then((r) => r.json())
+      .then((res) => {
+        if (res?.data?.preSuggestedPrompts && Array.isArray(res.data.preSuggestedPrompts) && res.data.preSuggestedPrompts.length > 0) {
+          setSuggestedChips(res.data.preSuggestedPrompts);
+        }
+      })
+      .catch(() => {});
+
+    return unsubscribe;
+  }, []);
 
   const router = useRouter();
   const { data: session } = useSession();
@@ -817,14 +891,60 @@ export default function AIChatbot() {
     | undefined;
   const role = normalizeRole(user?.role);
 
-  /* ---- Auto-scroll ---- */
+  const historyLoadedRef = useRef(false);
+
+  /* ---- Auto-scroll (only inside messages container, never jumps page) ---- */
   const scrollToBottom = useCallback((behavior: ScrollBehavior = "smooth") => {
-    messagesEndRef.current?.scrollIntoView({ behavior });
+    if (messagesContainerRef.current) {
+      messagesContainerRef.current.scrollTo({
+        top: messagesContainerRef.current.scrollHeight,
+        behavior,
+      });
+    }
   }, []);
 
   useEffect(() => {
     scrollToBottom();
   }, [messages, isTyping, scrollToBottom]);
+
+  /* ---- Load chat history from localStorage on mount ---- */
+  useEffect(() => {
+    try {
+      const storageKey = user?.id ? `foodflow_widget_history_${user.id}` : "foodflow_widget_history_guest";
+      const saved = localStorage.getItem(storageKey);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          const rehydrated: ChatMessage[] = parsed.map((m: any) => ({
+            ...m,
+            timestamp: m.timestamp ? new Date(m.timestamp) : new Date(),
+            parsed: m.parsed || (m.role === "assistant" ? parseAssistantMessage(m.content) : undefined),
+          }));
+          setMessages(rehydrated);
+          greetedRef.current = true;
+        }
+      }
+    } catch (e) {
+      console.warn("Failed to load widget chat history", e);
+    } finally {
+      historyLoadedRef.current = true;
+    }
+  }, [user?.id]);
+
+  /* ---- Persist chat history to localStorage ---- */
+  useEffect(() => {
+    if (!historyLoadedRef.current) return;
+    try {
+      const storageKey = user?.id ? `foodflow_widget_history_${user.id}` : "foodflow_widget_history_guest";
+      if (messages.length > 0) {
+        localStorage.setItem(storageKey, JSON.stringify(messages.slice(-50)));
+      } else {
+        localStorage.removeItem(storageKey);
+      }
+    } catch (e) {
+      console.warn("Failed to save widget chat history", e);
+    }
+  }, [messages, user?.id]);
 
   /* ---- Scroll container watcher ---- */
   const handleScroll = () => {
@@ -834,7 +954,7 @@ export default function AIChatbot() {
     setShowScrollBottom(isUp);
   };
 
-  /* ---- Greeting initialization ---- */
+  /* ---- Greeting initialization (only if no history) ---- */
   useEffect(() => {
     if (isOpen && !greetedRef.current) {
       greetedRef.current = true;
@@ -993,6 +1113,10 @@ export default function AIChatbot() {
         timestamp: new Date(),
       },
     ]);
+    try {
+      const storageKey = user?.id ? `foodflow_widget_history_${user.id}` : "foodflow_widget_history_guest";
+      localStorage.removeItem(storageKey);
+    } catch {}
   };
 
   /* ---- Send Message ---- */
@@ -1031,6 +1155,19 @@ export default function AIChatbot() {
         price: ci.foodItem?.discountPrice || ci.foodItem?.price || (ci as any)?.price || 0,
       }));
 
+      const userLocationPayload = {
+        zoneName: locationInfo.zoneName || locationInfo.upazila || locationInfo.district || locationInfo.city || "All Bangladesh",
+        currentZoneId: locationInfo.currentZoneId,
+        candidateZoneIds: locationInfo.candidateZoneIds,
+        lat: locationInfo.lat,
+        lng: locationInfo.lng,
+        city: locationInfo.city,
+        district: locationInfo.district,
+        upazila: locationInfo.upazila,
+        area: locationInfo.area,
+        isInsideServiceArea: locationInfo.isInsideServiceArea,
+      };
+
       try {
         // Try direct Next.js API route first, fallback to Express server if needed
         let res = await fetch(`/api/ai/chat`, {
@@ -1043,6 +1180,8 @@ export default function AIChatbot() {
             userId: user?.id,
             userEmail: user?.email,
             cartItems: cartSummary,
+            userLocation: userLocationPayload,
+            userMood: selectedMood,
           }),
         });
 
@@ -1058,6 +1197,8 @@ export default function AIChatbot() {
               userId: user?.id,
               userEmail: user?.email,
               cartItems: cartSummary,
+              userLocation: userLocationPayload,
+              userMood: selectedMood,
             }),
           });
         }
@@ -1076,13 +1217,29 @@ export default function AIChatbot() {
 
         const parsed = parseAssistantMessage(rawReply);
 
+        // Auto-execute Cart Action if user requested adding item to cart
+        const cartActionToRun = data?.cartAction || parsed.cartAction;
+        if (
+          cartActionToRun &&
+          (cartActionToRun.type === "ADD_TO_CART" || cartActionToRun.action === "ADD_TO_CART") &&
+          cartActionToRun.food
+        ) {
+          const food = cartActionToRun.food;
+          const qty = Number(food.quantity) || 1;
+          handleAddToCartFromAI(food, qty);
+          toast.success(`'${food.name}' সফলভাবে আপনার কার্টে যোগ করা হয়েছে! 🛒`);
+        }
+
         const replyMsg: ChatMessage = {
           id: generateId(),
           role: "assistant",
           content: rawReply,
           parsed,
           timestamp: new Date(),
+          provider: data?.provider || data?.data?.provider,
+          model: data?.model || data?.data?.model,
         };
+        console.log(`🤖 [FoodFlow AI Debug] Service: ${replyMsg.provider} | Model: ${replyMsg.model}`);
         setMessages((prev) => [...prev, replyMsg]);
         setInput("");
       } catch (err) {
@@ -1095,7 +1252,7 @@ export default function AIChatbot() {
         setIsTyping(false);
       }
     },
-    [input, isTyping, user, messages, cartItems]
+    [input, isTyping, user, messages, cartItems, handleAddToCartFromAI]
   );
 
   /* ---- Key Down Handler ---- */
@@ -1230,6 +1387,34 @@ export default function AIChatbot() {
               </div>
             </div>
 
+            {/* Location Bar with quick edit */}
+            <div className="flex items-center justify-between px-4 py-1.5 bg-orange-50/80 border-b border-orange-100 text-xs text-orange-900">
+              <div className="flex items-center gap-1.5 font-medium truncate">
+                <MapPin className="h-3.5 w-3.5 text-orange-600 shrink-0" />
+                <span className="text-gray-500 text-[11px]">লোকেশন:</span>
+                <span className="font-bold text-gray-800 text-[11px] truncate">
+                  {locationInfo.zoneName || locationInfo.district || locationInfo.city || "সকল জোন"}
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  const newLoc = prompt("আপনার ডেলিভারি এলাকা লিখুন (যেমন: ময়মনসিংহ, ধানমন্ডি, মিরপুর):", locationInfo.zoneName || locationInfo.city || "");
+                  if (newLoc && newLoc.trim()) {
+                    setLocationInfo((prev) => ({
+                      ...prev,
+                      zoneName: newLoc.trim(),
+                      city: newLoc.trim(),
+                      hasRealLocation: true,
+                    }));
+                  }
+                }}
+                className="text-[10px] font-bold text-orange-600 hover:text-orange-800 underline shrink-0 cursor-pointer"
+              >
+                পরিবর্তন
+              </button>
+            </div>
+
             {/* ---- Thread Messages List ---- */}
             <div
               ref={messagesContainerRef}
@@ -1291,34 +1476,60 @@ export default function AIChatbot() {
               </div>
             )}
 
-            {/* ---- Prompt Suggestions Cards (When messages <= 1) ---- */}
+            {/* ---- Pre-Suggested Prompt Chips (When messages <= 1) ---- */}
             {messages.length <= 1 && (
               <div className="border-t border-gray-100 px-4 py-3 bg-white">
                 <p className="mb-2 text-[11px] font-bold uppercase tracking-wider text-gray-400 flex items-center gap-1">
                   <Sparkles className="h-3 w-3 text-orange-500" /> দ্রুত শুরু করতে ট্যাপ করুন
                 </p>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                  {ROLE_QUICK_ACTIONS[role].map((action) => (
+                <div className="flex flex-wrap gap-1.5">
+                  {suggestedChips.map((chip) => (
                     <button
-                      key={action.title}
-                      onClick={() => handleSend(action.message)}
+                      key={chip.id}
+                      onClick={() => handleSend(chip.message)}
                       disabled={isTyping}
-                      className="flex items-start gap-2.5 p-2.5 rounded-xl border border-gray-200 bg-white hover:border-orange-300 hover:bg-orange-50/50 transition-all text-left group cursor-pointer shadow-2xs disabled:opacity-50"
+                      className="px-3 py-1.5 rounded-xl border border-gray-200 bg-white hover:border-orange-300 hover:bg-orange-50 text-xs font-semibold text-gray-700 hover:text-orange-600 transition cursor-pointer shadow-2xs disabled:opacity-50"
                     >
-                      <div className="p-1.5 rounded-lg bg-orange-100/60 group-hover:bg-orange-100 transition shrink-0 mt-0.5">
-                        {action.icon}
-                      </div>
-                      <div className="min-w-0">
-                        <h5 className="text-xs font-bold text-gray-800 group-hover:text-orange-600 truncate">
-                          {action.title}
-                        </h5>
-                        <p className="text-[10px] text-gray-500 truncate">{action.description}</p>
-                      </div>
+                      {chip.label}
                     </button>
                   ))}
                 </div>
               </div>
             )}
+
+            {/* Mood / Craving Quick Pills */}
+            <div className="px-3 pt-2 pb-1 bg-white border-t border-gray-100 flex items-center gap-1.5 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400 shrink-0 flex items-center gap-1">
+                <Flame className="h-3 w-3 text-orange-500" /> মুড:
+              </span>
+              {[
+                { id: "spicy", label: "🌶️ ঝাল", prompt: "আমার ঝাল ও স্পাইসি খাবার খেতে ইচ্ছে করছে, সেরা কিছু দেখাও।" },
+                { id: "cheat_day", label: "🍔 চিট ডে", prompt: "আজকে চিট ডে! দারুণ কোনো বার্গার বা পিজ্জা সাজেস্ট করো।" },
+                { id: "healthy", label: "🥗 হেলদি", prompt: "হেলদি ও লো-ক্যালরি ডায়েট ফুড অপশন দেখাও।" },
+                { id: "late_night", label: "🌙 লেট নাইট", prompt: "রাতে খাওয়ার মতো হালকা ও কমফোর্ট স্ন্যাক্স সাজেস্ট করো।" },
+                { id: "budget", label: "💰 বাজেট", prompt: "৳৫০০ টাকার মধ্যে ২ জনের জন্য সেরা বাজেট কম্বো সাজিয়ে দাও।" },
+                { id: "party", label: "🎉 আড্ডা", prompt: "৪-৫ জনের আড্ডার জন্য একটা পারফেক্ট প্ল্যাটটার সাজিয়ে দাও।" },
+              ].map((pill) => {
+                const isSelected = selectedMood === pill.id;
+                return (
+                  <button
+                    key={pill.id}
+                    type="button"
+                    onClick={() => {
+                      setSelectedMood(isSelected ? null : pill.id);
+                      handleSend(pill.prompt);
+                    }}
+                    className={`shrink-0 px-2.5 py-1 rounded-full text-xs font-bold transition-all cursor-pointer ${
+                      isSelected
+                        ? "bg-orange-500 text-white shadow-xs"
+                        : "bg-gray-100 hover:bg-orange-50 text-gray-700 hover:text-orange-600 border border-gray-200/60"
+                    }`}
+                  >
+                    {pill.label}
+                  </button>
+                );
+              })}
+            </div>
 
             {/* ---- Input Composer (assistant-ui style) ---- */}
             <div className="border-t border-gray-100 bg-white p-3">

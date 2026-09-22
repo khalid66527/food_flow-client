@@ -4,6 +4,7 @@ import React, { useState, useRef, useEffect, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
+import AiMarkdownRenderer from "@/components/ai/AiMarkdownRenderer";
 import {
   Send,
   Bot,
@@ -28,6 +29,7 @@ import {
   Volume2,
   VolumeX,
   ShoppingBag,
+<<<<<<< HEAD
   Heart,
   Store,
   Bike,
@@ -37,6 +39,9 @@ import {
   ExternalLink,
   Banknote,
   LayoutDashboard,
+=======
+  MapPin,
+>>>>>>> ed99c2d (Added: Multi-Model Ai Service Provider Added Like: Groq)
 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -50,6 +55,7 @@ import {
 } from "@/lib/api/favorite";
 import { TFavoriteItem } from "@/types/favorite";
 import { toast } from "react-toastify";
+import { getRealTimeLocation, subscribeLocation, ILocationInfo, DEFAULT_INITIAL_LOCATION } from "@/lib/location";
 
 /* ------------------------------------------------------------------ */
 /*  Types & Interfaces                                                */
@@ -106,7 +112,11 @@ interface ParsedMessageContent {
   recommendedFoods: RecommendedFood[];
   orderStatus: OrderStatusData | null;
   actionButtons: ActionButton[];
+<<<<<<< HEAD
   actionExecute: ActionExecuteDirective | null;
+=======
+  cartAction?: any;
+>>>>>>> ed99c2d (Added: Multi-Model Ai Service Provider Added Like: Groq)
 }
 
 interface ChatMessage {
@@ -116,6 +126,8 @@ interface ChatMessage {
   parsed?: ParsedMessageContent;
   timestamp: Date;
   feedback?: "like" | "dislike" | null;
+  provider?: string;
+  model?: string;
 }
 
 /* ------------------------------------------------------------------ */
@@ -123,10 +135,22 @@ interface ChatMessage {
 /* ------------------------------------------------------------------ */
 
 function sanitizeFoodImage(img?: string): string {
-  if (!img || typeof img !== "string" || img.startsWith("data:") || img.length > 250) {
-    return "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=400&q=80";
+  if (!img || typeof img !== "string" || !img.trim()) {
+    return "https://images.unsplash.com/photo-1513104890138-7c749659a591?auto=format&fit=crop&w=400&q=80";
   }
-  return img;
+  const trimmed = img.trim();
+  // Allow valid base64 data URIs (valid base64 images are at least 500 characters)
+  if (trimmed.startsWith("data:image/")) {
+    if (trimmed.length > 500) {
+      return trimmed;
+    }
+    return "https://images.unsplash.com/photo-1513104890138-7c749659a591?auto=format&fit=crop&w=400&q=80";
+  }
+  // Allow valid web URLs
+  if (trimmed.startsWith("http://") || trimmed.startsWith("https://") || trimmed.startsWith("/")) {
+    return trimmed;
+  }
+  return "https://images.unsplash.com/photo-1513104890138-7c749659a591?auto=format&fit=crop&w=400&q=80";
 }
 
 function parseMessageContent(raw: string): ParsedMessageContent {
@@ -134,6 +158,7 @@ function parseMessageContent(raw: string): ParsedMessageContent {
   let recommendedFoods: RecommendedFood[] = [];
   let orderStatus: OrderStatusData | null = null;
   let actionButtons: ActionButton[] = [];
+<<<<<<< HEAD
   let actionExecute: ActionExecuteDirective | null = null;
 
   // 1. Action Execute block: ```action_execute ... ```
@@ -150,6 +175,12 @@ function parseMessageContent(raw: string): ParsedMessageContent {
 
   // 2. Food Recommendations block: ```food_recommendations ... ```
   const foodBlockRegex = /```(?:food_recommendations|json)?\s*(\[\s*\{[\s\S]*?"id"[\s\S]*?\}\s*\])\s*```?/i;
+=======
+  let cartAction: any = null;
+
+  // 1. Food Recommendations block (with codeblock or raw json)
+  const foodBlockRegex = /```(?:food_recommendations|json:foods|json)?\s*(\[[\s\S]*?\])\s*```?/i;
+>>>>>>> ed99c2d (Added: Multi-Model Ai Service Provider Added Like: Groq)
   const foodMatch = text.match(foodBlockRegex);
   if (foodMatch) {
     try {
@@ -164,20 +195,22 @@ function parseMessageContent(raw: string): ParsedMessageContent {
       console.warn("Could not parse food recommendations JSON", e);
     }
     text = text.replace(foodBlockRegex, "").trim();
-  } else {
-    // Check for raw array without backticks
-    const rawArrayRegex = /\[\s*\{\s*"id"[\s\S]*?\}\s*\]/i;
-    const rawMatch = text.match(rawArrayRegex);
-    if (rawMatch) {
+  }
+
+  // 1b. Fallback: Parse individual food objects if array is truncated, unclosed, or lacks codeblocks
+  if (recommendedFoods.length === 0) {
+    const objectRegex = /\{[^{}]*?"id"\s*:\s*"([^"]+)"[^{}]*?"name"\s*:\s*"([^"]+)"[^{}]*?\}/g;
+    let match;
+    while ((match = objectRegex.exec(raw)) !== null) {
       try {
-        const parsed = JSON.parse(rawMatch[0].trim());
-        if (Array.isArray(parsed) && parsed[0]?.name) {
-          recommendedFoods = parsed.map((f: any) => ({
-            ...f,
-            image: sanitizeFoodImage(f.image),
-          }));
-          text = text.replace(rawArrayRegex, "").trim();
+        const item = JSON.parse(match[0]);
+        if (item && item.id && item.name) {
+          recommendedFoods.push({
+            ...item,
+            image: sanitizeFoodImage(item.image),
+          });
         }
+<<<<<<< HEAD
       } catch {
         // ignore
       }
@@ -186,6 +219,14 @@ function parseMessageContent(raw: string): ParsedMessageContent {
 
   // 3. Order Status block: ```order_status ... ```
   const orderBlockRegex = /```(?:order_status|json)?\s*(\{\s*"orderId"[\s\S]*?\}\s*)\s*```?/i;
+=======
+      } catch (e) {}
+    }
+  }
+
+  // 2. Order Status block
+  const orderBlockRegex = /```(?:order_status|json:order|json)?\s*(\{\s*"orderId"[\s\S]*?\}\s*)\s*```?/i;
+>>>>>>> ed99c2d (Added: Multi-Model Ai Service Provider Added Like: Groq)
   const orderMatch = text.match(orderBlockRegex);
   if (orderMatch) {
     try {
@@ -196,8 +237,13 @@ function parseMessageContent(raw: string): ParsedMessageContent {
     text = text.replace(orderBlockRegex, "").trim();
   }
 
+<<<<<<< HEAD
   // 4. Action buttons block: ```action_buttons ... ```
   const actionBlockRegex = /```(?:action_buttons|json)?\s*(\[\s*\{[\s\S]*?"type"[\s\S]*?\}\s*\])\s*```?/i;
+=======
+  // 3. Action buttons block
+  const actionBlockRegex = /```(?:action_buttons|json:actions|json)?\s*(\[\s*\{[\s\S]*?"type"[\s\S]*?\}\s*\])\s*```?/i;
+>>>>>>> ed99c2d (Added: Multi-Model Ai Service Provider Added Like: Groq)
   const actionMatch = text.match(actionBlockRegex);
   if (actionMatch) {
     try {
@@ -211,15 +257,41 @@ function parseMessageContent(raw: string): ParsedMessageContent {
     text = text.replace(actionBlockRegex, "").trim();
   }
 
+<<<<<<< HEAD
   // Strip any leftover unclosed markdown codeblock tags
   text = text.replace(/```(?:action_execute|food_recommendations|order_status|action_buttons)?/gi, "").trim();
+=======
+  // 4. Cart action block
+  const cartBlockRegex = /```(?:cart_action|json:cart)?\s*(\{\s*[\s\S]*?"(?:ADD_TO_CART|type)"[\s\S]*?\}\s*)\s*```?/i;
+  const cartMatch = text.match(cartBlockRegex);
+  if (cartMatch) {
+    try {
+      cartAction = JSON.parse(cartMatch[1].trim());
+    } catch (e) {
+      console.warn("Could not parse cart action JSON", e);
+    }
+    text = text.replace(cartBlockRegex, "").trim();
+  }
+
+  // 5. Aggressive cleanup: Strip any remaining raw JSON array or codeblock remnant so text is always 100% clean
+  text = text
+    .replace(/```(?:food_recommendations|order_status|action_buttons|cart_action|json)?[\s\S]*/gi, "")
+    .replace(/\[\s*\{\s*"id"[\s\S]*/gi, "")
+    .replace(/\{\s*"orderId"[\s\S]*/gi, "")
+    .replace(/\[\s*\{\s*"type"[\s\S]*/gi, "")
+    .trim();
+>>>>>>> ed99c2d (Added: Multi-Model Ai Service Provider Added Like: Groq)
 
   return {
     cleanMarkdown: text,
     recommendedFoods,
     orderStatus,
     actionButtons,
+<<<<<<< HEAD
     actionExecute,
+=======
+    cartAction,
+>>>>>>> ed99c2d (Added: Multi-Model Ai Service Provider Added Like: Groq)
   };
 }
 
@@ -303,6 +375,7 @@ export default function AIAssistantPage() {
   const [isListening, setIsListening] = useState(false);
   const [speakingMsgId, setSpeakingMsgId] = useState<string | null>(null);
 
+<<<<<<< HEAD
   const messagesContainerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
@@ -316,6 +389,88 @@ export default function AIAssistantPage() {
     if (messagesContainerRef.current) {
       messagesContainerRef.current.scrollTo({
         top: messagesContainerRef.current.scrollHeight,
+=======
+  // Real-Time Location & Mood & Suggested Prompts
+  const [locationInfo, setLocationInfo] = useState<ILocationInfo>(DEFAULT_INITIAL_LOCATION);
+  const [selectedMood, setSelectedMood] = useState<string | null>(null);
+  const [suggestedChips, setSuggestedChips] = useState<Array<{ id: string; label: string; message: string }>>([
+    { id: "1", label: "🔥 সেরা স্পাইসি খাবার", message: "আজকের সেরা স্পাইসি ও ঝাল খাবার কী আছে?" },
+    { id: "2", label: "💰 ৳৫০০ কম্বো (২ জন)", message: "আমার বাজেট ৫০০ টাকা, ২ জনের জন্য সেরা কম্বো খাবার সাজিয়ে দাও।" },
+    { id: "3", label: "⚡ দ্রুত ডেলিভারি", message: "আমার এরিয়াতে সবচেয়ে দ্রুত ডেলিভারি কোন খাবারের?" },
+    { id: "4", label: "🥗 হেলদি ডায়েট ফুড", message: "হেলদি ও লো-ক্যালরি ডায়েট ফুড অপশন দেখাও।" },
+    { id: "5", label: "🌙 লেট-নাইট স্ন্যাক্স", message: "রাতে খাওয়ার মতো হালকা ও মজার কিছু সাজেস্ট করো।" },
+    { id: "6", label: "🎉 ৪ জনের প্ল্যাটটার", message: "৪-৫ জনের আড্ডার জন্য একটা পারফেক্ট প্ল্যাটটার সাজিয়ে দাও।" },
+  ]);
+
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const chatContainerRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
+  const historyLoadedRef = useRef(false);
+
+  // Sync real-time location and settings on mount
+  useEffect(() => {
+    setLocationInfo(getRealTimeLocation());
+
+    const unsubscribe = subscribeLocation(() => {
+      setLocationInfo(getRealTimeLocation());
+    });
+
+    fetch("/api/ai/settings")
+      .then((r) => r.json())
+      .then((res) => {
+        if (res?.data?.preSuggestedPrompts && Array.isArray(res.data.preSuggestedPrompts) && res.data.preSuggestedPrompts.length > 0) {
+          setSuggestedChips(res.data.preSuggestedPrompts);
+        }
+      })
+      .catch(() => {});
+
+    return unsubscribe;
+  }, []);
+
+  // Load chat history from localStorage on mount
+  useEffect(() => {
+    try {
+      const storageKey = session?.user?.id ? `foodflow_ai_history_${session.user.id}` : "foodflow_ai_history_guest";
+      const saved = localStorage.getItem(storageKey);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          const rehydrated: ChatMessage[] = parsed.map((m: any) => ({
+            ...m,
+            timestamp: m.timestamp ? new Date(m.timestamp) : new Date(),
+            parsed: m.parsed || (m.role === "assistant" ? parseMessageContent(m.content) : undefined),
+          }));
+          setMessages(rehydrated);
+        }
+      }
+    } catch (e) {
+      console.warn("Could not load chat history from localStorage", e);
+    } finally {
+      historyLoadedRef.current = true;
+    }
+  }, [session?.user?.id]);
+
+  // Persist chat history to localStorage whenever messages change
+  useEffect(() => {
+    if (!historyLoadedRef.current) return;
+    try {
+      const storageKey = session?.user?.id ? `foodflow_ai_history_${session.user.id}` : "foodflow_ai_history_guest";
+      if (messages.length > 0) {
+        localStorage.setItem(storageKey, JSON.stringify(messages.slice(-50)));
+      } else {
+        localStorage.removeItem(storageKey);
+      }
+    } catch (e) {
+      console.warn("Could not save chat history to localStorage", e);
+    }
+  }, [messages, session?.user?.id]);
+
+  // Auto-scroll ONLY inside chat container on new message (prevents outer page/window from jumping)
+  useEffect(() => {
+    if (chatContainerRef.current) {
+      chatContainerRef.current.scrollTo({
+        top: chatContainerRef.current.scrollHeight,
+>>>>>>> ed99c2d (Added: Multi-Model Ai Service Provider Added Like: Groq)
         behavior: "smooth",
       });
     }
@@ -489,10 +644,29 @@ export default function AIAssistantPage() {
             role: m.role,
             content: m.content,
           })),
+<<<<<<< HEAD
           userId: user?.id,
           userEmail: user?.email,
           userName: user?.name,
           userRole: userRole,
+=======
+          userId: session?.user?.id,
+          userEmail: session?.user?.email,
+          userName: session?.user?.name,
+          userLocation: {
+            zoneName: locationInfo.zoneName || locationInfo.upazila || locationInfo.district || locationInfo.city || "All Bangladesh",
+            currentZoneId: locationInfo.currentZoneId,
+            candidateZoneIds: locationInfo.candidateZoneIds,
+            lat: locationInfo.lat,
+            lng: locationInfo.lng,
+            city: locationInfo.city,
+            district: locationInfo.district,
+            upazila: locationInfo.upazila,
+            area: locationInfo.area,
+            isInsideServiceArea: locationInfo.isInsideServiceArea,
+          },
+          userMood: selectedMood,
+>>>>>>> ed99c2d (Added: Multi-Model Ai Service Provider Added Like: Groq)
           cartItems: cartItems.map((item) => ({
             id: item.foodItem?._id || (item as any)?.foodId || (item as any)?.id,
             name: item.foodItem?.name || (item as any)?.name || "খাবার আইটেম",
@@ -511,9 +685,44 @@ export default function AIAssistantPage() {
       if (data.success && data.reply) {
         const parsed = parseMessageContent(data.reply);
 
+<<<<<<< HEAD
         // If AI emitted an autonomous action execution directive, execute it automatically!
         if (parsed.actionExecute) {
           executeAgentAction(parsed.actionExecute);
+=======
+        // Auto-execute Cart Action if user commanded an item to be added to cart
+        const cartActionToRun = data.cartAction || parsed.cartAction;
+        if (cartActionToRun && (cartActionToRun.type === "ADD_TO_CART" || cartActionToRun.action === "ADD_TO_CART") && cartActionToRun.food) {
+          const item = cartActionToRun.food;
+          const foodItemPayload: IGlobalFoodItem = {
+            _id: item.id || item._id,
+            restaurantId: item.restaurantId || "foodflow-kitchen",
+            name: item.name,
+            price: item.price,
+            discountPrice: item.discountPrice,
+            image: item.image || "https://images.unsplash.com/photo-1513104890138-7c749659a591?w=400&auto=format&fit=crop&q=80",
+            restaurantName: item.restaurantName || "FoodFlow Kitchen",
+            restaurantSlug: (item.restaurantName || "foodflow").toLowerCase().replace(/\s+/g, "-"),
+            restaurantLogo: "",
+            restaurantIsOpen: true,
+            restaurantRating: item.rating || 4.8,
+            restaurantReviewCount: 24,
+            description: item.description || "",
+            category: item.category || "Dishes",
+            status: "available",
+            isAvailable: true,
+            isSpicy: Boolean(item.isSpicy),
+            isVegetarian: Boolean(item.isVegetarian),
+          };
+
+          const qty = Number(item.quantity) || 1;
+          addItem(foodItemPayload, qty);
+          setAddedItems((prev) => ({ ...prev, [foodItemPayload._id]: true }));
+          toast.success(`'${foodItemPayload.name}' সফলভাবে আপনার কার্টে যোগ করা হয়েছে! 🛒`);
+          setTimeout(() => {
+            setAddedItems((prev) => ({ ...prev, [foodItemPayload._id]: false }));
+          }, 2500);
+>>>>>>> ed99c2d (Added: Multi-Model Ai Service Provider Added Like: Groq)
         }
 
         const assistantMessage: ChatMessage = {
@@ -522,7 +731,10 @@ export default function AIAssistantPage() {
           content: data.reply,
           parsed,
           timestamp: new Date(),
+          provider: data.provider,
+          model: data.model,
         };
+        console.log(`🤖 [FoodFlow AI Debug] Service: ${assistantMessage.provider} | Model: ${assistantMessage.model}`);
         setMessages((prev) => [...prev, assistantMessage]);
       } else {
         const errorText = `⚠️ দুঃখিত, রিকোয়েস্ট প্রসেস করতে সমস্যা হয়েছে: ${data.error || "কিছুক্ষণ পর আবার চেষ্টা করুন।"}`;
@@ -729,9 +941,14 @@ export default function AIAssistantPage() {
     window.speechSynthesis.speak(utterance);
   };
 
-  // Reset Chat
+  // Reset Chat & Clear Saved History
   const handleResetChat = () => {
     setMessages([]);
+    try {
+      const storageKey = session?.user?.id ? `foodflow_ai_history_${session.user.id}` : "foodflow_ai_history_guest";
+      localStorage.removeItem(storageKey);
+      toast.info("চ্যাট হিস্ট্রি মুছে নতুন চ্যাট শুরু করা হয়েছে");
+    } catch {}
   };
 
   return (
@@ -760,6 +977,12 @@ export default function AIAssistantPage() {
                 </span>
                 <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
                   Autonomous Agent Active
+                </span>
+                <span className="text-[10px] font-semibold px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 flex items-center gap-1 shadow-2xs">
+                  <MapPin className="h-3 w-3 text-emerald-600 animate-pulse" />
+                  <span className="truncate max-w-[130px] sm:max-w-[200px]">
+                    {locationInfo.zoneName || locationInfo.district || locationInfo.city || "সকল জোন"}
+                  </span>
                 </span>
               </div>
               <p className="text-xs text-gray-500">
@@ -805,6 +1028,7 @@ export default function AIAssistantPage() {
       {/* Main Content Area */}
       <div className="max-w-5xl mx-auto w-full flex-1 flex flex-col px-3 sm:px-6 py-4">
         
+<<<<<<< HEAD
         {/* Interactive Role-Based Quick Preset Chips */}
         <div className="mb-3 overflow-x-auto pb-1 flex items-center gap-2 select-none no-scrollbar">
           <span className="text-[11px] font-bold uppercase tracking-wider text-gray-400 shrink-0 flex items-center gap-1">
@@ -821,6 +1045,46 @@ export default function AIAssistantPage() {
             </button>
           ))}
         </div>
+=======
+        {/* Message Feed Card */}
+        <div
+          ref={chatContainerRef}
+          className="flex-1 bg-white rounded-3xl border border-gray-200/90 shadow-sm p-4 sm:p-6 overflow-y-auto flex flex-col space-y-4 min-h-[60vh] max-h-[68vh]"
+        >
+          
+          {/* Minimal Empty State when no messages */}
+          {messages.length === 0 && (
+            <div className="flex-1 flex flex-col items-center justify-center text-center p-6 my-auto select-none">
+              <div className="h-14 w-14 rounded-2xl bg-orange-100 text-orange-600 flex items-center justify-center shadow-xs mb-3">
+                <Bot className="h-7 w-7" />
+              </div>
+              <h3 className="text-base sm:text-lg font-bold text-gray-900 mb-1">
+                ফুডফ্লো এআই সেলস অ্যাসিস্ট্যান্ট
+              </h3>
+              <p className="text-xs sm:text-sm text-gray-500 max-w-sm mb-6">
+                আপনার বাজেট, পছন্দের খাবার বা যেকোনো স্পাইসি ক্রাভিংস এর কথা জানান!
+              </p>
+
+              {/* Pre-Suggested Quick Prompt Chips */}
+              <div className="w-full max-w-lg">
+                <p className="text-xs font-bold uppercase tracking-wider text-gray-400 mb-2">
+                  দ্রুত শুরু করতে ট্যাপ করুন
+                </p>
+                <div className="flex flex-wrap justify-center gap-2">
+                  {suggestedChips.map((chip) => (
+                    <button
+                      key={chip.id}
+                      onClick={() => handleSendMessage(chip.message)}
+                      className="px-3.5 py-2 rounded-xl bg-gray-50 hover:bg-orange-50 hover:border-orange-300 border border-gray-200 text-xs font-semibold text-gray-700 hover:text-orange-600 transition cursor-pointer shadow-2xs"
+                    >
+                      {chip.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
+>>>>>>> ed99c2d (Added: Multi-Model Ai Service Provider Added Like: Groq)
 
         {/* Message Feed Card */}
         <div 
@@ -865,12 +1129,8 @@ export default function AIAssistantPage() {
                     <p className="text-sm font-medium whitespace-pre-wrap leading-relaxed">{message.content}</p>
                   ) : (
                     <div>
-                      {/* React Markdown Rich Text Rendering */}
-                      <div className="prose prose-sm max-w-none prose-headings:font-bold prose-headings:text-orange-600 prose-a:text-orange-600 prose-a:underline prose-strong:text-gray-900 prose-ul:my-2 prose-li:my-0.5 prose-p:my-1.5 leading-relaxed text-sm text-gray-800">
-                        <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                          {parsed?.cleanMarkdown || message.content}
-                        </ReactMarkdown>
-                      </div>
+                      {/* Rich AI Markdown Rendering */}
+                      <AiMarkdownRenderer content={parsed?.cleanMarkdown || message.content} />
 
                       {/* 1. Recommended Food Cards (Only for Customer role) */}
                       {userRole !== "restaurant" && parsed?.recommendedFoods && parsed.recommendedFoods.length > 0 && (
@@ -894,9 +1154,12 @@ export default function AIAssistantPage() {
                                   {/* Image */}
                                   <div className="relative h-20 w-20 shrink-0 rounded-xl overflow-hidden bg-gray-100">
                                     <img
-                                      src={food.image || "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=400&q=80"}
+                                      src={food.image || "https://images.unsplash.com/photo-1513104890138-7c749659a591?auto=format&fit=crop&w=400&q=80"}
                                       alt={food.name}
                                       className="h-full w-full object-cover group-hover:scale-105 transition-transform duration-300"
+                                      onError={(e) => {
+                                        (e.target as HTMLImageElement).src = "https://images.unsplash.com/photo-1513104890138-7c749659a591?auto=format&fit=crop&w=400&q=80";
+                                      }}
                                     />
                                     {food.isSpicy && (
                                       <span className="absolute top-1 left-1 bg-red-500/90 text-white p-0.5 rounded-full text-[9px]">
@@ -1102,9 +1365,20 @@ export default function AIAssistantPage() {
 
                       {/* Message Footer Utilities */}
                       <div className="flex items-center justify-between mt-3 pt-2 border-t border-gray-200/60 text-gray-400 text-xs">
-                        <span className="text-[10px]">
-                          {message.timestamp.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
-                        </span>
+                        <div className="flex items-center gap-2">
+                          <span className="text-[10px]">
+                            {message.timestamp.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                          </span>
+                          {message.provider && (
+                            <span
+                              className="font-mono text-[9px] px-1.5 py-0.5 rounded bg-white border border-gray-200 text-gray-600 uppercase tracking-wider flex items-center gap-1 shadow-2xs"
+                              title={`Served by ${message.provider} (${message.model || "default"})`}
+                            >
+                              <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                              {message.provider} • {message.model || "model"}
+                            </span>
+                          )}
+                        </div>
 
                         <div className="flex items-center gap-1.5">
                           {/* Speak TTS */}
@@ -1177,6 +1451,7 @@ export default function AIAssistantPage() {
           )}
         </div>
 
+<<<<<<< HEAD
 
         {/* Input Bar */}
         <div className="mt-3 bg-white rounded-2xl border border-gray-200 shadow-sm p-2 flex items-center gap-2">
@@ -1190,6 +1465,50 @@ export default function AIAssistantPage() {
                 : "bg-gray-100 hover:bg-gray-200 text-gray-600"
             }`}
             title={isListening ? "ভয়েস শোনা হচ্ছে... ক্লিক করে থামান" : "ভয়েস দিয়ে বলুন (বাংলা/English)"}
+=======
+        {/* Mood / Craving Quick Pills */}
+        <div className="mt-3 px-3 py-1.5 bg-white rounded-xl border border-gray-200/80 flex items-center gap-2 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+          <span className="text-[11px] font-bold uppercase tracking-wider text-gray-400 shrink-0 flex items-center gap-1">
+            <Flame className="h-3 w-3 text-orange-500" /> মুড:
+          </span>
+          {[
+            { id: "spicy", label: "🌶️ ঝাল ও স্পাইসি", prompt: "আমার ঝাল ও স্পাইসি খাবার খেতে ইচ্ছে করছে, সেরা কিছু দেখাও।" },
+            { id: "cheat_day", label: "🍔 চিট ডে / ফাস্ট ফুড", prompt: "আজকে চিট ডে! দারুণ কোনো বার্গার বা পিজ্জা সাজেস্ট করো।" },
+            { id: "healthy", label: "🥗 হেলদি / ডায়েট", prompt: "হেলদি ও লো-ক্যালরি ডায়েট ফুড অপশন দেখাও।" },
+            { id: "late_night", label: "🌙 লেট নাইট", prompt: "রাতে খাওয়ার মতো হালকা ও কমফোর্ট স্ন্যাক্স সাজেস্ট করো।" },
+            { id: "budget", label: "💰 বাজেট কম্বো", prompt: "৳৫০০ টাকার মধ্যে ২ জনের জন্য সেরা বাজেট কম্বো সাজিয়ে দাও।" },
+            { id: "party", label: "🎉 পার্টি ও আড্ডা", prompt: "৪-৫ জনের আড্ডার জন্য একটা পারফেক্ট প্ল্যাটটার সাজিয়ে দাও।" },
+          ].map((pill) => {
+            const isSelected = selectedMood === pill.id;
+            return (
+              <button
+                key={pill.id}
+                type="button"
+                onClick={() => {
+                  setSelectedMood(isSelected ? null : pill.id);
+                  handleSendMessage(pill.prompt);
+                }}
+                className={`shrink-0 px-3 py-1 rounded-full text-xs font-bold transition-all cursor-pointer ${
+                  isSelected
+                    ? "bg-orange-500 text-white shadow-xs"
+                    : "bg-gray-100 hover:bg-orange-50 text-gray-700 hover:text-orange-600 border border-gray-200/60"
+                }`}
+              >
+                {pill.label}
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Input Bar & Controls */}
+        <div className="mt-2 bg-white rounded-2xl border border-gray-200 shadow-sm p-2 sm:p-3">
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              handleSendMessage();
+            }}
+            className="flex items-end gap-2"
+>>>>>>> ed99c2d (Added: Multi-Model Ai Service Provider Added Like: Groq)
           >
             {isListening ? <MicOff className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
           </button>
