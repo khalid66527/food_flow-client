@@ -139,6 +139,13 @@ export default function DashboardSideBar() {
           href: "/dashboard/admin/settings",
           icon: Settings,
         },
+        {
+          label: "AI Sales & Multi-Model Config",
+          href: "/dashboard/admin/ai-settings",
+          icon: Sparkles,
+          badge: "AI 2.0",
+          badgeType: "brand",
+        },
       ],
     },
 
