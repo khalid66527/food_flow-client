@@ -28,6 +28,8 @@ import {
 } from "@/lib/location";
 import LocationModal from "@/components/common/LocationModal";
 
+import NavbarNotificationBell from "@/components/notifications/NavbarNotificationBell";
+
 // Better Auth session ba user object-er type definition (Real implementation er jonno)
 type UserRole = "customer" | "restaurant" | "rider" | "admin" | string | null;
 
@@ -108,6 +110,13 @@ export default function Navbar({
   const handleLogout = async () => {
     setIsDropdownOpen(false);
     setIsMobileMenuOpen(false);
+    try {
+      localStorage.removeItem("foodflow_restaurant_data");
+      localStorage.removeItem("foodflow_rider_data");
+      localStorage.removeItem("restaurant_owner_email");
+      localStorage.removeItem("foodflow_has_restaurant");
+      localStorage.removeItem("foodflow_active_notifications");
+    } catch {}
     if (onLogout) {
       await onLogout();
     } else {
@@ -250,6 +259,9 @@ export default function Navbar({
               </span>
             )}
           </button>
+
+          {/* Real-time Order & Delivery Notification Bell with Dropdown */}
+          <NavbarNotificationBell />
 
           {/* Better Auth User Authentication State */}
           {user ? (
